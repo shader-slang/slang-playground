@@ -1,0 +1,31 @@
+<html>
+  <script src="try-slang.js"> </script>
+  <script src="slang-wgsl.js"></script>
+  <head>
+    <title>Try Slang!</title>
+  </head>
+  <body>
+    <h1>Input (Slang)</h1>
+    <textarea id="input" rows="20" cols="90">
+RWStructuredBuffer<int> outputBuffer;
+
+void writeArray(inout float3 a[4])
+{
+    a[0] = float3(1, 1, 1);
+    a[1] = float3(1, 1, 1);
+    a[2] = float3(1, 1, 1);
+    a[3] = float3(1, 1, 1);
+}
+
+[numthreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+    float3 b[4];
+    writeArray(b);
+    outputBuffer[dispatchThreadID.x] = int(b[0].x);
+}
+    </textarea>
+    <h1>Output (WGSL)</h1>
+    <textarea id="output" rows="20" cols="90"></textarea>
+  </body>
+</html>
