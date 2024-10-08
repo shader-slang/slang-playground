@@ -21,13 +21,13 @@ required_variables += TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH
 $(eval $(foreach var,$(required_variables),\
 	$(call ensure_defined,$(var))))
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wgsl.js: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\include\slang.h
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wgsl.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wgsl.h
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wgsl.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wgsl.cpp
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\include\slang.h
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wasm.h
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wasm.cpp
 	em++ \
 	 -I $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\include \
-	 $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wgsl-bindings.cpp \
-	 $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wgsl.cpp \
+	 $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wasm-bindings.cpp \
+	 $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\slang-wasm.cpp \
 	 --bind \
 	 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\lib\libslang.a \
 	 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\lib\libcompiler-core.a \
@@ -39,7 +39,7 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wgsl.js: $(TRY_SLANG_SOURCE_DIRECTORY_P
 
 .PHONY: website_runtime
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\index.html
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wgsl.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\try-slang.js
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)\index.html: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\index.html

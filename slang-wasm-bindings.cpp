@@ -2,7 +2,7 @@
 #include <emscripten/bind.h>
 #include <slang-com-ptr.h>
 #include "try-slang-external-includes-end.h"
-#include "slang-wgsl.h"
+#include "slang-wasm.h"
 
 using namespace emscripten;
 
