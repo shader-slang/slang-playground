@@ -8,15 +8,13 @@ On Windows, set up the environment as follows:
 
     set TRY_SLANG_SOURCE_DIRECTORY_PATH=%userprofile%\source\try-slang
     set TRY_SLANG_TARGET_DIRECTORY_PATH=%userprofile%\target\try-slang
-    set TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH=%userprofile%\source\slang
-
-Now in the same shell, run `emsdk_env.bat` from the Emscripten SDK.
 
 In the following, it is also assumed that GNU Make and Python are in PATH.
 
 ### Slang
 
-Follow the instructions on how to produce a Wasm build in the Slang repository, which is assumed to be checked out under `TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH`.
+`external/slang-wasm.js` and `external/slang-wasm.wasm` are built from the Slang repository, using the `slang-wasm` target.
+If you want to build these yourself, follow the instructions in `docs/building.md` in the Slang repository.
 
 ### Server
 
