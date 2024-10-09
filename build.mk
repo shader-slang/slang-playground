@@ -27,14 +27,23 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.wasm
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\try-slang.js
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\external\slang-wasm.js
-	copy /b /y $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\external\slang-wasm.js $@
+.PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js
+$(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.wasm &:
+	cd $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH) && \
+	 cmake --build --preset emscripten --target slang-wasm
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.wasm: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\external\slang-wasm.wasm
-	copy /b /y $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\external\slang-wasm.wasm $@
+.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js
+	copy /b /y $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js $@
 
+.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.wasm
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.wasm: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.wasm
+	copy /b /y $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.wasm $@
+
+.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\index.html
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)\index.html: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\index.html
 	copy /b /y $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\index.html $@
 
+.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\try-slang.js
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)\try-slang.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\try-slang.js
 	copy /b /y $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\try-slang.js $@
