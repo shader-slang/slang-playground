@@ -19,10 +19,18 @@ var TrySlang = {
                 );
             document.getElementById("output").value = wgslCode;
         } finally {
-            linkedProgram.delete();
-            program.delete();
-            entryPoint.delete();
-            module.delete();
+            if(linkedProgram) {
+                linkedProgram.delete();
+            }
+            if(program) {
+                program.delete();
+            }
+            if(entryPoint) {
+                entryPoint.delete();
+            }
+            if(module) {
+                module.delete();
+            }
         }        
     },
 };
