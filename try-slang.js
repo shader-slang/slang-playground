@@ -4,9 +4,15 @@ var Slang;
 
 var TrySlang = {
     iterate: function() {
+
         try {
             var slangCode = document.getElementById("input").value;
             var module = Slang.loadModuleFromSource(slangCode);
+            if(!module) {
+                var error = Slang.error();
+                console.error(error.type + " error: " + error.message);
+                return;
+            }
             var entryPoint = module.findEntryPointByName("computeMain");
             var components = new Slang.ComponentTypeList();
             components.push_back(module);
@@ -17,6 +23,11 @@ var TrySlang = {
                 linkedProgram.getEntryPointCode(
                     0 /* entryPointIndex */, 0 /* targetIndex */
                 );
+            if(wgslCode == "") {
+                var error = Slang.error();
+                console.error(error.type + " error: " + error.message);
+                return;
+            }
             document.getElementById("output").value = wgslCode;
         } finally {
             if(linkedProgram) {
@@ -31,7 +42,7 @@ var TrySlang = {
             if(module) {
                 module.delete();
             }
-        }        
+        }
     },
 };
 
@@ -39,7 +50,9 @@ var TrySlang = {
 var Module = {
     onRuntimeInitialized: function() {
         Slang = Module;
-        Slang.createGlobalSession();
+        if(Slang.createGlobalSession() != Slang.SLANG_OK) {
+            console.error("Failed to create global session");
+        }
         TrySlang.iterate();
     },
 };
