@@ -11,7 +11,7 @@ var TrySlang = {
             var slangCode = document.getElementById("input").value;
             var module = slangSession.loadModuleFromSource(slangCode);
             if(!module) {
-                var error = Slang.error();
+                var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
                 return;
             }
@@ -26,7 +26,7 @@ var TrySlang = {
                     0 /* entryPointIndex */, 0 /* targetIndex */
                 );
             if(wgslCode == "") {
-                var error = Slang.error();
+                var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
                 return;
             }
@@ -55,13 +55,13 @@ var Module = {
         try {
             globalSlangSession = Slang.createGlobalSession();
             if(!globalSlangSession) {
-                var error = Slang.error();
+                var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
                 return;
             }
             slangSession = globalSlangSession.createSession();
             if(!slangSession) {
-                var error = Slang.error();
+                var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
                 return;
             }
