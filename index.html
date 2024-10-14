@@ -12,9 +12,9 @@ RWStructuredBuffer<int> outputBuffer;
 void writeArray(inout float3 a[4])
 {
     a[0] = float3(1, 1, 1);
-    a[1] = float3(1, 1, 1);
-    a[2] = float3(1, 1, 1);
-    a[3] = float3(1, 1, 1);
+    a[1] = float3(2, 1, 1);
+    a[2] = float3(3, 1, 1);
+    a[3] = float3(4, 1, 1);
 }
 
 [numthreads(4, 1, 1)]
@@ -22,10 +22,12 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     float3 b[4];
     writeArray(b);
-    outputBuffer[dispatchThreadID.x] = int(b[0].x);
+    outputBuffer[dispatchThreadID.x] = int(b[dispatchThreadID.x].x);
 }
     </textarea>
     <h1>Output (WGSL)</h1>
     <textarea id="output" rows="20" cols="90"></textarea>
+    <h1>Compute Result</h1>
+    <textarea id="result" rows="20" cols="40"></textarea>
   </body>
 </html>
