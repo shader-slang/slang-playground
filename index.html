@@ -1,30 +1,46 @@
 <html>
   <script src="try-slang.js"> </script>
   <script src="slang-wasm.js"></script>
+  <script src="util.js"></script>
+  <script src="pass_through.js"></script>
+  <script src="try-slang.js"></script>
+  <script src="slang-wgsl.js"></script>
   <head>
     <title>Try Slang!</title>
   </head>
   <body>
+    <canvas id="canvas" width="640" height="480"></canvas>
     <h1>Input (Slang)</h1>
     <textarea id="input" rows="20" cols="90">
-RWStructuredBuffer<int> outputBuffer;
 
-void writeArray(inout float3 a[4])
-{
-    a[0] = float3(1, 1, 1);
-    a[1] = float3(2, 1, 1);
-    a[2] = float3(3, 1, 1);
-    a[3] = float3(4, 1, 1);
-}
+RWStructuredBuffer<int>               outputBuffer;
+[format("r32ui")] RWTexture2D<uint>   texture;
 
-[numthreads(4, 1, 1)]
+[shader("compute")]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    float3 b[4];
-    writeArray(b);
-    outputBuffer[dispatchThreadID.x] = int(b[dispatchThreadID.x].x);
+    int idx = dispatchThreadID.x * 32 + dispatchThreadID.y;
+    outputBuffer[idx] = idx;
+
+    uint width = 0;
+    uint height = 0;
+    texture.GetDimensions(width, height);
+
+    float2 size = float2(width, height);
+    float2 center = size / 2.0;
+
+    float2 pos = float2(dispatchThreadID.xy);
+
+    float dist = distance(pos, center);
+    float strip = dist / 32.0 % 2.0;
+
+    if (strip < 1.0f)
+        texture[dispatchThreadID.xy] = 0xFF0000FF;
+    else
+        texture[dispatchThreadID.xy] = 0x00FFFFFF;
 }
     </textarea>
+    <button id="run" onclick="onRunCompile()">Run</button>
     <h1>Output (WGSL)</h1>
     <textarea id="output" rows="20" cols="90"></textarea>
     <h1>Compute Result</h1>
