@@ -1,12 +1,10 @@
 'use strict';
 
 var Slang;
-<<<<<<< HEAD
 var globalSlangSession;
 var slangSession;
-=======
 var device;
->>>>>>> 272516a (Render something on browser)
+var context;
 
 async function webgpuInit()
 {
@@ -17,12 +15,17 @@ async function webgpuInit()
         requiredFeatures.push('bgra8unorm-storage')
     }
 
+    if (adapter.features.has('bgra8unorm-storage')) {
+        requiredFeatures.push('float32-filterable')
+    }
+
     device = await adapter?.requestDevice({requiredFeatures});
     if (!device)
     {
         fail('need a browser that supports WebGPU');
         return;
     }
+    context = configContext(device, canvas);
 }
 
 class ComputePipeline
@@ -83,8 +86,6 @@ class ComputePipeline
     createOutput()
     {
         let usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
-        // const workgroupSize = [canvas.width, canvas.height, 1];
-        // const dispatchCount = [1, 1, 1];
         const numberElements = canvas.width * canvas.height;
         const size = numberElements * 4; // int type
         this.outputBuffer = this.device.createBuffer({size, usage});
@@ -96,7 +97,7 @@ class ComputePipeline
         const imageBuffer = this.device.createBuffer({size, usage});
         this.outputImageBuffer = imageBuffer;
 
-        const storageTexture = createOutputTexture(device, canvas.width, canvas.height, 'r32uint');
+        const storageTexture = createOutputTexture(device, canvas.width, canvas.height, 'r32float');
         this.outputTexture = storageTexture;
 
     }
@@ -104,13 +105,12 @@ class ComputePipeline
     setupComputePipeline()
     {
         this.createOutput();
-        this.createComputePipelineLayout(this.shaderModule, 'r32uint');
+        this.createComputePipelineLayout();
     }
 }
 
 function render(shaderCode)
 {
-    // const context = configContext(device, canvas);
     const module = device.createShaderModule({code:shaderCode});
     computePipeline.createPipeline(module);
 
@@ -118,20 +118,33 @@ function render(shaderCode)
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
-    pass.setPipeline(computePipeline.pipeline);
     pass.setBindGroup(0, computePipeline.bindGroup);
+    pass.setPipeline(computePipeline.pipeline);
     pass.dispatchWorkgroups(canvas.width, canvas.height);
     pass.end();
 
+    // Get a WebGPU context from the canvas and configure it
+
+    var renderPassDescriptor = passThroughPipeline.createRenderPassDesc();
+    renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
+    const renderPass = encoder.beginRenderPass(renderPassDescriptor);
+
+    renderPass.setBindGroup(0, passThroughPipeline.bindGroup);
+    renderPass.setPipeline(passThroughPipeline.pipeline);
+    renderPass.draw(6);  // call our vertex shader 6 times.
+    renderPass.end();
+
+    // copy output buffer back
     encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
 
-    const sourceTex = { texture: computePipeline.outputTexture};
-    const dstBuffer = {
-            bytesPerRow: canvas.width * 4,
-            rowPerImage: canvas.height,
-            buffer: computePipeline.outputImageBuffer
-        };
-    encoder.copyTextureToBuffer(sourceTex, dstBuffer, {width: canvas.width, height: canvas.height});
+    // TODO: Remove this code because we can display the texture to canvas later by using above pass through pipeline
+    // const sourceTex = { texture: computePipeline.outputTexture};
+    // const dstBuffer = {
+    //         bytesPerRow: canvas.width * 4,
+    //         rowPerImage: canvas.height,
+    //         buffer: computePipeline.outputImageBuffer
+    //     };
+    // encoder.copyTextureToBuffer(sourceTex, dstBuffer, {width: canvas.width, height: canvas.height});
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
@@ -145,19 +158,19 @@ async function waitForComplete(outputBufferRead, outputImageBuffer)
         outputBufferRead.mapAsync(GPUMapMode.READ),
     ]);
 
-    await Promise.all([
-        outputImageBuffer.mapAsync(GPUMapMode.READ),
-    ]);
+    // await Promise.all([
+    //     outputImageBuffer.mapAsync(GPUMapMode.READ),
+    // ]);
 
     const output = new Int32Array(outputBufferRead.getMappedRange());
 
-    const outputImage = new Uint32Array(outputImageBuffer.getMappedRange());
+    // const outputImage = new Uint32Array(outputImageBuffer.getMappedRange());
 
     outputResult(output);
-    copyToCanvas(outputImage);
+    // copyToCanvas(outputImage);
 
     outputBufferRead.unmap();
-    outputImageBuffer.unmap();
+    // outputImageBuffer.unmap();
 }
 
 function copyToCanvas(outputImage)
@@ -246,20 +259,30 @@ const SLANG_STAGE_FRAGMENT = 5;
 const SLANG_STAGE_COMPUTE = 6;
 
 var computePipeline;
+var passThroughPipeline;
+
 var onRunCompile = () => {
-    if (device && !computePipeline)
+    if (!device)
+        return;
+
+    if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);
         computePipeline.setupComputePipeline();
     }
 
+    if (!passThroughPipeline)
+    {
+        passThroughPipeline = new GraphicsPipeline(device);
+        const shaderModule = device.createShaderModule({code: passThroughshaderCode});
+        const inputTexture = computePipeline.outputTexture;
+        passThroughPipeline.createPipeline(shaderModule, inputTexture);
+    }
+
+    // compile the compute shader code from input text area
     var shaderSource = document.getElementById("input").value;
     var wgslCode = TrySlang.compile(shaderSource, "computeMain", SLANG_STAGE_COMPUTE);
-
-    var test = document.getElementById("passthrough_shader");
-
-    var wgsl_vert = TrySlang.compile(passThroughshaderCode, "vertexMain", SLANG_STAGE_VERTEX);
-    var wgsl_frag = TrySlang.compile(passThroughshaderCode, "fragMain", SLANG_STAGE_FRAGMENT);
+    document.getElementById("output").value = wgslCode;
 
     render(wgslCode);
     waitForComplete(computePipeline.outputBufferRead, computePipeline.outputImageBuffer);
@@ -294,5 +317,6 @@ var Module = {
             }
         }
         webgpuInit();
+
     },
 };

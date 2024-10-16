@@ -14,7 +14,8 @@
     <textarea id="input" rows="20" cols="90">
 
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32ui")] RWTexture2D<uint>   texture;
+[format("r32f")] RWTexture2D<float>   texture;
+
 
 [shader("compute")]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
@@ -34,10 +35,13 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     float dist = distance(pos, center);
     float strip = dist / 32.0 % 2.0;
 
+    uint color = 0;
     if (strip < 1.0f)
-        texture[dispatchThreadID.xy] = 0xFF0000FF;
+        color = 0xFF0000FF;
     else
-        texture[dispatchThreadID.xy] = 0x00FFFFFF;
+        color = 0x00FFFFFF;
+
+    texture[dispatchThreadID.xy] = float(color);
 }
     </textarea>
     <button id="run" onclick="onRunCompile()">Run</button>
