@@ -1,9 +1,5 @@
 'use strict';
 
-const SLANG_STAGE_VERTEX = 1;
-const SLANG_STAGE_FRAGMENT = 5;
-const SLANG_STAGE_COMPUTE = 6;
-
 var Slang;
 var globalSlangSession;
 var slangSession;
@@ -14,6 +10,10 @@ var passThroughPipeline;
 
 var monacoEditor;
 var outputCodeArea;
+
+const SLANG_STAGE_VERTEX = 1;
+const SLANG_STAGE_FRAGMENT = 5;
+const SLANG_STAGE_COMPUTE = 6;
 
 const defaultShaderCode = `
 RWStructuredBuffer<int>               outputBuffer;
@@ -111,33 +111,12 @@ async function waitForComplete(outputBufferRead)
 
     const output = new Int32Array(outputBufferRead.getMappedRange());
 
-    outputResult(output);
-    outputBufferRead.unmap();
+    outputResult(output).then(() => {
+        outputBufferRead.unmap()
+    });
 }
 
-function copyToCanvas(outputImage)
-{
-    var ctx = canvas.getContext("2d");;
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < outputImage.length; i++)
-    {
-        var pix = outputImage[i];
-        const r  = ((pix & 0xFF000000) >> 24);
-        const g  = ((pix & 0x00FF0000) >> 16);
-        const b  = ((pix & 0x0000FF00) >> 8);
-        const a  = ((pix & 0x000000FF) >> 0);
-        const pixel = new Uint8Array([r, g, b, a]);
-
-        data[i * 4] =     pixel[0];
-        data[i * 4 + 1] = pixel[1];
-        data[i * 4 + 2] = pixel[2];
-        data[i * 4 + 3] = 255;
-    }
-    ctx.putImageData(imageData, 0, 0);
-}
-
-function outputResult(output)
+async function outputResult(output)
 {
     var result = "";
     for (let i = 0; i < output.length; i++)
@@ -152,14 +131,28 @@ var TrySlang = {
     compile: function(shaderSource, entryPointName, stage) {
 
         try {
-            var slangCode = document.getElementById("input").value;
-            var module = slangSession.loadModuleFromSource(slangCode);
+            slangSession = globalSlangSession.createSession();
+            if(!slangSession) {
+                var error = Slang.getLastError();
+                console.error(error.type + " error: " + error.message);
+                outputCodeArea.setValue(error.type + " error: " + error.message);
+                return null;
+            }
+
+            var module = slangSession.loadModuleFromSource(shaderSource);
             if(!module) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                return;
+                outputCodeArea.setValue(error.type + " error: " + error.message);
+                return null;
             }
-            var entryPoint = module.findEntryPointByName(entryPointName, stage);
+            var entryPoint = module.findAndCheckEntryPoint(entryPointName, stage);
+            if(!entryPoint) {
+                var error = Slang.getLastError();
+                console.error(error.type + " error: " + error.message);
+                outputCodeArea.setValue(error.type + " error: " + error.message);
+                return null;
+            }
             var components = new Slang.ComponentTypeList();
             components.push_back(module);
             components.push_back(entryPoint);
@@ -172,7 +165,8 @@ var TrySlang = {
             if(wgslCode == "") {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                return;
+                outputCodeArea.setValue(error.type + " error: " + error.message);
+                return null;
             }
         } catch (e) {
             console.log(e);
@@ -190,6 +184,9 @@ var TrySlang = {
             }
             if(module) {
                 module.delete();
+            }
+            if (slangSession) {
+                slangSession.delete();
             }
             return wgslCode;
         }
@@ -218,6 +215,9 @@ var onRunCompile = () => {
     // compile the compute shader code from input text area
     var shaderSource = monacoEditor.getValue();
     var wgslCode = TrySlang.compile(shaderSource, "computeMain", SLANG_STAGE_COMPUTE);
+    if (!wgslCode)
+        return;
+
     outputCodeArea.setValue(wgslCode);
 
     render(wgslCode);
@@ -255,22 +255,10 @@ var Module = {
                 console.error(error.type + " error: " + error.message);
                 return;
             }
-            slangSession = globalSlangSession.createSession();
-            if(!slangSession) {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                return;
-            }
-
-            TrySlang.iterate();
-
-        } finally {
-            if(globalSlangSession) {
-                globalSlangSession.delete();
-            }
-            if(slangSession) {
-                slangSession.delete();
-            }
+        } catch (e) {
+            console.log(e);
+            document.getElementById("WebGPU-status-bar").innerHTML = "Failed to initialize Slang Compiler";
+            return;
         }
         webgpuInit();
 

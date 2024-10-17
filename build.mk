@@ -44,10 +44,6 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
 
-ifneq ($(OS_NAME),Windows)
-website_runtime: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/test
-endif
-
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm &:
 	cd $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH) && \
@@ -78,7 +74,3 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js: $(TRY_SLANG_SOURCE_DIRECTORY
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js
 	cp $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js $@
 
-ifneq ($(OS_NAME),Windows)
-$(TRY_SLANG_SOURCE_DIRECTORY_PATH)/test: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/test.o $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wgsl-cpp.o
-	g++ -g $^ -o $@ -L $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build/Debug/lib/ -lslang -Wl,-rpath $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build/Debug/lib/
-endif

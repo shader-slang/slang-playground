@@ -3,12 +3,13 @@
 #include <string>
 #include <slang.h>
 #include <slang-com-ptr.h>
-#include "slang-wgsl.h"
+#include "slang-wasm.h"
 
 
 void test()
 {
-    slang::wgsl::createGlobalSession();
+    slang::wgsl::GlobalSession* globalSession = slang::wgsl::createGlobalSession();
+    slang::wgsl::Session* session = globalSession->createSession();
 
     std::string source1 = R"(
 
@@ -39,14 +40,14 @@ void test()
         }
     )";
 
-    slang::wgsl::Module* module1 = slang::wgsl::loadModuleFromSource(source1.c_str());
+    slang::wgsl::Module* module1 = session->loadModuleFromSource(source1.c_str());
     if (module1 == nullptr)
     {
         std::cout << "Failed to load module1" << std::endl;
         return;
     }
 
-    slang::wgsl::EntryPoint* entryPoint1 = module1->findEntryPointByName("computeMain", SLANG_STAGE_COMPUTE);
+    slang::wgsl::EntryPoint* entryPoint1 = module1->findEntryPointByName("computeMain");
     if (entryPoint1 == nullptr)
     {
         std::cout << "Failed to find entry point in module 1" << std::endl;
@@ -54,14 +55,14 @@ void test()
     }
 
 
-    slang::wgsl::Module* module2 = slang::wgsl::loadModuleFromSource(source2.c_str());
+    slang::wgsl::Module* module2 = session->loadModuleFromSource(source2.c_str());
     if (module2 == nullptr)
     {
         std::cout << "Failed to load module1" << std::endl;
         return;
     }
 
-    slang::wgsl::EntryPoint* entryPoint2 = module2->findEntryPointByName("vertexMain", SLANG_STAGE_VERTEX);
+    slang::wgsl::EntryPoint* entryPoint2 = module2->findEntryPointByName("vertexMain");
     if (entryPoint2 == nullptr)
     {
         std::cout << "Failed to find entry point in module 1" << std::endl;
