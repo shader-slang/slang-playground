@@ -1,53 +1,73 @@
 <html>
   <script src="try-slang.js"> </script>
   <script src="slang-wasm.js"></script>
+<style> 
+textarea {
+  width: 100%;
+  height: 100%;
+  padding: 12px 20px;
+  box-sizing: border-box;
+  border: 2px solid #ccc;
+  border-radius: 4px;
+  background-color: #121212;
+  color: #ffffff;
+  font-size: 16px;
+  resize: none;
+}
+</style>
+  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+  <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+  <script>
+          require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+          window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+          let proxy = URL.createObjectURL(new Blob([`
+              self.MonacoEnvironment = {
+                  baseUrl: 'https://unpkg.com/monaco-editor@latest/min/'
+              };
+              importScripts('https://unpkg.com/monaco-editor@latest/min/vs/base/worker/workerMain.js');
+          `], { type: 'text/javascript' }));
+  </script>
   <script src="util.js"></script>
   <script src="pass_through.js"></script>
+  <script src="compute.js"></script>
   <script src="try-slang.js"></script>
   <script src="slang-wgsl.js"></script>
   <head>
     <title>Try Slang!</title>
   </head>
   <body>
-    <canvas id="canvas" width="640" height="480"></canvas>
-    <h1>Input (Slang)</h1>
-    <textarea id="input" rows="20" cols="90">
+    <div class="w3-container w3-black w3-teal">
 
-RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+      <div class="w3-row-padding">
+        <div id="WebGPU-status-bar" style="width: 100%; height: 50px;"></div>
+      </div>
 
+      <div class="w3-row-padding">
+        <div class="w3-half">
+              <h1>Input (Slang)</h1>
+              <div id="container" style="width: 1200px; height: 800px; border: 1px solid grey"></div>
+                <!-- OR ANY OTHER AMD LOADER HERE INSTEAD OF loader.js -->
+                <script> loadEditor(false, 'container', defaultShaderCode); </script>
 
-[shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
-{
-    int idx = dispatchThreadID.x * 32 + dispatchThreadID.y;
-    outputBuffer[idx] = idx;
+              <div style="margin:auto 45%">
+                <button class="w3-btn w3-round w3-orange" id="run-btn" onclick="onRunCompile()" disabled>Run</button>
+              </div>
 
-    uint width = 0;
-    uint height = 0;
-    texture.GetDimensions(width, height);
+              <h1>Compute Result</h1>
+              <div id="container" style="width: 1200px; height: 300px;">
+                <textarea readonly id="result"></textarea>
+              </div>
+        </div>
 
-    float2 size = float2(width, height);
-    float2 center = size / 2.0;
+        <div class="w3-half">
+            <canvas id="canvas" width="1200" height="768"></canvas>
+            <h1>Output WGSL</h1>
+            <div id="outputContainer" style="width: 1200px; height: 600px; border: 1px solid grey"></div>
+            <script> loadEditor(true, 'outputContainer', ''); </script>
+        </div>
 
-    float2 pos = float2(dispatchThreadID.xy);
+      </div>
+    </div>
 
-    float dist = distance(pos, center);
-    float strip = dist / 32.0 % 2.0;
-
-    uint color = 0;
-    if (strip < 1.0f)
-        color = 0xFF0000FF;
-    else
-        color = 0x00FFFFFF;
-
-    texture[dispatchThreadID.xy] = float(color);
-}
-    </textarea>
-    <button id="run" onclick="onRunCompile()">Run</button>
-    <h1>Output (WGSL)</h1>
-    <textarea id="output" rows="20" cols="90"></textarea>
-    <h1>Compute Result</h1>
-    <textarea id="result" rows="20" cols="40"></textarea>
   </body>
 </html>

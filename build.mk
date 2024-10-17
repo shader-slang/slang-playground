@@ -42,6 +42,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/try-slang.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
 
 ifneq ($(OS_NAME),Windows)
 website_runtime: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/test
@@ -73,6 +74,9 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/u
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/pass_through.js
 	$(COPY) $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/pass_through.js $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js
+	cp $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js $@
 
 ifneq ($(OS_NAME),Windows)
 $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/test: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/test.o $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wgsl-cpp.o

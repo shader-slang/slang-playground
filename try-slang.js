@@ -1,20 +1,60 @@
 'use strict';
 
+const SLANG_STAGE_VERTEX = 1;
+const SLANG_STAGE_FRAGMENT = 5;
+const SLANG_STAGE_COMPUTE = 6;
+
 var Slang;
 var globalSlangSession;
 var slangSession;
 var device;
 var context;
+var computePipeline;
+var passThroughPipeline;
+
+var monacoEditor;
+var outputCodeArea;
+
+const defaultShaderCode = `
+RWStructuredBuffer<int>               outputBuffer;
+[format("r32f")] RWTexture2D<float>   texture;
+
+
+[shader("compute")]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+    int idx = dispatchThreadID.x * 32 + dispatchThreadID.y;
+    outputBuffer[idx] = idx;
+
+    uint width = 0;
+    uint height = 0;
+    texture.GetDimensions(width, height);
+
+    float2 size = float2(width, height);
+    float2 center = size / 2.0;
+
+    float2 pos = float2(dispatchThreadID.xy);
+
+    float dist = distance(pos, center);
+    float strip = dist / 32.0 % 2.0;
+
+    uint color = 0;
+    if (strip < 1.0f)
+        color = 0xFF0000FF;
+    else
+        color = 0x00FFFFFF;
+
+    texture[dispatchThreadID.xy] = float(color);
+}
+`;
 
 async function webgpuInit()
 {
     const adapter = await navigator.gpu?.requestAdapter();
 
     const requiredFeatures = [];
-    if (adapter.features.has('bgra8unorm-storage')) {
-        requiredFeatures.push('bgra8unorm-storage')
-    }
 
+    // This feature is not necessary if we can support write-only texture in slang.
     if (adapter.features.has('bgra8unorm-storage')) {
         requiredFeatures.push('float32-filterable')
     }
@@ -22,92 +62,12 @@ async function webgpuInit()
     device = await adapter?.requestDevice({requiredFeatures});
     if (!device)
     {
-        fail('need a browser that supports WebGPU');
+        console.log('need a browser that supports WebGPU');
         return;
     }
     context = configContext(device, canvas);
 }
 
-class ComputePipeline
-{
-    pipeline;
-    pipelineLayout;
-    outputBuffer;
-    outputTexture;
-    outputImageBuffer; // will be deleted once we have graphics render pass
-    device;
-    bindGroup;
-
-    constructor(device)
-    {
-        this.device = device;
-    }
-
-    createComputePipelineLayout()
-    {
-        // We fill fix our bind group layout to have 2 entries in our playground.
-        const bindGroupLayoutDescriptor = {
-            lable: 'compute pipeline bind group layout',
-            entries: [
-                {binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'storage'}},
-                {binding: 1, visibility: GPUShaderStage.COMPUTE, storageTexture: {access: "read-write", format: this.outputTexture.format}},
-            ],
-        };
-
-        const bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
-
-        this.pipelineLayout = layout;
-    }
-
-    createPipeline(shaderModule)
-    {
-        const pipeline = device.createComputePipeline({
-            label: 'compute pipeline',
-            layout: this.pipelineLayout,
-            compute: {module: shaderModule},
-            });
-
-        const bindGroup = device.createBindGroup({
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [
-                    { binding: 0, resource: { buffer: this.outputBuffer }},
-                    { binding: 1, resource: this.outputTexture.createView() },
-                    ],
-            });
-
-        this.bindGroup = bindGroup;
-        this.pipeline = pipeline;
-    }
-
-    // All out compute pipeline will have 2 outputs:
-    // 1. A buffer that will be used to read the result back to the CPU
-    // 2. A texture that will be used to display the result on the screen
-    createOutput()
-    {
-        let usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
-        const numberElements = canvas.width * canvas.height;
-        const size = numberElements * 4; // int type
-        this.outputBuffer = this.device.createBuffer({size, usage});
-
-        usage = GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST;
-        const outputBufferRead = this.device.createBuffer({size, usage});
-        this.outputBufferRead = outputBufferRead;
-
-        const imageBuffer = this.device.createBuffer({size, usage});
-        this.outputImageBuffer = imageBuffer;
-
-        const storageTexture = createOutputTexture(device, canvas.width, canvas.height, 'r32float');
-        this.outputTexture = storageTexture;
-
-    }
-
-    setupComputePipeline()
-    {
-        this.createOutput();
-        this.createComputePipelineLayout();
-    }
-}
 
 function render(shaderCode)
 {
@@ -137,40 +97,22 @@ function render(shaderCode)
     // copy output buffer back
     encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
 
-    // TODO: Remove this code because we can display the texture to canvas later by using above pass through pipeline
-    // const sourceTex = { texture: computePipeline.outputTexture};
-    // const dstBuffer = {
-    //         bytesPerRow: canvas.width * 4,
-    //         rowPerImage: canvas.height,
-    //         buffer: computePipeline.outputImageBuffer
-    //     };
-    // encoder.copyTextureToBuffer(sourceTex, dstBuffer, {width: canvas.width, height: canvas.height});
-
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 }
 
-async function waitForComplete(outputBufferRead, outputImageBuffer)
+async function waitForComplete(outputBufferRead)
 {
     // Read the results
     await Promise.all([
         outputBufferRead.mapAsync(GPUMapMode.READ),
     ]);
 
-    // await Promise.all([
-    //     outputImageBuffer.mapAsync(GPUMapMode.READ),
-    // ]);
-
     const output = new Int32Array(outputBufferRead.getMappedRange());
 
-    // const outputImage = new Uint32Array(outputImageBuffer.getMappedRange());
-
     outputResult(output);
-    // copyToCanvas(outputImage);
-
     outputBufferRead.unmap();
-    // outputImageBuffer.unmap();
 }
 
 function copyToCanvas(outputImage)
@@ -254,12 +196,6 @@ var TrySlang = {
     },
 };
 
-const SLANG_STAGE_VERTEX = 1;
-const SLANG_STAGE_FRAGMENT = 5;
-const SLANG_STAGE_COMPUTE = 6;
-
-var computePipeline;
-var passThroughPipeline;
 
 var onRunCompile = () => {
     if (!device)
@@ -280,12 +216,32 @@ var onRunCompile = () => {
     }
 
     // compile the compute shader code from input text area
-    var shaderSource = document.getElementById("input").value;
+    var shaderSource = monacoEditor.getValue();
     var wgslCode = TrySlang.compile(shaderSource, "computeMain", SLANG_STAGE_COMPUTE);
-    document.getElementById("output").value = wgslCode;
+    outputCodeArea.setValue(wgslCode);
 
     render(wgslCode);
-    waitForComplete(computePipeline.outputBufferRead, computePipeline.outputImageBuffer);
+    waitForComplete(computePipeline.outputBufferRead);
+
+    var code=monacoEditor.getValue();
+    console.log(code);
+}
+
+
+function loadEditor(readOnlyMode = false, containerId, preloadCode) {
+
+    require(["vs/editor/editor.main"], function () {
+      var editor = monaco.editor.create(document.getElementById(containerId), {
+                  value: preloadCode,
+                  language: 'javascript',
+                  theme: 'vs-dark',
+                  readOnly: readOnlyMode
+              });
+        if (readOnlyMode)
+            outputCodeArea = editor;
+        else
+            monacoEditor = editor;
+    });
 }
 
 
@@ -318,5 +274,16 @@ var Module = {
         }
         webgpuInit();
 
+        var promise = webgpuInit();
+        promise.then(() => {
+            if (device)
+            {
+                document.getElementById("run-btn").disabled = false;
+            }
+            else
+            {
+                document.getElementById("WebGPU-status-bar").innerHTML = "Browser does not support WebGPU";
+            }
+        });
     },
 };
