@@ -51,6 +51,11 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 async function webgpuInit()
 {
     const adapter = await navigator.gpu?.requestAdapter();
+    if (!adapter)
+    {
+        console.log('need a browser that supports WebGPU');
+        return;
+    }
 
     const requiredFeatures = [];
 
