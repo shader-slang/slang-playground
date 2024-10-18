@@ -59,7 +59,7 @@ class ComputePipeline
     createOutput()
     {
         let usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
-        const numberElements = canvas.width * canvas.height;
+        const numberElements = canvas.clientWidth * canvas.clientHeight;
         const size = numberElements * 4; // int type
         this.outputBuffer = this.device.createBuffer({size, usage});
 
@@ -70,7 +70,7 @@ class ComputePipeline
         const imageBuffer = this.device.createBuffer({size, usage});
         this.outputImageBuffer = imageBuffer;
 
-        const storageTexture = createOutputTexture(device, canvas.width, canvas.height, 'r32float');
+        const storageTexture = createOutputTexture(device, canvas.clientWidth, canvas.clientHeight, 'r32float');
         this.outputTexture = storageTexture;
 
     }

@@ -1,28 +1,122 @@
+<!DOCTYPE html>
 <html>
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-textarea {
-  width: 100%;
-  height: 100%;
-  padding: 12px 20px;
+* {
   box-sizing: border-box;
-  border: 2px solid #ccc;
-  border-radius: 4px;
-  background-color: #121212;
-  color: #ffffff;
-  font-size: 16px;
-  resize: none;
 }
+
+body {
+  font-family: Arial;
+  margin: 0;
+}
+
+.header {
+  padding: 10px;
+  text-align: center;
+  background: #1abc9c;
+  color: white;
+}
+
+.monaco-editor {
+    position: absolute !important;
+}
+
+.navbar {
+  display: flex;
+  background-color: #111;
+}
+
+.bannerbar {
+  display: flex;
+  background-color: #ddd;
+}
+
+.navbar a {
+  color: white;
+  padding: 14px 20px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.navbar a:hover {
+  background-color: orange;
+  color: black;
+}
+
+.mainContainer {
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+}
+
+.workSpace {
+  flex: 60%;
+  background-color: #333;
+  border: 2px solid red;
+  flex-direction: column;
+}
+
+.codingSpace {
+  background-color: #aaa;
+  margin: 10px;
+  border: 2px solid red;
+}
+
+.diagnosticSpace {
+  background-color: #aaa;
+  margin: 10px;
+  border: 2px solid red;
+}
+
+.resultSpace {
+  flex: 40%;
+  background-color: #777;
+  border: 2px solid red;
+  flex-direction: column;
+}
+
+.outputSpace {
+  background-color: #aaa;
+  margin: 10px;
+  border: 2px solid red;
+}
+
+.codeGenSpace {
+  background-color: #aaa;
+  padding: 10px;
+  margin: 10px;
+  border: 2px solid red;
+}
+
+.renderCanvas {
+  background-color: #aaa;
+  border: 2px solid red;
+  display: block;  /* make the canvas act like a block   */
+  width: 100%;     /* make the canvas fill its container */
+  height: 100%;
+}
+
+/* Footer */
+.footer {
+  padding: 20px;
+  text-align: center;
+  background: #ddd;
+}
+
 </style>
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-  <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+  <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
   <script>
-          require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+          require.config({ paths: { 'vs': 'https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs' }});
           window.MonacoEnvironment = { getWorkerUrl: () => proxy };
           let proxy = URL.createObjectURL(new Blob([`
               self.MonacoEnvironment = {
-                  baseUrl: 'https://unpkg.com/monaco-editor@latest/min/'
+                  baseUrl: 'https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/'
               };
-              importScripts('https://unpkg.com/monaco-editor@latest/min/vs/base/worker/workerMain.js');
+              importScripts('https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/base/worker/workerMain.js');
           `], { type: 'text/javascript' }));
   </script>
   <script src="util.js"></script>
@@ -30,42 +124,48 @@ textarea {
   <script src="compute.js"></script>
   <script src="try-slang.js"></script>
   <script src="slang-wasm.js"></script>
-  <head>
-    <title>Try Slang!</title>
-  </head>
-  <body>
-    <div class="w3-container w3-black w3-teal">
+</head>
+<body>
 
-      <div class="w3-row-padding">
-        <div id="WebGPU-status-bar" style="width: 100%; height: 50px;"></div>
-      </div>
+<!-- Header -->
+<div class="header">
+  <h2>Slang Playground</h2>
+</div>
 
-      <div class="w3-row-padding">
-        <div class="w3-half">
-              <h1>Input (Slang)</h1>
-              <div id="container" style="width: 1200px; height: 800px; border: 1px solid grey"></div>
-                <!-- OR ANY OTHER AMD LOADER HERE INSTEAD OF loader.js -->
-                <script> loadEditor(false, 'container', defaultShaderCode); </script>
 
-              <div style="margin:auto 45%">
-                <button class="w3-btn w3-round w3-orange" id="run-btn" onclick="onRunCompile()" disabled>Run</button>
-              </div>
+<div class="bannerbar" id="WebGPU-status-bar">
+  WebGPU status
+</div>
 
-              <h1>Compute Result</h1>
-              <div id="container" style="width: 1200px; height: 300px;">
-                <textarea readonly id="result"></textarea>
-              </div>
-        </div>
+<!-- Navigation Bar -->
+<div class="navbar">
+  <button style="background-color: orange" id="run-btn" onclick="onRunCompile()" disabled>Run</button>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+</div>
 
-        <div class="w3-half">
-            <canvas id="canvas" width="1200" height="768"></canvas>
-            <h1>Output WGSL</h1>
-            <div id="outputContainer" style="width: 1200px; height: 600px; border: 1px solid grey"></div>
-            <script> loadEditor(true, 'outputContainer', ''); </script>
-        </div>
+<div class="mainContainer">
+  <div class="workSpace" style="height:1200px;">
+    <div class="codingSpace" style="height:800px" id="codeEditor"></div>
+      <script> loadEditor(false, 'codeEditor', defaultShaderCode); </script>
 
-      </div>
+    <div class="diagnosticSpace" style="height:320px" id="diagnostics"></div>
+      <script> loadEditor(true, 'diagnostics', "diagnostic space"); </script>
+  </div>
+
+  <div class="resultSpace">
+    <div class="outputSpace" style="height:640px" id="output">
+      <canvas class="renderCanvas" id="canvas"></canvas>
     </div>
+    <div class="codeGenSpace"style="height:480px" id="codeGen"></div>
+      <script> loadEditor(true, 'codeGen', "out generation space"); </script>
+  </div>
+</div>
 
-  </body>
+
+
+
+</body>
 </html>

@@ -9,7 +9,8 @@ var computePipeline;
 var passThroughPipeline;
 
 var monacoEditor;
-var outputCodeArea;
+var diagnosticsArea;
+var codeGenArea;
 
 const SLANG_STAGE_VERTEX = 1;
 const SLANG_STAGE_FRAGMENT = 5;
@@ -71,6 +72,21 @@ async function webgpuInit()
         return;
     }
     context = configContext(device, canvas);
+    // window.addEventListener('resize', resizeCanvas);
+    console.log(canvas.clientWidth);
+    console.log(canvas.clientHeight);
+}
+
+function resizeCanvas()
+{
+    // var canvasParent = document.getElementById("output");
+    // canvas.width = canvasParent.offsetWidth;
+    // canvas.height = canvasParent.offsetHeight;
+    // const devicePixelRatio = window.devicePixelRatio || 1;
+    // let currentCanvasWidth = canvas.clientWidth * devicePixelRatio;
+    // let currentCanvasHeight = canvas.clientHeight * devicePixelRatio;
+    // canvas.width = currentCanvasWidth;
+    // canvas.height = currentCanvasHeight;
 }
 
 
@@ -85,7 +101,7 @@ function render(shaderCode)
 
     pass.setBindGroup(0, computePipeline.bindGroup);
     pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(canvas.width, canvas.height);
+    pass.dispatchWorkgroups(canvas.clientWidth, canvas.clientHeight);
     pass.end();
 
     // Get a WebGPU context from the canvas and configure it
@@ -123,13 +139,15 @@ async function waitForComplete(outputBufferRead)
 
 async function outputResult(output)
 {
-    var result = "";
-    for (let i = 0; i < output.length; i++)
-    {
-         result += output[i] + '\n';
-    }
-
-    document.getElementById("result").value = result;
+    // TODO: Optional - output the printable result to the output area
+    // we don't have such area in the current UI
+    // var result = "";
+    // for (let i = 0; i < output.length; i++)
+    // {
+    //      result += output[i] + '\n';
+    // }
+    //
+    // document.getElementById("result").value = result;
 }
 
 var TrySlang = {
@@ -140,7 +158,7 @@ var TrySlang = {
             if(!slangSession) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
 
@@ -148,14 +166,14 @@ var TrySlang = {
             if(!module) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
             var entryPoint = module.findAndCheckEntryPoint(entryPointName, stage);
             if(!entryPoint) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
             var components = new Slang.ComponentTypeList();
@@ -170,7 +188,7 @@ var TrySlang = {
             if(wgslCode == "") {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
         } catch (e) {
@@ -223,7 +241,7 @@ var onRunCompile = () => {
     if (!wgslCode)
         return;
 
-    outputCodeArea.setValue(wgslCode);
+    codeGenArea.setValue(wgslCode);
 
     render(wgslCode);
     waitForComplete(computePipeline.outputBufferRead);
@@ -240,12 +258,16 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
                   value: preloadCode,
                   language: 'javascript',
                   theme: 'vs-dark',
-                  readOnly: readOnlyMode
+                  readOnly: readOnlyMode,
+                  automaticLayout: true,
               });
-        if (readOnlyMode)
-            outputCodeArea = editor;
-        else
+
+        if (containerId == "codeEditor")
             monacoEditor = editor;
+        else if (containerId == "diagnostics")
+            diagnosticsArea = editor;
+        else if (containerId == "codeGen")
+            codeGenArea = editor;
     });
 }
 
