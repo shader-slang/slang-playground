@@ -12,6 +12,8 @@
 body {
   font-family: Arial;
   margin: 0;
+  height: 100%;
+  min-height: 50px;
 }
 
 .header {
@@ -47,48 +49,64 @@ body {
   color: black;
 }
 
+.screenFitter {
+    display: flex;
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
 .mainContainer {
+  flex: 100%;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   flex-direction: row;
+  border: 2px solid red;
 }
 
 .workSpace {
   flex: 60%;
+  display: flex;
   background-color: #333;
   border: 2px solid red;
   flex-direction: column;
 }
 
 .codingSpace {
+  flex: 70%;
   background-color: #aaa;
-  margin: 10px;
   border: 2px solid red;
+  margin: 0.5% 0.5% 0.25% 0.5%;
 }
 
 .diagnosticSpace {
+  flex: 30%;
   background-color: #aaa;
-  margin: 10px;
+  margin: 0.25% 0.5% 0.5% 0.5%;
   border: 2px solid red;
 }
 
 .resultSpace {
   flex: 40%;
+  display: flex;
   background-color: #777;
   border: 2px solid red;
   flex-direction: column;
 }
 
 .outputSpace {
+  flex: 60%;
   background-color: #aaa;
-  margin: 10px;
+  margin: 0.5% 0.5% 0.25% 0.5%;
   border: 2px solid red;
 }
 
 .codeGenSpace {
+  flex: 40%;
   background-color: #aaa;
-  padding: 10px;
   margin: 10px;
+  margin: 0.25% 0.5% 0.5% 0.5%;
   border: 2px solid red;
 }
 
@@ -127,11 +145,7 @@ body {
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-  <h2>Slang Playground</h2>
-</div>
-
+<div class="screenFitter">
 
 <div class="bannerbar" id="WebGPU-status-bar">
   WebGPU status
@@ -146,24 +160,25 @@ body {
   <a href="#">Link</a>
 </div>
 
-<div class="mainContainer">
-  <div class="workSpace" style="height:1200px;">
-    <div class="codingSpace" style="height:800px" id="codeEditor"></div>
-      <script> loadEditor(false, 'codeEditor', defaultShaderCode); </script>
+  <div class="mainContainer">
+    <div class="workSpace">
+      <div class="codingSpace" id="codeEditor"></div>
+        <script> loadEditor(false, 'codeEditor', defaultShaderCode); </script>
 
-    <div class="diagnosticSpace" style="height:320px" id="diagnostics"></div>
-      <script> loadEditor(true, 'diagnostics', "diagnostic space"); </script>
-  </div>
-
-  <div class="resultSpace">
-    <div class="outputSpace" style="height:640px" id="output">
-      <canvas class="renderCanvas" id="canvas"></canvas>
+      <div class="diagnosticSpace" id="diagnostics"></div>
+        <script> loadEditor(true, 'diagnostics', "diagnostic space"); </script>
     </div>
-    <div class="codeGenSpace"style="height:480px" id="codeGen"></div>
-      <script> loadEditor(true, 'codeGen', "out generation space"); </script>
-  </div>
-</div>
 
+    <div class="resultSpace">
+      <div class="outputSpace" id="output">
+        <canvas class="renderCanvas" id="canvas"></canvas>
+      </div>
+      <div class="codeGenSpace" id="codeGen"></div>
+        <script> loadEditor(true, 'codeGen', "out generation space"); </script>
+    </div>
+  </div>
+
+</div>
 
 
 
