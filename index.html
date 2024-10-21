@@ -3,7 +3,7 @@
 <head>
 <title>Page Title</title>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
 <style>
 * {
   box-sizing: border-box;
@@ -60,7 +60,7 @@ body {
 .mainContainer {
   flex: 100%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   flex-direction: row;
   border: 2px solid red;
 }
@@ -89,32 +89,38 @@ body {
 
 .resultSpace {
   flex: 40%;
-  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
   background-color: #777;
   border: 2px solid red;
-  flex-direction: column;
 }
 
+/*
+   This is the container for output render canvas.
+   NOTE: Do not use 'flex-basis' to specify the size, as we allow the canvas to be resized in JS code, but
+     we will use integer values for the width and height, in such case the percentage value of the size
+     will not be accurate as expected, so the resize event to be triggered again, and finally will cause the
+     infinite loop until the limited valud is hit.
+ */
 .outputSpace {
-  flex: 60%;
+  width: 99%;
+  height: 60%;
   background-color: #aaa;
-  margin: 0.5% 0.5% 0.25% 0.5%;
+  margin: 0.7% 1% 0.5% 0.5%;
   border: 2px solid red;
 }
 
 .codeGenSpace {
-  flex: 40%;
+  width: 99%;
+  height: 38.5%;      /* 40% - minus the (margin-top + margin-bottom)*/
   background-color: #aaa;
-  margin: 10px;
-  margin: 0.25% 0.5% 0.5% 0.5%;
+  margin: 0.25% 1% 0.7% 0.5%;
   border: 2px solid red;
 }
 
 .renderCanvas {
   background-color: #aaa;
-  border: 2px solid red;
-  display: block;  /* make the canvas act like a block   */
-  width: 100%;     /* make the canvas fill its container */
+  width: 100%;
   height: 100%;
 }
 
