@@ -9,13 +9,22 @@ var computePipeline;
 var passThroughPipeline;
 
 var monacoEditor;
-var outputCodeArea;
+var diagnosticsArea;
+var codeGenArea;
 
 const SLANG_STAGE_VERTEX = 1;
 const SLANG_STAGE_FRAGMENT = 5;
 const SLANG_STAGE_COMPUTE = 6;
 
+var sourceCodeChange = true;
+var g_needResize = false;
+
+// TODO: Question?
+// When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
+// code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
+// looking at the generated shader code?
 const defaultShaderCode = `
+uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
 [format("r32f")] RWTexture2D<float>   texture;
 
@@ -35,8 +44,10 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 
     float2 pos = float2(dispatchThreadID.xy);
 
-    float dist = distance(pos, center);
-    float strip = dist / 32.0 % 2.0;
+    float stripSize = width / 40;
+
+    float dist = distance(pos, center) + time;
+    float strip = dist / stripSize % 2.0;
 
     uint color = 0;
     if (strip < 1.0f)
@@ -71,21 +82,74 @@ async function webgpuInit()
         return;
     }
     context = configContext(device, canvas);
+
+    // The default resolution of a canvas element is 300x150, which is too small compared to the container size of the canvas,
+    // therefore, we have to set the resolution same as the container size.
+
+    const observer = new ResizeObserver((entries) => { resizeCanvasHandler(entries); });
+    observer.observe(canvas);
+}
+
+function resizeCanvas(entries)
+{
+    const canvas = entries[0].target;
+
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    if (canvas.width !== width || canvas.height !== height)
+    {
+        // ensure the size won't be 0 nor exceed the limit, otherwise WebGPU will throw an errors
+        canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
+        canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
+
+        return true;
+    }
+
+    return false;
+}
+
+// We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
+// multiple useless frames.
+function resizeCanvasHandler(entries)
+{
+    setTimeout(() => {
+        var needResize = resizeCanvas(entries);
+        if (needResize)
+        {
+            if (computePipeline && passThroughPipeline)
+            {
+                computePipeline.createOutput(true);
+                computePipeline.createBindGroup();
+                passThroughPipeline.inputTexture = computePipeline.outputTexture;
+                passThroughPipeline.createBindGroup();
+                requestAnimationFrame(render);
+            }
+        }
+    }, 100);
 }
 
 
-function render(shaderCode)
+async function render(timeMS)
 {
-    const module = device.createShaderModule({code:shaderCode});
-    computePipeline.createPipeline(module);
+    // we only need to re-create the pipeline when the source code is changed and recompiled.
+    if (sourceCodeChange)
+    {
+        var shaderCode = codeGenArea.getValue();
+        const module = device.createShaderModule({code:shaderCode});
+        computePipeline.createPipeline(module);
+        sourceCodeChange = false;
+    }
 
+
+    computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup);
     pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(canvas.width, canvas.height);
+    pass.dispatchWorkgroups(canvas.clientWidth, canvas.clientHeight);
     pass.end();
 
     // Get a WebGPU context from the canvas and configure it
@@ -100,11 +164,13 @@ function render(shaderCode)
     renderPass.end();
 
     // copy output buffer back
-    encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+    // encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
+
+    requestAnimationFrame(render);
 }
 
 async function waitForComplete(outputBufferRead)
@@ -123,13 +189,15 @@ async function waitForComplete(outputBufferRead)
 
 async function outputResult(output)
 {
-    var result = "";
-    for (let i = 0; i < output.length; i++)
-    {
-         result += output[i] + '\n';
-    }
-
-    document.getElementById("result").value = result;
+    // TODO: Optional - output the printable result to the output area
+    // we don't have such area in the current UI
+    // var result = "";
+    // for (let i = 0; i < output.length; i++)
+    // {
+    //      result += output[i] + '\n';
+    // }
+    //
+    // document.getElementById("result").value = result;
 }
 
 var TrySlang = {
@@ -140,7 +208,7 @@ var TrySlang = {
             if(!slangSession) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
 
@@ -148,14 +216,14 @@ var TrySlang = {
             if(!module) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
             var entryPoint = module.findAndCheckEntryPoint(entryPointName, stage);
             if(!entryPoint) {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
             var components = new Slang.ComponentTypeList();
@@ -170,7 +238,7 @@ var TrySlang = {
             if(wgslCode == "") {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
-                outputCodeArea.setValue(error.type + " error: " + error.message);
+                codeGenArea.setValue(error.type + " error: " + error.message);
                 return null;
             }
         } catch (e) {
@@ -207,6 +275,7 @@ var onRunCompile = () => {
     {
         computePipeline = new ComputePipeline(device);
         computePipeline.setupComputePipeline();
+        computePipeline.createUniformBuffer(4); // 4 bytes for float number
     }
 
     if (!passThroughPipeline)
@@ -223,15 +292,22 @@ var onRunCompile = () => {
     if (!wgslCode)
         return;
 
-    outputCodeArea.setValue(wgslCode);
+    codeGenArea.setValue(wgslCode);
 
-    render(wgslCode);
-    waitForComplete(computePipeline.outputBufferRead);
+    render(0);
+    // TODO: This function is used to read the output buffer from GPU, and print out.
+    // We will add an option to select render Mode and print mode. Once print mode is selected,
+    // we will not enable the animation, and will call this function to print results on screen.
+    // waitForComplete(computePipeline.outputBufferRead);
 
     var code=monacoEditor.getValue();
     console.log(code);
 }
 
+function onSourceCodeChange()
+{
+    sourceCodeChange = true;
+}
 
 function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
@@ -240,12 +316,21 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
                   value: preloadCode,
                   language: 'javascript',
                   theme: 'vs-dark',
-                  readOnly: readOnlyMode
+                  readOnly: readOnlyMode,
+                  automaticLayout: true,
               });
-        if (readOnlyMode)
-            outputCodeArea = editor;
-        else
+
+        if (containerId == "codeEditor")
             monacoEditor = editor;
+        else if (containerId == "diagnostics")
+            diagnosticsArea = editor;
+        else if (containerId == "codeGen")
+        {
+            codeGenArea = editor;
+            codeGenArea.onDidChangeModelContent(function (e) {
+              onSourceCodeChange();
+            });
+        }
     });
 }
 

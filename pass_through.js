@@ -104,13 +104,18 @@ class GraphicsPipeline
         this.pipeline = pipeline;
 
         this.sampler = device.createSampler();
+        this.inputTexture = inputTexture;
+        this.createBindGroup();
+    }
 
+    createBindGroup()
+    {
         const bindGroup = device.createBindGroup({
           label: 'pass through pipeline bind group',
           layout: this.pipeline.getBindGroupLayout(0),
           entries: [
             { binding: 0, resource: this.sampler },
-            { binding: 1, resource: inputTexture.createView() },
+            { binding: 1, resource: this.inputTexture.createView() },
           ],
         });
 

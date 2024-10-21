@@ -1,28 +1,146 @@
+<!DOCTYPE html>
 <html>
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1">
 <style>
-textarea {
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial;
+  margin: 0;
+  height: 100%;
+  min-height: 50px;
+}
+
+.header {
+  padding: 10px;
+  text-align: center;
+  background: #1abc9c;
+  color: white;
+}
+
+.monaco-editor {
+    position: absolute !important;
+}
+
+.navbar {
+  display: flex;
+  background-color: #111;
+}
+
+.bannerbar {
+  display: flex;
+  background-color: #ddd;
+}
+
+.navbar a {
+  color: white;
+  padding: 14px 20px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.navbar a:hover {
+  background-color: orange;
+  color: black;
+}
+
+.screenFitter {
+    display: flex;
+    position: absolute;
+    top: 0; right: 0; bottom: 0; left: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.mainContainer {
+  flex: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  border: 2px solid red;
+}
+
+.workSpace {
+  flex: 60%;
+  display: flex;
+  background-color: #333;
+  border: 2px solid red;
+  flex-direction: column;
+}
+
+.codingSpace {
+  flex: 70%;
+  background-color: #aaa;
+  border: 2px solid red;
+  margin: 0.5% 0.5% 0.25% 0.5%;
+}
+
+.diagnosticSpace {
+  flex: 30%;
+  background-color: #aaa;
+  margin: 0.25% 0.5% 0.5% 0.5%;
+  border: 2px solid red;
+}
+
+.resultSpace {
+  flex: 40%;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  background-color: #777;
+  border: 2px solid red;
+}
+
+/*
+   This is the container for output render canvas.
+   NOTE: Do not use 'flex-basis' to specify the size, as we allow the canvas to be resized in JS code, but
+     we will use integer values for the width and height, in such case the percentage value of the size
+     will not be accurate as expected, so the resize event to be triggered again, and finally will cause the
+     infinite loop until the limited valud is hit.
+ */
+.outputSpace {
+  width: 99%;
+  height: 60%;
+  background-color: #aaa;
+  margin: 0.7% 1% 0.5% 0.5%;
+  border: 2px solid red;
+}
+
+.codeGenSpace {
+  width: 99%;
+  height: 38.5%;      /* 40% - minus the (margin-top + margin-bottom)*/
+  background-color: #aaa;
+  margin: 0.25% 1% 0.7% 0.5%;
+  border: 2px solid red;
+}
+
+.renderCanvas {
+  background-color: #111;
   width: 100%;
   height: 100%;
-  padding: 12px 20px;
-  box-sizing: border-box;
-  border: 2px solid #ccc;
-  border-radius: 4px;
-  background-color: #121212;
-  color: #ffffff;
-  font-size: 16px;
-  resize: none;
 }
+
+/* Footer */
+.footer {
+  padding: 20px;
+  text-align: center;
+  background: #ddd;
+}
+
 </style>
-  <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-  <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+  <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
   <script>
-          require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+          require.config({ paths: { 'vs': 'https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs' }});
           window.MonacoEnvironment = { getWorkerUrl: () => proxy };
           let proxy = URL.createObjectURL(new Blob([`
               self.MonacoEnvironment = {
-                  baseUrl: 'https://unpkg.com/monaco-editor@latest/min/'
+                  baseUrl: 'https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/'
               };
-              importScripts('https://unpkg.com/monaco-editor@latest/min/vs/base/worker/workerMain.js');
+              importScripts('https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/base/worker/workerMain.js');
           `], { type: 'text/javascript' }));
   </script>
   <script src="util.js"></script>
@@ -30,42 +148,45 @@ textarea {
   <script src="compute.js"></script>
   <script src="try-slang.js"></script>
   <script src="slang-wasm.js"></script>
-  <head>
-    <title>Try Slang!</title>
-  </head>
-  <body>
-    <div class="w3-container w3-black w3-teal">
+</head>
+<body>
 
-      <div class="w3-row-padding">
-        <div id="WebGPU-status-bar" style="width: 100%; height: 50px;"></div>
-      </div>
+<div class="screenFitter">
 
-      <div class="w3-row-padding">
-        <div class="w3-half">
-              <h1>Input (Slang)</h1>
-              <div id="container" style="width: 1200px; height: 800px; border: 1px solid grey"></div>
-                <!-- OR ANY OTHER AMD LOADER HERE INSTEAD OF loader.js -->
-                <script> loadEditor(false, 'container', defaultShaderCode); </script>
+<div class="bannerbar" id="WebGPU-status-bar">
+  WebGPU status
+</div>
 
-              <div style="margin:auto 45%">
-                <button class="w3-btn w3-round w3-orange" id="run-btn" onclick="onRunCompile()" disabled>Run</button>
-              </div>
+<!-- Navigation Bar -->
+<div class="navbar">
+  <button style="background-color: orange" id="run-btn" onclick="onRunCompile()" disabled>Run</button>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+  <a href="#">Link</a>
+</div>
 
-              <h1>Compute Result</h1>
-              <div id="container" style="width: 1200px; height: 300px;">
-                <textarea readonly id="result"></textarea>
-              </div>
-        </div>
+  <div class="mainContainer">
+    <div class="workSpace">
+      <div class="codingSpace" id="codeEditor"></div>
+        <script> loadEditor(false, 'codeEditor', defaultShaderCode); </script>
 
-        <div class="w3-half">
-            <canvas id="canvas" width="1200" height="768"></canvas>
-            <h1>Output WGSL</h1>
-            <div id="outputContainer" style="width: 1200px; height: 600px; border: 1px solid grey"></div>
-            <script> loadEditor(true, 'outputContainer', ''); </script>
-        </div>
-
-      </div>
+      <div class="diagnosticSpace" id="diagnostics"></div>
+        <script> loadEditor(true, 'diagnostics', "diagnostic space"); </script>
     </div>
 
-  </body>
+    <div class="resultSpace">
+      <div class="outputSpace" id="output">
+        <canvas class="renderCanvas" id="canvas"></canvas>
+      </div>
+      <div class="codeGenSpace" id="codeGen"></div>
+        <script> loadEditor(true, 'codeGen', "out generation space"); </script>
+    </div>
+  </div>
+
+</div>
+
+
+
+</body>
 </html>

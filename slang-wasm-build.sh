@@ -2,7 +2,7 @@
 
 sudo apt-get install -y ninja-build
 
-mkdir ./slang-repo
+# slang-repo was created in previous step
 pushd ./slang-repo
 
 git clone https://github.com/emscripten-core/emsdk.git
@@ -16,8 +16,9 @@ source ./emsdk_env.sh
 popd
 
 
-git clone --recursive https://github.com/shader-slang/slang.git
+# slang was created in previous step
 pushd slang
+git submodule update --init --recursive
 
 cmake --workflow --preset generators --fresh
 mkdir generators
@@ -32,5 +33,11 @@ popd
 popd
 
 cp slang-repo/slang/build.em/Release/bin/* ./
+cp slang-repo/slang/build.em/Release/bin/* ./
+
+rm key.txt
+echo "$(git -C ./slang-repo/slang rev-parse HEAD)" >> key.txt
+
+echo "key: $(cat key.txt)"
 
 sudo rm -r slang-repo
