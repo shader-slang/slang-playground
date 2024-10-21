@@ -85,8 +85,6 @@ async function webgpuInit()
 
     // The default resolution of a canvas element is 300x150, which is too small compared to the container size of the canvas,
     // therefore, we have to set the resolution same as the container size.
-    // canvas.width = canvas.clientWidth;
-    // canvas.height = canvas.clientHeight;
 
     const observer = new ResizeObserver((entries) => { resizeCanvasHandler(entries); });
     observer.observe(canvas);
@@ -127,7 +125,6 @@ function resizeCanvasHandler(entries)
                 passThroughPipeline.createBindGroup();
                 requestAnimationFrame(render);
             }
-            // re-render the shader code
         }
     }, 100);
 }
