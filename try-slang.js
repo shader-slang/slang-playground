@@ -17,7 +17,9 @@ const SLANG_STAGE_FRAGMENT = 5;
 const SLANG_STAGE_COMPUTE = 6;
 
 var sourceCodeChange = true;
-var g_needResize = false;
+
+var webGPUAvailable = false;
+var stopRender = true;
 
 // TODO: Question?
 // When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
@@ -68,12 +70,10 @@ async function webgpuInit()
         return;
     }
 
-    const requiredFeatures = [];
-
     // This feature is not necessary if we can support write-only texture in slang.
-    if (adapter.features.has('bgra8unorm-storage')) {
-        requiredFeatures.push('float32-filterable')
-    }
+    const requiredFeatures = [];
+    requiredFeatures.push('bgra8unorm-storage');
+    requiredFeatures.push('float32-filterable');
 
     device = await adapter?.requestDevice({requiredFeatures});
     if (!device)
@@ -132,6 +132,9 @@ function resizeCanvasHandler(entries)
 
 async function render(timeMS)
 {
+    if (stopRender)
+      return;
+
     // we only need to re-create the pipeline when the source code is changed and recompiled.
     if (sourceCodeChange)
     {
@@ -140,7 +143,6 @@ async function render(timeMS)
         computePipeline.createPipeline(module);
         sourceCodeChange = false;
     }
-
 
     computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
@@ -266,8 +268,7 @@ var TrySlang = {
     },
 };
 
-
-var onRunCompile = () => {
+var onRun = () => {
     if (!device)
         return;
 
@@ -286,22 +287,47 @@ var onRunCompile = () => {
         passThroughPipeline.createPipeline(shaderModule, inputTexture);
     }
 
-    // compile the compute shader code from input text area
-    var shaderSource = monacoEditor.getValue();
-    var wgslCode = TrySlang.compile(shaderSource, "computeMain", SLANG_STAGE_COMPUTE);
-    if (!wgslCode)
-        return;
-
-    codeGenArea.setValue(wgslCode);
-
     render(0);
     // TODO: This function is used to read the output buffer from GPU, and print out.
     // We will add an option to select render Mode and print mode. Once print mode is selected,
     // we will not enable the animation, and will call this function to print results on screen.
     // waitForComplete(computePipeline.outputBufferRead);
+}
 
-    var code=monacoEditor.getValue();
-    console.log(code);
+function disableRendering(reason)
+{
+    stopRender = true;
+    document.getElementById("run-btn").disabled = true;
+}
+
+function enableRendering(reason)
+{
+    stopRender = false;
+    document.getElementById("run-btn").disabled = false;
+}
+
+var onCompile = () => {
+    // compile the compute shader code from input text area
+    var slangSource = monacoEditor.getValue();
+    var compiledCode = TrySlang.compile(slangSource, "computeMain", SLANG_STAGE_COMPUTE);
+    if (!compiledCode)
+    {
+        disableRendering(0);
+        return;
+    }
+
+    codeGenArea.setValue(compiledCode);
+
+    // TODO: Add condition that this is a wgsl shader code.
+    // We only make "Run" button available when the browser supports WebGPU and the compile target is wgsl
+    if (webGPUAvailable)
+    {
+        enableRendering(0);
+    }
+    else
+    {
+        disableRendering(0);
+    }
 }
 
 function onSourceCodeChange()
@@ -340,10 +366,15 @@ var Module = {
         Slang = Module;
         try {
             globalSlangSession = Slang.createGlobalSession();
-            if(!globalSlangSession) {
+            if(!globalSlangSession)
+            {
                 var error = Slang.getLastError();
                 console.error(error.type + " error: " + error.message);
                 return;
+            }
+            else
+            {
+                document.getElementById("compile-btn").disabled = false;
             }
         } catch (e) {
             console.log(e);
@@ -356,7 +387,7 @@ var Module = {
         promise.then(() => {
             if (device)
             {
-                document.getElementById("run-btn").disabled = false;
+                webGPUAvailable = true;
             }
             else
             {

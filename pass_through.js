@@ -50,7 +50,7 @@ var passThroughshaderCode = `
           let g = ((value & 0x00FF0000) >> 16);
           let b = ((value & 0x0000FF00) >> 8);
 
-          return vec4f(f32(r)/255.0f, f32(b)/255.0f, f32(g)/255.0f, 1.0f);
+          return vec4f(f32(r)/255.0f, f32(g)/255.0f, f32(b)/255.0f, 1.0f);
       }
 `;
 
