@@ -68,12 +68,10 @@ async function webgpuInit()
         return;
     }
 
-    const requiredFeatures = [];
-
     // This feature is not necessary if we can support write-only texture in slang.
-    if (adapter.features.has('bgra8unorm-storage')) {
-        requiredFeatures.push('float32-filterable')
-    }
+    const requiredFeatures = [];
+    requiredFeatures.push('bgra8unorm-storage');
+    requiredFeatures.push('float32-filterable');
 
     device = await adapter?.requestDevice({requiredFeatures});
     if (!device)

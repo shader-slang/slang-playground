@@ -43,6 +43,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/try-slang.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js
 
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm &:
@@ -72,5 +73,8 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js: $(TRY_SLANG_SOURCE_DIRECTORY
 	$(COPY) $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/pass_through.js $@
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js
-	cp $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js $@
+	$(COPY) $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/water_demo.js
+	$(COPY) $^ $@
 
