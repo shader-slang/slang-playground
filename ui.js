@@ -21,4 +21,36 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     ],
   });
+
+  initializeDemoDropdown();
 });
+
+function initializeDemoDropdown() {
+  const demoDropdown = document.getElementById("demo-dropdown");
+  if (!demoDropdown) return;
+
+  const demoLinks = demoDropdown.querySelectorAll(".dropdown-content a");
+  const demoButton = demoDropdown.querySelector(".dropdown-btn");
+
+  demoLinks.forEach((link) => {
+    link.addEventListener("click", function (e) {
+      e.preventDefault();
+
+      const selectedDemo = this.textContent;
+
+      switch (selectedDemo) {
+        case "Circles":
+          monacoEditor.setValue(defaultShaderCode);
+          break;
+        case "Water":
+          monacoEditor.setValue(oceanDemoCode);
+          break;
+      }
+
+      demoButton.innerHTML = `${selectedDemo}  &#9662;`;
+
+      // Trigger source code change
+      sourceCodeChange = true;
+    });
+  });
+}
