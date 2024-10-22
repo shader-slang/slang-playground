@@ -1,0 +1,130 @@
+@import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap");
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Open Sans;
+  margin: 0;
+  height: 100%;
+  min-height: 50px;
+}
+
+.header {
+  padding: 10px;
+  text-align: center;
+  background: #1abc9c;
+  color: white;
+}
+
+.monaco-editor {
+  position: absolute !important;
+}
+
+.navbar {
+  display: flex;
+  background-color: #111;
+}
+
+.bannerbar {
+  display: flex;
+  background-color: #ddd;
+}
+
+.navbar a {
+  color: white;
+  padding: 14px 20px;
+  text-decoration: none;
+  text-align: center;
+}
+
+.navbar a:hover {
+  background-color: orange;
+  color: black;
+}
+
+.screenFitter {
+  display: flex;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.mainContainer {
+  flex: 100%;
+  display: flex;
+  flex-wrap: nowrap;
+  flex-direction: row;
+  border: 2px solid red;
+}
+
+.workSpace {
+  flex: 60%;
+  display: flex;
+  background-color: #333;
+  border: 2px solid red;
+  flex-direction: column;
+}
+
+.codingSpace {
+  flex: 70%;
+  background-color: #aaa;
+  border: 2px solid red;
+  margin: 0.5% 0.5% 0.25% 0.5%;
+}
+
+.diagnosticSpace {
+  flex: 30%;
+  background-color: #aaa;
+  margin: 0.25% 0.5% 0.5% 0.5%;
+  border: 2px solid red;
+}
+
+.resultSpace {
+  flex: 40%;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  background-color: #777;
+  border: 2px solid red;
+}
+
+/*
+     This is the container for output render canvas.
+     NOTE: Do not use 'flex-basis' to specify the size, as we allow the canvas to be resized in JS code, but
+       we will use integer values for the width and height, in such case the percentage value of the size
+       will not be accurate as expected, so the resize event to be triggered again, and finally will cause the
+       infinite loop until the limited valud is hit.
+   */
+.outputSpace {
+  width: 99%;
+  height: 60%;
+  background-color: #aaa;
+  margin: 0.7% 1% 0.5% 0.5%;
+  border: 2px solid red;
+}
+
+.codeGenSpace {
+  width: 99%;
+  height: 38.5%; /* 40% - minus the (margin-top + margin-bottom)*/
+  background-color: #aaa;
+  margin: 0.25% 1% 0.7% 0.5%;
+  border: 2px solid red;
+}
+
+.renderCanvas {
+  background-color: #111;
+  width: 100%;
+  height: 100%;
+}
+
+/* Footer */
+.footer {
+  padding: 20px;
+  text-align: center;
+  background: #ddd;
+}
