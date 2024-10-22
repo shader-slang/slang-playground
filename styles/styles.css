@@ -14,6 +14,8 @@
   --light-grey: #2b2b2b;
   --light-black: #202020;
   --button-border: 2px solid #404040;
+
+  --font-size: 14px;
 }
 
 * {
@@ -52,13 +54,13 @@ h2 {
   height: 100% !important;
 }
 
-.navbar {
+/* .navbar {
   display: flex;
   background-color: var(--dark-grey);
   justify-content: space-around;
   width: 100%;
   padding: 10px;
-}
+} */
 
 .bannerbar {
   display: flex;
@@ -89,7 +91,7 @@ h2 {
 
 .leftContainer {
   display: grid;
-  grid-template-rows: 8.5% 1fr;
+  grid-template-rows: 10% 1fr;
   background-color: var(--light-grey);
   overflow: hidden;
 }
@@ -188,39 +190,6 @@ h2 {
   display: inline-block;
 }
 
-.dropdown-btn {
-  background-color: var(--medium-grey);
-  border: var(--button-border);
-  color: var(--white);
-  padding: 8px 16px;
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: var(--medium-grey);
-  min-width: 160px;
-  box-shadow: 0px 8px 16px hsla(0, 0%, 0%, 0.2);
-  z-index: 1;
-}
-
-.dropdown-content a {
-  color: var(--white);
-  font-family: var(--font);
-  padding: 12px 16px;
-  text-decoration: none;
-  display: block;
-}
-
-.dropdown:hover .dropdown-content {
-  display: block;
-}
-
 .navbar .run-btn,
 .navbar .compile-btn {
   margin-left: 10px;
@@ -278,18 +247,7 @@ h2 {
 .dropdown {
   position: relative;
   display: inline-block;
-}
-
-.dropdown-content {
-  display: none;
-  position: absolute;
-  background-color: #f9f9f9;
-  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-}
-
-.dropdown:hover .dropdown-content {
-  display: block;
+  font-size: var(--font-size);
 }
 
 button {
@@ -308,4 +266,71 @@ button[disabled] {
   text-decoration: none;
   background-color: orange;
   color: white;
+}
+.dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size);
+}
+
+label {
+  font-size: 14px;
+  color: var(--white);
+  margin-bottom: 2px;
+  text-align: left;
+}
+
+.dropdown-input {
+  background-color: var(--medium-grey);
+  border: var(--button-border);
+  color: var(--white);
+  padding: 8px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  border-radius: 4px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.dropdown-input::after {
+  content: "▼";
+  font-size: 12px;
+  color: var(--white);
+  padding-left: 10px;
+}
+
+.dropdown-input:focus {
+  outline: none;
+  border-color: var(--orange);
+}
+
+.dropdown-input option {
+  background-color: var(--dark-grey);
+  color: var(--white);
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--dark-grey);
+  padding: 10px;
+}
+
+.navbar-group {
+  display: flex;
+  gap: 16px;
+}
+
+.navbar-item {
+  background-color: var(--light-grey);
+  color: var(--white);
+  padding: 8px 16px;
+  text-align: center;
+  height: 98%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
