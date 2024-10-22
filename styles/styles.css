@@ -2,16 +2,18 @@
 
 :root {
   --font: "Open Sans";
-  --green: hsl(78, 100%, 36%);
+  --orange: orange;
   --black: hsl(0, 0%, 0%);
   --white: hsl(0, 0%, 100%);
   --background: hsl(345, 4%, 5%);
   --grey: hsl(0, 0%, 13%);
-
   --dark-grey: hsl(0, 0%, 7%);
   --medium-grey: hsl(0, 0%, 13%);
   --light-grey: hsl(0deg 0% 11.76);
   --very-light-grey: hsl(0, 0%, 67%);
+  --light-grey: #2b2b2b;
+  --light-black: #202020;
+  --button-border: 2px solid #404040;
 }
 
 * {
@@ -54,6 +56,8 @@ h2 {
   display: flex;
   background-color: var(--dark-grey);
   justify-content: space-around;
+  width: 100%;
+  padding: 10px;
 }
 
 .bannerbar {
@@ -71,13 +75,13 @@ h2 {
 }
 
 .navbar a:hover {
-  background-color: var(--green);
+  background-color: var(--orange);
   color: var(--black);
 }
 
 .mainContainer {
   display: grid;
-  grid-template-columns: 62% 12px 1fr;
+  grid-template-columns: 62% 14px 1fr;
   grid-template-rows: 1fr;
   height: 100vh;
   overflow: hidden;
@@ -85,7 +89,7 @@ h2 {
 
 .leftContainer {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: 8.5% 1fr;
   background-color: var(--light-grey);
   overflow: hidden;
 }
@@ -98,7 +102,7 @@ h2 {
 
 .workSpace {
   display: grid;
-  grid-template-rows: 80% 12px 1fr;
+  grid-template-rows: 80% 14px 1fr;
   overflow: hidden;
 }
 
@@ -120,7 +124,6 @@ h2 {
   background-color: var(--very-light-grey);
   width: 100%;
   height: 100%;
-  border: 4px solid var(--green);
 }
 
 .gutter {
@@ -140,7 +143,7 @@ h2 {
 }
 
 #run-btn {
-  background-color: var(--green);
+  background-color: var(--orange);
   color: var(--black);
 }
 
@@ -161,7 +164,6 @@ h2 {
 #run-btn {
   background-color: var(--medium-grey);
   color: var(--white);
-  /* border: 2px solid var(--green); */
   padding: 8px 16px;
   text-decoration: none;
   text-align: center;
@@ -172,7 +174,7 @@ h2 {
 
 .navbar a:hover,
 #run-btn:hover {
-  background-color: var(--green);
+  background-color: var(--orange);
 }
 
 #run-btn:disabled {
@@ -188,7 +190,7 @@ h2 {
 
 .dropdown-btn {
   background-color: var(--medium-grey);
-  /* border: 2px solid var(--green); */
+  border: var(--button-border);
   color: var(--white);
   padding: 8px 16px;
   text-align: center;
@@ -213,11 +215,6 @@ h2 {
   padding: 12px 16px;
   text-decoration: none;
   display: block;
-  /* border-bottom: 2px solid var(--green); */
-}
-
-.dropdown-content a:hover {
-  /* color: var(--green); */
 }
 
 .dropdown:hover .dropdown-content {
@@ -233,4 +230,82 @@ h2 {
 .compile-btn {
   font-size: 12px;
   padding: 6px 14px;
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+}
+
+.navbar-actions {
+  flex-basis: 32%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.navbar-run {
+  flex-basis: 20%;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.navbar-compile {
+  flex-basis: 48%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.navbar-item {
+  background-color: var(--light-grey);
+  color: var(--white);
+  padding: 8px 16px;
+  text-align: center;
+  height: 98%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: #f9f9f9;
+  box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+button {
+  padding: 8px 16px;
+  border: var(--button-border);
+  cursor: pointer;
+}
+
+button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.run-btn {
+  padding: 10px;
+  text-decoration: none;
+  background-color: orange;
+  color: white;
 }

@@ -41,9 +41,8 @@
   <body>
     <div class="mainContainer">
       <div class="leftContainer">
-        <h2>Slang Playground</h2>
         <div class="navbar">
-          <div class="card">
+          <div class="navbar-actions navbar-item">
             <div class="navbar-group">
               <div class="dropdown">
                 <a href="#" class="dropdown-btn">New &#9662;</a>
@@ -56,35 +55,23 @@
               <div class="dropdown">
                 <a href="#" class="dropdown-btn">Demo &#9662;</a>
                 <div class="dropdown-content">
-                  <a href="#">Demo 1</a>
+                  <a href="#">Concentric Circles</a>
                   <a href="#">Demo 2</a>
-                  <a href="#">Demo 3</a>
                 </div>
               </div>
             </div>
           </div>
-          <div class="card">
-            <button
-              style="background-color: orange"
-              id="run-btn"
-              onclick="onRun()"
-              disabled
-            >
-              Run
-            </button>
+          <div class="navbar-run navbar-item">
+            <button id="run-btn" onclick="onRun()" disabled>Run</button>
           </div>
-          <div class="card">
+          <div class="navbar-compile navbar-item">
             <a href="#" class="run-btn">computeMain (Compute) -> SPIRV</a>
-            <button
-              style="background-color: orange"
-              id="compile-btn"
-              onclick="onCompile()"
-              disabled
-            >
+            <button id="compile-btn" onclick="onCompile()" disabled>
               Compile
             </button>
           </div>
         </div>
+
         <div class="workSpace">
           <div class="codingSpace" id="codeEditor"></div>
           <div class="gutter gutter-vertical"></div>
