@@ -1,8 +1,6 @@
 'use strict';
 
-var Slang;
-var globalSlangSession;
-var slangSession;
+var compiler;
 var device;
 var context;
 var computePipeline;
@@ -12,14 +10,8 @@ var monacoEditor;
 var diagnosticsArea;
 var codeGenArea;
 
-const SLANG_STAGE_VERTEX = 1;
-const SLANG_STAGE_FRAGMENT = 5;
-const SLANG_STAGE_COMPUTE = 6;
 
 var sourceCodeChange = true;
-
-var webGPUAvailable = false;
-var stopRender = true;
 
 // TODO: Question?
 // When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
@@ -32,7 +24,7 @@ RWStructuredBuffer<int>               outputBuffer;
 
 
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void imageMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x * 32 + dispatchThreadID.y;
     outputBuffer[idx] = idx;
@@ -132,9 +124,6 @@ function resizeCanvasHandler(entries)
 
 async function render(timeMS)
 {
-    if (stopRender)
-      return;
-
     // we only need to re-create the pipeline when the source code is changed and recompiled.
     if (sourceCodeChange)
     {
@@ -202,71 +191,6 @@ async function outputResult(output)
     // document.getElementById("result").value = result;
 }
 
-var TrySlang = {
-    compile: function(shaderSource, entryPointName, stage) {
-
-        try {
-            slangSession = globalSlangSession.createSession();
-            if(!slangSession) {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                codeGenArea.setValue(error.type + " error: " + error.message);
-                return null;
-            }
-
-            var module = slangSession.loadModuleFromSource(shaderSource);
-            if(!module) {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                codeGenArea.setValue(error.type + " error: " + error.message);
-                return null;
-            }
-            var entryPoint = module.findAndCheckEntryPoint(entryPointName, stage);
-            if(!entryPoint) {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                codeGenArea.setValue(error.type + " error: " + error.message);
-                return null;
-            }
-            var components = new Slang.ComponentTypeList();
-            components.push_back(module);
-            components.push_back(entryPoint);
-            var program = slangSession.createCompositeComponentType(components);
-            var linkedProgram = program.link();
-            var wgslCode =
-                linkedProgram.getEntryPointCode(
-                    0 /* entryPointIndex */, 0 /* targetIndex */
-                );
-            if(wgslCode == "") {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                codeGenArea.setValue(error.type + " error: " + error.message);
-                return null;
-            }
-        } catch (e) {
-            console.log(e);
-            return null;
-        }
-        finally {
-            if(linkedProgram) {
-                linkedProgram.delete();
-            }
-            if(program) {
-                program.delete();
-            }
-            if(entryPoint) {
-                entryPoint.delete();
-            }
-            if(module) {
-                module.delete();
-            }
-            if (slangSession) {
-                slangSession.delete();
-            }
-            return wgslCode;
-        }
-    },
-};
 
 var onRun = () => {
     if (!device)
@@ -287,6 +211,16 @@ var onRun = () => {
         passThroughPipeline.createPipeline(shaderModule, inputTexture);
     }
 
+    // When click the run button, we won't provide the entrypoint name, the compiler will try
+    // the all the runnable entry points, and if it can't find it, it will not run the shader
+    // and show the error message in the diagnostics area.
+    const ret = compileShader("");
+    if (!ret)
+    {
+        diagnosticsArea.setValue(compiler.diagnosticsMsg);
+        return;
+    }
+
     render(0);
     // TODO: This function is used to read the output buffer from GPU, and print out.
     // We will add an option to select render Mode and print mode. Once print mode is selected,
@@ -294,40 +228,26 @@ var onRun = () => {
     // waitForComplete(computePipeline.outputBufferRead);
 }
 
-function disableRendering(reason)
+function compileShader(entryPoint)
 {
-    stopRender = true;
-    document.getElementById("run-btn").disabled = true;
-}
-
-function enableRendering(reason)
-{
-    stopRender = false;
-    document.getElementById("run-btn").disabled = false;
-}
-
-var onCompile = () => {
     // compile the compute shader code from input text area
     var slangSource = monacoEditor.getValue();
-    var compiledCode = TrySlang.compile(slangSource, "computeMain", SLANG_STAGE_COMPUTE);
+    var compiledCode = compiler.compile(slangSource, entryPoint, SlangCompiler.SLANG_STAGE_COMPUTE);
+
+    // If compile is failed, we just clear the codeGenArea
     if (!compiledCode)
     {
-        disableRendering(0);
-        return;
+        codeGenArea.setValue('');
+        return false;
     }
 
     codeGenArea.setValue(compiledCode);
+    return true;
+}
 
-    // TODO: Add condition that this is a wgsl shader code.
-    // We only make "Run" button available when the browser supports WebGPU and the compile target is wgsl
-    if (webGPUAvailable)
-    {
-        enableRendering(0);
-    }
-    else
-    {
-        disableRendering(0);
-    }
+var onCompile = () => {
+    // TODO: We should get the entry point from the UI
+    compileShader("computeMain");
 }
 
 function onSourceCodeChange()
@@ -361,38 +281,36 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 }
 
 
+// Event when loading the WebAssembly module
 var Module = {
     onRuntimeInitialized: function() {
-        Slang = Module;
-        try {
-            globalSlangSession = Slang.createGlobalSession();
-            if(!globalSlangSession)
-            {
-                var error = Slang.getLastError();
-                console.error(error.type + " error: " + error.message);
-                return;
-            }
-            else
-            {
-                document.getElementById("compile-btn").disabled = false;
-            }
-        } catch (e) {
-            console.log(e);
-            document.getElementById("WebGPU-status-bar").innerHTML = "Failed to initialize Slang Compiler";
-            return;
+        compiler = new SlangCompiler(Module);
+        var result = compiler.init();
+        if (result.ret)
+        {
+            document.getElementById("compile-btn").disabled = false;
         }
-        webgpuInit();
-
-        var promise = webgpuInit();
-        promise.then(() => {
-            if (device)
-            {
-                webGPUAvailable = true;
-            }
-            else
-            {
-                document.getElementById("WebGPU-status-bar").innerHTML = "Browser does not support WebGPU";
-            }
-        });
+        else
+        {
+            console.log(result.msg);
+            document.getElementById("WebGPU-status-bar").innerHTML = "Failed to initialize Slang Compiler " + result.msg;
+        }
     },
 };
+
+// even when loading the page
+window.onload = function ()
+{
+    webgpuInit();
+    var promise = webgpuInit();
+    promise.then(() => {
+        if (device)
+        {
+            document.getElementById("run-btn").disabled = false;
+        }
+        else
+        {
+            document.getElementById("WebGPU-status-bar").innerHTML = "Browser does not support WebGPU";
+        }
+    });
+}
