@@ -91,7 +91,7 @@ h2 {
 
 .leftContainer {
   display: grid;
-  grid-template-rows: 10% 1fr;
+  grid-template-rows: 11% 1fr;
   background-color: var(--light-grey);
   overflow: hidden;
 }
