@@ -8,6 +8,7 @@
       content="width=device-width, height=device-height, initial-scale=1"
     />
     <link href="./styles/styles.css" rel="stylesheet" />
+    <script src="https://unpkg.com/split-grid/dist/split-grid.js"></script>
     <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
     <script>
       require.config({
@@ -38,56 +39,70 @@
     <script src="slang-wasm.js"></script>
   </head>
   <body>
-    <div class="screenFitter">
-      <div class="bannerbar" id="WebGPU-status-bar">WebGPU status</div>
-
-      <!-- Navigation Bar -->
-      <div class="navbar">
-        <button
-          style="background-color: orange"
-          id="run-btn"
-          onclick="onRun()"
-          disabled
-        >
-          Run
-        </button>
-        <button
-          style="background-color: orange"
-          id="compile-btn"
-          onclick="onCompile()"
-          disabled
-        >
-          Compile
-        </button>
-        <a href="#">Link</a>
-        <a href="#">Link</a>
-        <a href="#">Link</a>
-        <a href="#">Link</a>
-      </div>
-
-      <div class="mainContainer">
+    <div class="mainContainer">
+      <div class="leftContainer">
+        <h2>Slang Playground</h2>
+        <div class="navbar">
+          <div class="card">
+            <div class="navbar-group">
+              <div class="dropdown">
+                <a href="#" class="dropdown-btn">New &#9662;</a>
+                <div class="dropdown-content">
+                  <a href="#">Runnable Print Shader</a>
+                  <a href="#">Runnable Image Shader</a>
+                  <a href="#">Option 3</a>
+                </div>
+              </div>
+              <div class="dropdown">
+                <a href="#" class="dropdown-btn">Demo &#9662;</a>
+                <div class="dropdown-content">
+                  <a href="#">Demo 1</a>
+                  <a href="#">Demo 2</a>
+                  <a href="#">Demo 3</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <button
+              style="background-color: orange"
+              id="run-btn"
+              onclick="onRun()"
+              disabled
+            >
+              Run
+            </button>
+          </div>
+          <div class="card">
+            <a href="#" class="run-btn">computeMain (Compute) -> SPIRV</a>
+            <button
+              style="background-color: orange"
+              id="compile-btn"
+              onclick="onCompile()"
+              disabled
+            >
+              Compile
+            </button>
+          </div>
+        </div>
         <div class="workSpace">
           <div class="codingSpace" id="codeEditor"></div>
-          <script>
-            loadEditor(false, "codeEditor", defaultShaderCode);
-          </script>
-
+          <div class="gutter gutter-vertical"></div>
           <div class="diagnosticSpace" id="diagnostics"></div>
-          <script>
-            loadEditor(true, "diagnostics", "diagnostic space");
-          </script>
         </div>
-
+      </div>
+      <div class="gutter gutter-horizontal"></div>
+      <div class="rightContainer">
         <div class="resultSpace">
           <div class="outputSpace" id="output">
             <canvas class="renderCanvas" id="canvas"></canvas>
           </div>
+          <div class="gutter gutter-vertical"></div>
           <div class="codeGenSpace" id="codeGen"></div>
-          <script>
-            loadEditor(true, "codeGen", "out generation space");
-          </script>
         </div>
       </div>
     </div>
+
+    <script src="ui.js"></script>
   </body>
 </html>

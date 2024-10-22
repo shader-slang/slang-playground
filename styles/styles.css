@@ -1,130 +1,236 @@
 @import url("https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap");
 
+:root {
+  --font: "Open Sans";
+  --green: hsl(78, 100%, 36%);
+  --black: hsl(0, 0%, 0%);
+  --white: hsl(0, 0%, 100%);
+  --background: hsl(345, 4%, 5%);
+  --grey: hsl(0, 0%, 13%);
+
+  --dark-grey: hsl(0, 0%, 7%);
+  --medium-grey: hsl(0, 0%, 13%);
+  --light-grey: hsl(0deg 0% 11.76);
+  --very-light-grey: hsl(0, 0%, 67%);
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
-  font-family: Open Sans;
+  font-family: var(--font);
   margin: 0;
-  height: 100%;
-  min-height: 50px;
+  height: 100vh;
+  display: grid;
+  overflow: hidden;
+  background: var(--black);
+}
+
+.header,
+.bannerbar,
+.navbar {
+  width: 100%;
 }
 
 .header {
-  padding: 10px;
-  text-align: center;
-  background: #1abc9c;
-  color: white;
+  background: var(--black);
+  color: var(--white);
+}
+
+h2 {
+  margin: 0;
+  padding: 5px;
+  color: var(--white);
+  background-color: var(--black);
 }
 
 .monaco-editor {
-  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .navbar {
   display: flex;
-  background-color: #111;
+  background-color: var(--dark-grey);
+  justify-content: space-around;
 }
 
 .bannerbar {
   display: flex;
-  background-color: #ddd;
+  color: hsl(0, 0%, 87%);
+  background-color: var(--black);
+  font-size: 12px;
 }
 
 .navbar a {
-  color: white;
+  color: var(--white);
   padding: 14px 20px;
   text-decoration: none;
   text-align: center;
 }
 
 .navbar a:hover {
-  background-color: orange;
-  color: black;
-}
-
-.screenFitter {
-  display: flex;
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  flex-direction: column;
-  flex-wrap: nowrap;
+  background-color: var(--green);
+  color: var(--black);
 }
 
 .mainContainer {
-  flex: 100%;
-  display: flex;
-  flex-wrap: nowrap;
-  flex-direction: row;
-  border: 2px solid red;
+  display: grid;
+  grid-template-columns: 62% 12px 1fr;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.leftContainer {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  background-color: var(--light-grey);
+  overflow: hidden;
+}
+
+.rightContainer {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
 }
 
 .workSpace {
-  flex: 60%;
-  display: flex;
-  background-color: #333;
-  border: 2px solid red;
-  flex-direction: column;
-}
-
-.codingSpace {
-  flex: 70%;
-  background-color: #aaa;
-  border: 2px solid red;
-  margin: 0.5% 0.5% 0.25% 0.5%;
-}
-
-.diagnosticSpace {
-  flex: 30%;
-  background-color: #aaa;
-  margin: 0.25% 0.5% 0.5% 0.5%;
-  border: 2px solid red;
+  display: grid;
+  grid-template-rows: 80% 12px 1fr;
+  overflow: hidden;
 }
 
 .resultSpace {
-  flex: 40%;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  background-color: #777;
-  border: 2px solid red;
+  display: grid;
+  grid-template-rows: 69% 12px 1fr;
+  overflow: hidden;
 }
 
-/*
-     This is the container for output render canvas.
-     NOTE: Do not use 'flex-basis' to specify the size, as we allow the canvas to be resized in JS code, but
-       we will use integer values for the width and height, in such case the percentage value of the size
-       will not be accurate as expected, so the resize event to be triggered again, and finally will cause the
-       infinite loop until the limited valud is hit.
-   */
-.outputSpace {
-  width: 99%;
-  height: 60%;
-  background-color: #aaa;
-  margin: 0.7% 1% 0.5% 0.5%;
-  border: 2px solid red;
-}
-
+.codingSpace,
+.diagnosticSpace,
+.outputSpace,
 .codeGenSpace {
-  width: 99%;
-  height: 38.5%; /* 40% - minus the (margin-top + margin-bottom)*/
-  background-color: #aaa;
-  margin: 0.25% 1% 0.7% 0.5%;
-  border: 2px solid red;
+  background-color: var(--light-grey);
+  overflow: auto;
 }
 
 .renderCanvas {
-  background-color: #111;
+  background-color: var(--very-light-grey);
   width: 100%;
   height: 100%;
+  border: 4px solid var(--green);
 }
 
-/* Footer */
-.footer {
-  padding: 20px;
+.gutter {
+  background-color: var(--black);
+  background-repeat: no-repeat;
+  background-position: 50%;
+}
+
+.gutter.gutter-horizontal {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUAAAAeCAYAAADkftS9AAAAIklEQVQoU2M4c+bMfxAGAgYYmwGrIIiDjrELjpo5aiZeMwF+yNnOs5KSvgAAAABJRU5ErkJggg==");
+  cursor: col-resize;
+}
+
+.gutter.gutter-vertical {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAB4AAAAFAQMAAABo7865AAAABlBMVEVHcEzMzMzyAv2sAAAAAXRSTlMAQObYZgAAABBJREFUeF5jOAMEEAIEEFwAn3kMwcB6I2AAAAAASUVORK5CYII=");
+  cursor: row-resize;
+}
+
+#run-btn {
+  background-color: var(--green);
+  color: var(--black);
+}
+
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: var(--dark-grey);
+  padding: 10px;
+}
+
+.navbar-group {
+  display: flex;
+  gap: 10px;
+}
+
+.navbar a,
+#run-btn {
+  background-color: var(--medium-grey);
+  color: var(--white);
+  /* border: 2px solid var(--green); */
+  padding: 8px 16px;
+  text-decoration: none;
   text-align: center;
-  background: #ddd;
+  cursor: pointer;
+  display: inline-block;
+  font-size: 14px;
+}
+
+.navbar a:hover,
+#run-btn:hover {
+  background-color: var(--green);
+}
+
+#run-btn:disabled {
+  background-color: hsl(0, 0%, 33%);
+  color: hsl(0, 0%, 53%);
+  cursor: not-allowed;
+}
+
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-btn {
+  background-color: var(--medium-grey);
+  /* border: 2px solid var(--green); */
+  color: var(--white);
+  padding: 8px 16px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.dropdown-content {
+  display: none;
+  position: absolute;
+  background-color: var(--medium-grey);
+  min-width: 160px;
+  box-shadow: 0px 8px 16px hsla(0, 0%, 0%, 0.2);
+  z-index: 1;
+}
+
+.dropdown-content a {
+  color: var(--white);
+  font-family: var(--font);
+  padding: 12px 16px;
+  text-decoration: none;
+  display: block;
+  /* border-bottom: 2px solid var(--green); */
+}
+
+.dropdown-content a:hover {
+  /* color: var(--green); */
+}
+
+.dropdown:hover .dropdown-content {
+  display: block;
+}
+
+.navbar .run-btn,
+.navbar .compile-btn {
+  margin-left: 10px;
+}
+
+.run-btn,
+.compile-btn {
+  font-size: 12px;
+  padding: 6px 14px;
 }
