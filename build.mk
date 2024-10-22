@@ -18,7 +18,7 @@ COPY:=
 ifeq ($(OS_NAME),Windows)
 	COPY = copy /b /y
 else
-	COPY = cp
+	COPY = cp -rf
 endif
 
 # Helper to ensure a directory exists
@@ -44,6 +44,9 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js
 
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm &:
@@ -78,3 +81,11 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/water_demo.js
 	$(COPY) $^ $@
 
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/ui.js
+	$(COPY) $^ $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/styles
+	$(COPY) $^ $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compiler.js
+	$(COPY) $^ $@
