@@ -52,20 +52,21 @@
         <div class="navbar">
           <div class="navbar-actions navbar-item">
             <div class="navbar-group">
-              <div class="dropdown" id="new-dropdown">
-                <a href="#" class="dropdown-btn">New &#9662;</a>
-                <div class="dropdown-content">
-                  <a href="#">Runnable Print Shader</a>
-                  <a href="#">Runnable Image Shader</a>
-                  <a href="#">Option 3</a>
-                </div>
+              <!-- Runnable Dropdown -->
+              <div class="dropdown" id="runnable-dropdown">
+                <label for="">Shader:</label>
+                <select class="dropdown-input">
+                  <option>Runnable Print Shader</option>
+                  <option>Runnable Image Shader</option>
+                  <option>Option 3</option>
+                </select>
               </div>
               <div class="dropdown" id="demo-dropdown">
-                <a href="#" class="dropdown-btn">Demo &#9662;</a>
-                <div class="dropdown-content">
-                  <a href="#">Circles</a>
-                  <a href="#">Water</a>
-                </div>
+                <label for="">Demo:</label>
+                <select class="dropdown-input">
+                  <option>Circles</option>
+                  <option>Water</option>
+                </select>
               </div>
             </div>
           </div>
@@ -73,13 +74,19 @@
             <button id="run-btn" onclick="onRun()" disabled>Run</button>
           </div>
           <div class="navbar-compile navbar-item">
-            <a href="#" class="run-btn">computeMain (Compute) -> SPIRV</a>
+            <div class="dropdown" id="compile-dropdown">
+              <label for="">Compiler:</label>
+              <select class="dropdown-input">
+                <option>SPIRV</option>
+                <option>Runnable Image Shader</option>
+                <option>Option 3</option>
+              </select>
+            </div>
             <button id="compile-btn" onclick="onCompile()" disabled>
               Compile
             </button>
           </div>
         </div>
-
         <div class="workSpace">
           <div class="codingSpace" id="codeEditor"></div>
           <div class="gutter gutter-vertical"></div>
@@ -97,7 +104,6 @@
         </div>
       </div>
     </div>
-
     <script src="ui.js"></script>
   </body>
 </html>
