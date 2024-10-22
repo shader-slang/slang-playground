@@ -68,14 +68,8 @@
       <div class="mainContainer">
         <div class="workSpace">
           <div class="codingSpace" id="codeEditor"></div>
-          <script>
-            loadEditor(false, "codeEditor", defaultShaderCode);
-          </script>
 
           <div class="diagnosticSpace" id="diagnostics"></div>
-          <script>
-            loadEditor(true, "diagnostics", "diagnostic space");
-          </script>
         </div>
 
         <div class="resultSpace">
@@ -83,11 +77,10 @@
             <canvas class="renderCanvas" id="canvas"></canvas>
           </div>
           <div class="codeGenSpace" id="codeGen"></div>
-          <script>
-            loadEditor(true, "codeGen", "out generation space");
-          </script>
         </div>
       </div>
     </div>
+
+    <script src="ui.js"></script>
   </body>
 </html>
