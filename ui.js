@@ -22,35 +22,48 @@ document.addEventListener("DOMContentLoaded", function () {
     ],
   });
 
-  initializeDemoDropdown();
+  handleDemoDropdown();
+  handleRunnableDropdown();
+  handleCompileDropdown();
 });
 
-function initializeDemoDropdown() {
+function handleDemoDropdown() {
   const demoDropdown = document.getElementById("demo-dropdown");
-  if (!demoDropdown) return;
+  const selectInput = demoDropdown.querySelector(".dropdown-select");
 
-  const demoLinks = demoDropdown.querySelectorAll(".dropdown-content a");
-  const demoButton = demoDropdown.querySelector(".dropdown-btn");
+  selectInput.addEventListener("change", function () {
+    const selectedDemo = this.value;
+    switch (selectedDemo) {
+      case "Circles":
+        monacoEditor.setValue(defaultShaderCode);
+        break;
+      case "Water":
+        monacoEditor.setValue(oceanDemoCode);
+        break;
+    }
 
-  demoLinks.forEach((link) => {
-    link.addEventListener("click", function (e) {
-      e.preventDefault();
+    // Trigger source code change
+    sourceCodeChange = true;
+  });
+}
 
-      const selectedDemo = this.textContent;
+// Handle logic for Runnable Dropdown
+function handleRunnableDropdown() {
+  const runnableDropdown = document.getElementById("runnable-dropdown");
+  const selectInput = runnableDropdown.querySelector(".dropdown-select");
 
-      switch (selectedDemo) {
-        case "Circles":
-          monacoEditor.setValue(defaultShaderCode);
-          break;
-        case "Water":
-          monacoEditor.setValue(oceanDemoCode);
-          break;
-      }
+  selectInput.addEventListener("change", function () {
+    const selectedOption = this.value;
+    // Custom logic
+  });
+}
 
-      demoButton.innerHTML = `${selectedDemo}  &#9662;`;
+function handleCompileDropdown() {
+  const compileDropdown = document.getElementById("compile-dropdown");
+  const selectInput = compileDropdown.querySelector(".dropdown-select");
 
-      // Trigger source code change
-      sourceCodeChange = true;
-    });
+  selectInput.addEventListener("change", function () {
+    const selectedOption = this.value;
+    // Custom logic
   });
 }
