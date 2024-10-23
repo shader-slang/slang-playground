@@ -322,8 +322,15 @@ var onCompile = () => {
 
     toggleDisplayMode(HIDDEN_MODE);
 
-    // TODO: We should get the entry point from the UI
-    const ret = compileShader("computeMain");
+    const entryPoint = document.getElementById("entryPoint");
+    const entryPointName = (entryPoint.value == "") ? entryPoint.placeholder : entryPoint.value;
+    if (!entryPointName || entryPointName.length == 0)
+    {
+        diagnosticsArea.setValue("Please provide the entry point name");
+        return;
+    }
+
+    const ret = compileShader(entryPointName);
     if (!ret)
     {
         diagnosticsArea.setValue(compiler.diagnosticsMsg);
