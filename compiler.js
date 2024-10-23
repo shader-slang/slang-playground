@@ -56,14 +56,7 @@ class SlangCompiler
                     this.shaderType = SlangCompiler.RENDER_SHADER;
                 else
                     this.shaderType = SlangCompiler.PRINT_SHADER;
-
                 return entryPoint;
-            }
-            else
-            {
-                var error = this.slangWasmModule.getLastError();
-                console.error(error.type + " error: " + error.message);
-                this.diagnosticsMsg+=(error.type + " error: " + error.message);
             }
         }
 
@@ -92,11 +85,13 @@ class SlangCompiler
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
+            return entryPoint;
         }
     }
 
     compile(shaderSource, entryPointName, stage)
     {
+        this.diagnosticsMsg = "";
         try {
             var slangSession = this.globalSlangSession.createSession();
             if(!slangSession) {
