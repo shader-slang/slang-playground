@@ -187,7 +187,7 @@ float encodeColor(float4 color)
 
 // Main
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void imageMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
   uint width = 0;
   uint height = 0;

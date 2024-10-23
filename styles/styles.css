@@ -107,6 +107,12 @@ h2 {
   height: 100%;
 }
 
+.printSpace {
+  background-color: var(--very-light-grey);
+  width: 100%;
+  height: 100%;
+}
+
 .gutter {
   background-color: var(--black);
   background-repeat: no-repeat;
