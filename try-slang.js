@@ -17,6 +17,8 @@ var currentWindowSize = [300, 150];
 
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
 const PRINT_MODE = SlangCompiler.PRINT_SHADER;
+const HIDDEN_MODE = SlangCompiler.NON_RUNNABLE_SHADER;
+
 var currentMode = RENDER_MODE;
 
 // TODO: Question?
@@ -165,6 +167,13 @@ function toggleDisplayMode(displayMode)
 
         currentMode = PRINT_MODE;
     }
+    else if (displayMode == HIDDEN_MODE)
+    {
+        canvas.style.display="none";
+        document.getElementById("printResult").style.display = "none";
+
+        currentMode = HIDDEN_MODE;
+    }
     else
     {
         console.log("Invalid display mode " + displayMode);
@@ -173,6 +182,9 @@ function toggleDisplayMode(displayMode)
 
 async function render(timeMS)
 {
+    if (currentMode == HIDDEN_MODE)
+        return;
+
     // we only need to re-create the pipeline when the source code is changed and recompiled.
     if (sourceCodeChange)
     {
@@ -192,7 +204,7 @@ async function render(timeMS)
     pass.dispatchWorkgroups(currentWindowSize[0], currentWindowSize[1]);
     pass.end();
 
-    if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+    if (currentMode == RENDER_MODE)
     {
         var renderPassDescriptor = passThroughPipeline.createRenderPassDesc();
         renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
@@ -205,7 +217,7 @@ async function render(timeMS)
     }
 
     // copy output buffer back in print mode
-    if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
+    if (currentMode == PRINT_MODE)
         encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
 
     // Finish encoding and submit the commands
@@ -213,7 +225,7 @@ async function render(timeMS)
     device.queue.submit([commandBuffer]);
 
     // Only request the next frame if we are in the render mode
-    if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+    if (currentMode == RENDER_MODE)
         requestAnimationFrame(render);
 }
 
@@ -270,11 +282,6 @@ var onRun = () => {
     // the all the runnable entry points, and if it can't find it, it will not run the shader
     // and show the error message in the diagnostics area.
     const ret = compileShader("");
-    if (!ret)
-    {
-        diagnosticsArea.setValue(compiler.diagnosticsMsg);
-        return;
-    }
 
     toggleDisplayMode(compiler.shaderType);
 
@@ -290,6 +297,8 @@ function compileShader(entryPoint)
     var slangSource = monacoEditor.getValue();
     var compiledCode = compiler.compile(slangSource, entryPoint, SlangCompiler.SLANG_STAGE_COMPUTE);
 
+    diagnosticsArea.setValue(compiler.diagnosticsMsg);
+
     // If compile is failed, we just clear the codeGenArea
     if (!compiledCode)
     {
@@ -302,8 +311,16 @@ function compileShader(entryPoint)
 }
 
 var onCompile = () => {
+
+    toggleDisplayMode(HIDDEN_MODE);
+
     // TODO: We should get the entry point from the UI
-    compileShader("computeMain");
+    const ret = compileShader("computeMain");
+    if (!ret)
+    {
+        diagnosticsArea.setValue(compiler.diagnosticsMsg);
+        return;
+    }
 }
 
 function onSourceCodeChange()
