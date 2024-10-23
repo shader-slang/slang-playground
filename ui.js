@@ -29,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 function handleDemoDropdown() {
   const demoDropdown = document.getElementById("demo-dropdown");
-  const selectInput = demoDropdown.querySelector(".dropdown-input");
+  const selectInput = demoDropdown.querySelector(".dropdown-select");
 
   selectInput.addEventListener("change", function () {
     const selectedDemo = this.value;
@@ -50,7 +50,7 @@ function handleDemoDropdown() {
 // Handle logic for Runnable Dropdown
 function handleRunnableDropdown() {
   const runnableDropdown = document.getElementById("runnable-dropdown");
-  const selectInput = runnableDropdown.querySelector(".dropdown-input");
+  const selectInput = runnableDropdown.querySelector(".dropdown-select");
 
   selectInput.addEventListener("change", function () {
     const selectedOption = this.value;
@@ -60,7 +60,7 @@ function handleRunnableDropdown() {
 
 function handleCompileDropdown() {
   const compileDropdown = document.getElementById("compile-dropdown");
-  const selectInput = compileDropdown.querySelector(".dropdown-input");
+  const selectInput = compileDropdown.querySelector(".dropdown-select");
 
   selectInput.addEventListener("change", function () {
     const selectedOption = this.value;

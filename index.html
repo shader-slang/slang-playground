@@ -56,7 +56,7 @@
               <!-- Runnable Dropdown -->
               <div class="dropdown" id="runnable-dropdown">
                 <label for="">Shader:</label>
-                <select class="dropdown-input">
+                <select class="dropdown-select">
                   <option>Runnable Print Shader</option>
                   <option>Runnable Image Shader</option>
                   <option>Option 3</option>
@@ -64,28 +64,42 @@
               </div>
               <div class="dropdown" id="demo-dropdown">
                 <label for="">Demo:</label>
-                <select class="dropdown-input">
+                <select class="dropdown-select">
                   <option>Circles</option>
                   <option>Water</option>
                 </select>
               </div>
             </div>
           </div>
-          <div class="navbar-run navbar-item">
-            <button id="run-btn" onclick="onRun()" disabled>Run</button>
-          </div>
+
           <div class="navbar-compile navbar-item">
+            <div class="input">
+              <label for="entryPoint">Entry point</label>
+              <input
+                type="text"
+                id="entryPoint"
+                name="entryPoint"
+                class="input-textbox"
+                placeholder="imageMain"
+                aria-label="Entry point"
+                required
+              />
+            </div>
             <div class="dropdown" id="compile-dropdown">
               <label for="">Compiler:</label>
-              <select class="dropdown-input">
+              <select class="dropdown-select">
                 <option>SPIRV</option>
                 <option>Runnable Image Shader</option>
                 <option>Option 3</option>
               </select>
             </div>
+          </div>
+
+          <div class="navbar-run navbar-item">
             <button id="compile-btn" onclick="onCompile()" disabled>
               Compile
             </button>
+            <button id="run-btn" onclick="onRun()" disabled>Run</button>
           </div>
         </div>
         <div class="workSpace">
