@@ -11,6 +11,7 @@ class ComputePipeline
     uniformBufferHost = new Float32Array(4);
 
     outputBuffer;
+    outputBufferRead;
     outputTexture;
     device;
     bindGroup;
@@ -87,13 +88,13 @@ class ComputePipeline
     // All out compute pipeline will have 2 outputs:
     // 1. A buffer that will be used to read the result back to the CPU
     // 2. A texture that will be used to display the result on the screen
-    createOutput(invalid)
+    createOutput(invalid, windowSize)
     {
         if (invalid)
         {
             this.destroyResources();
             let usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
-            const numberElements = canvas.clientWidth * canvas.clientHeight;
+            const numberElements = windowSize[0] * windowSize[1];
             const size = numberElements * 4; // int type
             this.outputBuffer = this.device.createBuffer({lable: 'outputBuffer', size, usage});
 
@@ -101,7 +102,7 @@ class ComputePipeline
             const outputBufferRead = this.device.createBuffer({lable: 'outputBufferRead', size, usage});
             this.outputBufferRead = outputBufferRead;
 
-            const storageTexture = createOutputTexture(device, canvas.clientWidth, canvas.clientHeight, 'r32float');
+            const storageTexture = createOutputTexture(device, windowSize[0], windowSize[1], 'r32float');
             this.outputTexture = storageTexture;
 
         }
@@ -118,9 +119,9 @@ class ComputePipeline
         this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformBufferHost);
     }
 
-    setupComputePipeline()
+    setupComputePipeline(windowSize)
     {
-        this.createOutput(true);
+        this.createOutput(true, windowSize);
         this.createComputePipelineLayout();
     }
 }

@@ -5,16 +5,22 @@ class SlangCompiler
     static SLANG_STAGE_FRAGMENT = 5;
     static SLANG_STAGE_COMPUTE = 6;
 
+    static RENDER_SHADER = 0;
+    static PRINT_SHADER = 1;
+    static NON_RUNNABLE_SHADER = 2;
+
     globalSlangSession = null;
     slangSession = null;
 
     slangWasmModule;
-
     diagnosticsMsg;
+    shaderType;
+
     constructor(module)
     {
         this.slangWasmModule = module;
         this.diagnosticsMsg = "";
+        this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
     }
 
     init()
@@ -46,6 +52,11 @@ class SlangCompiler
             var entryPoint = module.findAndCheckEntryPoint(entryPointName, SlangCompiler.SLANG_STAGE_COMPUTE);
             if(entryPoint)
             {
+                if (i == 0)
+                    this.shaderType = SlangCompiler.RENDER_SHADER;
+                else
+                    this.shaderType = SlangCompiler.PRINT_SHADER;
+
                 return entryPoint;
             }
             else

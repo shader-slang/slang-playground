@@ -13,6 +13,12 @@ var codeGenArea;
 
 var sourceCodeChange = true;
 
+var currentWindowSize = [300, 150];
+
+const RENDER_MODE = SlangCompiler.RENDER_SHADER;
+const PRINT_MODE = SlangCompiler.PRINT_SHADER;
+var currentMode = RENDER_MODE;
+
 // TODO: Question?
 // When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
 // code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
@@ -86,6 +92,13 @@ function resizeCanvas(entries)
 {
     const canvas = entries[0].target;
 
+    if (canvas.style.display == "none")
+    {
+        var parentDiv = document.getElementById("output");
+        currentWindowSize = [parentDiv.clientWidth, parentDiv.clientHeight];
+        return true;
+    }
+
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
 
@@ -95,6 +108,7 @@ function resizeCanvas(entries)
         canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
         canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
 
+        currentWindowSize = [canvas.width, canvas.height];
         return true;
     }
 
@@ -111,16 +125,51 @@ function resizeCanvasHandler(entries)
         {
             if (computePipeline && passThroughPipeline)
             {
-                computePipeline.createOutput(true);
+                computePipeline.createOutput(true, currentWindowSize);
                 computePipeline.createBindGroup();
                 passThroughPipeline.inputTexture = computePipeline.outputTexture;
                 passThroughPipeline.createBindGroup();
-                requestAnimationFrame(render);
+                if (canvas.style.display != "none")
+                {
+                    requestAnimationFrame(render);
+                }
             }
         }
     }, 100);
 }
 
+function toggleDisplayMode(displayMode)
+{
+    if (currentMode == displayMode)
+        return;
+
+    if (displayMode == RENDER_MODE)
+    {
+        var printResult = document.getElementById("printResult")
+        printResult.style.display = "none";
+
+        canvas.style.display="grid";
+        canvas.style.width = "100%";
+        canvas.style.height = "100%";
+
+        currentMode = RENDER_MODE;
+    }
+    else if (displayMode == PRINT_MODE)
+    {
+        canvas.style.display="none";
+        var printResult = document.getElementById("printResult")
+        printResult.style.display = "grid";
+        printResult.style.width = "100%";
+        printResult.style.height = "100%";
+        printResult.style.backgroundColor = "white";
+
+        currentMode = PRINT_MODE;
+    }
+    else
+    {
+        console.log("Invalid display mode " + displayMode);
+    }
+}
 
 async function render(timeMS)
 {
@@ -140,55 +189,61 @@ async function render(timeMS)
 
     pass.setBindGroup(0, computePipeline.bindGroup);
     pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(canvas.clientWidth, canvas.clientHeight);
+    pass.dispatchWorkgroups(currentWindowSize[0], currentWindowSize[1]);
     pass.end();
 
-    // Get a WebGPU context from the canvas and configure it
+    if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+    {
+        var renderPassDescriptor = passThroughPipeline.createRenderPassDesc();
+        renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
+        const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
-    var renderPassDescriptor = passThroughPipeline.createRenderPassDesc();
-    renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
-    const renderPass = encoder.beginRenderPass(renderPassDescriptor);
+        renderPass.setBindGroup(0, passThroughPipeline.bindGroup);
+        renderPass.setPipeline(passThroughPipeline.pipeline);
+        renderPass.draw(6);  // call our vertex shader 6 times.
+        renderPass.end();
+    }
 
-    renderPass.setBindGroup(0, passThroughPipeline.bindGroup);
-    renderPass.setPipeline(passThroughPipeline.pipeline);
-    renderPass.draw(6);  // call our vertex shader 6 times.
-    renderPass.end();
-
-    // copy output buffer back
-    // encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+    // copy output buffer back in print mode
+    if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
+        encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 
-    requestAnimationFrame(render);
+    // Only request the next frame if we are in the render mode
+    if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+        requestAnimationFrame(render);
 }
 
-async function waitForComplete(outputBufferRead)
+async function printResult(outputBufferRead)
 {
-    // Read the results
+    await device.queue.onSubmittedWorkDone();
+    // Read the results once the job is done
     await Promise.all([
         outputBufferRead.mapAsync(GPUMapMode.READ),
     ]);
 
     const output = new Int32Array(outputBufferRead.getMappedRange());
 
-    outputResult(output).then(() => {
-        outputBufferRead.unmap()
-    });
+    const textResult = formatResult(output);
+    outputBufferRead.unmap();
+
+    console.log(canvas.style.display);
+
+    document.getElementById("printResult").value = textResult;
 }
 
-async function outputResult(output)
+function formatResult(output)
 {
-    // TODO: Optional - output the printable result to the output area
-    // we don't have such area in the current UI
-    // var result = "";
-    // for (let i = 0; i < output.length; i++)
-    // {
-    //      result += output[i] + '\n';
-    // }
-    //
-    // document.getElementById("result").value = result;
+    var result = "";
+    for (let i = 0; i < output.length; i++)
+    {
+         result += output[i] + '\n';
+    }
+
+    return result;
 }
 
 
@@ -199,7 +254,7 @@ var onRun = () => {
     if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);
-        computePipeline.setupComputePipeline();
+        computePipeline.setupComputePipeline(currentWindowSize);
         computePipeline.createUniformBuffer(4); // 4 bytes for float number
     }
 
@@ -221,11 +276,12 @@ var onRun = () => {
         return;
     }
 
+    toggleDisplayMode(compiler.shaderType);
+
     render(0);
-    // TODO: This function is used to read the output buffer from GPU, and print out.
-    // We will add an option to select render Mode and print mode. Once print mode is selected,
-    // we will not enable the animation, and will call this function to print results on screen.
-    // waitForComplete(computePipeline.outputBufferRead);
+
+    if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
+        printResult(computePipeline.outputBufferRead);
 }
 
 function compileShader(entryPoint)
