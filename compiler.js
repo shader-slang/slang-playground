@@ -12,6 +12,8 @@ class SlangCompiler
     globalSlangSession = null;
     slangSession = null;
 
+    compileTargetMap = null;
+
     slangWasmModule;
     diagnosticsMsg;
     shaderType;
@@ -27,9 +29,11 @@ class SlangCompiler
     {
         try {
             this.globalSlangSession = this.slangWasmModule.createGlobalSession();
-            if(!this.globalSlangSession)
+            this.compileTargetMap = this.slangWasmModule.getCompileTargets();
+
+            if(!this.globalSlangSession || !this.compileTargetMap)
             {
-                var error = Slang.getLastError();
+                var error = this.slangWasmModule.getLastError();
                 return {ret: false, msg: (error.type + " error: " + error.message)};
             }
             else
@@ -89,11 +93,18 @@ class SlangCompiler
         }
     }
 
-    compile(shaderSource, entryPointName, stage)
+    compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
+        const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
+
+        if(!compileTarget) {
+            this.diagnosticsMsg = "unknown compile target: " + compileTargetStr;
+            return null;
+        }
+
         try {
-            var slangSession = this.globalSlangSession.createSession();
+            var slangSession = this.globalSlangSession.createSession(compileTarget);
             if(!slangSession) {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);

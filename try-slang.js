@@ -1,6 +1,6 @@
 'use strict';
 
-var compiler;
+var compiler = null;
 var device;
 var context;
 var computePipeline;
@@ -278,7 +278,7 @@ var onRun = () => {
     // When click the run button, we won't provide the entrypoint name, the compiler will try
     // the all the runnable entry points, and if it can't find it, it will not run the shader
     // and show the error message in the diagnostics area.
-    const ret = compileShader("");
+    const ret = compileShader("", "WGSL");
 
     if (!ret)
     {
@@ -294,16 +294,11 @@ var onRun = () => {
         printResult(computePipeline.outputBufferRead);
 }
 
-function compileShader(entryPoint)
+function compileShader(entryPoint, compileTarget)
 {
     // compile the compute shader code from input text area
     var slangSource = monacoEditor.getValue();
-    if (!compiler)
-    {
-        diagnosticsArea.setValue("Failed to initialize the Slang compiler.");
-        return false;
-    }
-    var compiledCode = compiler.compile(slangSource, entryPoint, SlangCompiler.SLANG_STAGE_COMPUTE);
+    var compiledCode = compiler.compile(slangSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
 
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
@@ -330,7 +325,9 @@ var onCompile = () => {
         return;
     }
 
-    const ret = compileShader(entryPointName);
+    const compileTarget = getCurrentCompileTargetOption();
+
+    const ret = compileShader(entryPointName, compileTarget);
     if (!ret)
     {
         diagnosticsArea.setValue(compiler.diagnosticsMsg);
@@ -403,7 +400,7 @@ var Module = {
     },
 };
 
-// even when loading the page
+// event when loading the page
 window.onload = function ()
 {
     webgpuInit();
@@ -412,7 +409,7 @@ window.onload = function ()
         if (device)
         {
             document.getElementById("run-btn").disabled = false;
-            diagnosticsArea.setValue(moduleLoadingMessage + "WebGPU initialized successfully.\n");
+            document.getElementById("run-btn").click();
         }
         else
         {
