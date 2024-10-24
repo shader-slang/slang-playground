@@ -313,7 +313,7 @@ function compileShader(entryPoint, compileTarget)
     return true;
 }
 
-var onCompile = () => {
+var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
 
@@ -326,6 +326,9 @@ var onCompile = () => {
     }
 
     const compileTarget = getCurrentCompileTargetOption();
+
+    if (compileTarget == "SPIRV")
+        await compiler.initSpirvTools();
 
     const ret = compileShader(entryPointName, compileTarget);
     if (!ret)

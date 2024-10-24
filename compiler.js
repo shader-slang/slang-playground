@@ -18,6 +18,8 @@ class SlangCompiler
     diagnosticsMsg;
     shaderType;
 
+    spirvToolsModule = null;
+
     constructor(module)
     {
         this.slangWasmModule = module;
@@ -93,6 +95,35 @@ class SlangCompiler
         }
     }
 
+    async initSpirvTools()
+    {
+        if (!this.spirvToolsModule)
+        {
+            const spirvTools = BrowserCJS.require("./spirv-tools.js");
+            this.spirvToolsModule = await spirvTools();
+        }
+    }
+
+    spirvDisassembly(spirvBinary)
+    {
+
+        const disAsmCode = this.spirvToolsModule.dis(
+                spirvBinary,
+                this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
+                this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_INDENT |
+                this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES
+            );
+
+
+        if (disAsmCode == "Error")
+        {
+            this.diagnosticsMsg += ("SPIRV disassembly error");
+            disAsmCode = "";
+        }
+
+        return disAsmCode;
+    }
+
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
@@ -129,18 +160,33 @@ class SlangCompiler
             var components = new this.slangWasmModule.ComponentTypeList();
             components.push_back(module);
             components.push_back(entryPoint);
+
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
-            var wgslCode =
-                linkedProgram.getEntryPointCode(
-                    0 /* entryPointIndex */, 0 /* targetIndex */
+
+            var outCode;
+            if (compileTargetStr == "SPIRV")
+            {
+                const spirvCode = linkedProgram.getEntryPointCodeSpirv(
+                            0 /* entryPointIndex */, 0 /* targetIndex */
                 );
-            if(wgslCode == "") {
+                outCode = this.spirvDisassembly(spirvCode);
+            }
+            else
+            {
+                outCode = linkedProgram.getEntryPointCode(
+                            0 /* entryPointIndex */, 0 /* targetIndex */
+                );
+            }
+
+            if(outCode == "") {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
+
+
         } catch (e) {
             console.log(e);
             return null;
@@ -161,7 +207,7 @@ class SlangCompiler
             if (slangSession) {
                 slangSession.delete();
             }
-            return wgslCode;
+            return outCode;
         }
     }
 };
