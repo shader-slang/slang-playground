@@ -317,20 +317,19 @@ var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
 
-    const entryPoint = document.getElementById("entryPoint");
-    const entryPointName = (entryPoint.value == "") ? entryPoint.placeholder : entryPoint.value;
-    if (!entryPointName || entryPointName.length == 0)
+    const entryPoint = document.getElementById("entrypoint-select").value;
+    if (entryPoint == "")
     {
-        diagnosticsArea.setValue("Please provide the entry point name");
+        diagnosticsArea.setValue("Please select the entry point name");
         return;
     }
 
-    const compileTarget = getCurrentCompileTargetOption();
+    const compileTarget = document.getElementById("target-select").value;
 
     if (compileTarget == "SPIRV")
         await compiler.initSpirvTools();
 
-    const ret = compileShader(entryPointName, compileTarget);
+    const ret = compileShader(entryPoint, compileTarget);
     if (!ret)
     {
         diagnosticsArea.setValue(compiler.diagnosticsMsg);

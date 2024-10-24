@@ -2,10 +2,9 @@
 
 sudo apt-get install -y ninja-build
 
-# slang-repo was created in previous step
-pushd ./slang-repo
-
-git clone https://github.com/emscripten-core/emsdk.git
+if [ ! -d emsdk ]; then
+    git clone https://github.com/emscripten-core/emsdk.git
+fi
 
 pushd emsdk
 
@@ -15,6 +14,8 @@ source ./emsdk_env.sh
 
 popd
 
+# slang-repo was created in previous step
+pushd ./slang-repo
 
 # slang was created in previous step
 pushd slang
@@ -39,5 +40,3 @@ rm key.txt
 echo "$(git -C ./slang-repo/slang rev-parse HEAD)" >> key.txt
 
 echo "key: $(cat key.txt)"
-
-sudo rm -r slang-repo
