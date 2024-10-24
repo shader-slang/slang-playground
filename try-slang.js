@@ -378,6 +378,7 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
 
 // Event when loading the WebAssembly module
+var moduleLoadingMessage = "";
 var Module = {
     onRuntimeInitialized: function() {
         compiler = new SlangCompiler(Module);
@@ -385,11 +386,12 @@ var Module = {
         if (result.ret)
         {
             document.getElementById("compile-btn").disabled = false;
+            moduleLoadingMessage = "Slang compiler initialized successfully.\n";
         }
         else
         {
             console.log(result.msg);
-            diagnosticsArea.setValue("Failed to initialize Slang Compiler, Run and Compile features are disabled.");
+            moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
         }
     },
 };
@@ -403,10 +405,11 @@ window.onload = function ()
         if (device)
         {
             document.getElementById("run-btn").disabled = false;
+            diagnosticsArea.setValue(moduleLoadingMessage + "WebGPU initialized successfully.\n");
         }
         else
         {
-            diagnosticsArea.setValue("Browser does not support WebGPU, Run shader feature is disabled.");
+            diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
             document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
         }
     });
