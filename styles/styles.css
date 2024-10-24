@@ -132,29 +132,6 @@ h2 {
   cursor: row-resize;
 }
 
-#run-btn {
-  background-color: var(--medium-grey);
-  color: var(--white);
-  padding: 8px 16px;
-  text-decoration: none;
-  text-align: center;
-  cursor: pointer;
-  display: inline-block;
-  font-size: 14px;
-  background-color: var(--button-face);
-  min-width:max-content
-}
-
-#run-btn:hover {
-  background-color: var(--orange);
-  border-radius: 10px;
-}
-
-#run-btn:disabled {
-  cursor: not-allowed;
-  background-color: var(--button-face-disabled);
-}
-
 button {
   padding: 8px 16px;
   border: var(--button-border);
@@ -164,7 +141,16 @@ button {
   color: white;
 }
 
-button[disabled] {
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: var(--button-face-disabled);
+}
+
+button:hover {
+  background-color: var(--orange);
+}
+button:disabled:hover {
   opacity: 0.5;
   cursor: not-allowed;
   background-color: var(--button-face-disabled);
@@ -195,16 +181,11 @@ button[disabled] {
   justify-content: center;
   align-items: center;
 }
-
-.help-btn svg {
-  color: var(--white);
-  width: 24px;
-  height: 24px;
-}
-
-.help-btn:hover svg {
+.help-btn:hover{
   color: var(--orange);
+  background:none;
 }
+
 .navbar-logo {
   flex-basis: 10%;
   min-width: 150px;
