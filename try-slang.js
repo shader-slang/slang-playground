@@ -348,7 +348,7 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
       var container = document.getElementById(containerId);
       var editor = monaco.editor.create(container, {
                   value: preloadCode,
-                  language: readOnlyMode?'text':'csharp',
+                  language: 'csharp',
                   quickSuggestions: false,
                   theme: 'vs-dark',
                   readOnly: readOnlyMode,
