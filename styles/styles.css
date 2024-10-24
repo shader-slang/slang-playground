@@ -2,7 +2,7 @@
 
 :root {
   --font: "Open Sans";
-  --orange: orange;
+  --orange: rgb(198, 99, 12);
   --black: hsl(0, 0%, 0%);
   --white: hsl(0, 0%, 100%);
   --background: hsl(345, 4%, 5%);
