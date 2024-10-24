@@ -339,7 +339,8 @@ function onSourceCodeChange()
 function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
-      var editor = monaco.editor.create(document.getElementById(containerId), {
+      var container = document.getElementById(containerId);
+      var editor = monaco.editor.create(container, {
                   value: preloadCode,
                   language: readOnlyMode?'text':'csharp',
                   quickSuggestions: false,
@@ -351,6 +352,15 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
                     enabled: false
                 },
               });
+        const leftContainer = document.getElementsByClassName("leftContainer").item(0);
+        const rightContainer = document.getElementsByClassName("rightContainer").item(0);
+        const resizeObserver = new ResizeObserver(() => {
+            const width = leftContainer.contains(container)? leftContainer.clientWidth : rightContainer.clientWidth;
+            const height = container.clientHeight;
+            editor.layout({ width, height });
+        });
+        resizeObserver.observe(container);
+        resizeObserver.observe(leftContainer);
 
         if (containerId == "codeEditor")
             monacoEditor = editor;
@@ -379,7 +389,7 @@ var Module = {
         else
         {
             console.log(result.msg);
-            document.getElementById("WebGPU-status-bar").innerHTML = "Failed to initialize Slang Compiler " + result.msg;
+            diagnosticsArea.setValue("Failed to initialize Slang Compiler, Run and Compile features are disabled.");
         }
     },
 };
@@ -396,7 +406,8 @@ window.onload = function ()
         }
         else
         {
-            document.getElementById("WebGPU-status-bar").innerHTML = "Browser does not support WebGPU";
+            diagnosticsArea.setValue("Browser does not support WebGPU, Run shader feature is disabled.");
+            document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
         }
     });
 }
