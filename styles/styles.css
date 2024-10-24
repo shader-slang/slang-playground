@@ -16,6 +16,8 @@
   --button-border: 2px solid #404040;
   --button-face: #505050;
   --panel-background: #101010;
+  --gutter: #101010;
+  --gutter-hover:#252525;
   --font-size: 14px;
 }
 
@@ -92,6 +94,7 @@ h2 {
 
 .resultSpace {
   display: grid;
+  background-color: var(--panel-background);
   grid-template-rows: 69% 12px 1fr;
   overflow: hidden;
 }
@@ -100,26 +103,36 @@ h2 {
 .diagnosticSpace,
 .outputSpace,
 .codeGenSpace {
-  background-color: var(--light-grey);
-  overflow: auto;
+  background-color: var(--panel-background);
 }
 
 .renderCanvas {
-  background-color: var(--very-light-grey);
+  background-color: var(--black);
   width: 100%;
   height: 100%;
 }
 
 .printSpace {
-  background-color: var(--very-light-grey);
+  background-color: #1E1E1E;
+  margin-top:10px;
+  border:none;
+  color:white;
   width: 100%;
   height: 100%;
 }
+.printSpace:focus {
+  outline:none;
+}
 
 .gutter {
-  background-color: var(--black);
+  background-color: var(--gutter);
   background-repeat: no-repeat;
   background-position: 50%;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.gutter:hover {
+  background-color: var(--gutter-hover);
 }
 
 .gutter.gutter-horizontal {
@@ -139,6 +152,7 @@ button {
   background-color: var(--button-face);
   border-radius: 10px;
   color: white;
+  transition: background-color 0.2s ease-in-out;
 }
 
 button:disabled {
@@ -180,6 +194,7 @@ button:disabled:hover {
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: color 0.2s ease-in-out;
 }
 .help-btn:hover{
   color: var(--orange);
@@ -266,6 +281,7 @@ label {
   border-radius: 4px;
   width: 100%;
   box-sizing: border-box;
+  transition: background-color 0.2s ease-in-out;
 }
 
 .dropdown-select:hover {

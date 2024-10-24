@@ -161,9 +161,6 @@ function toggleDisplayMode(displayMode)
         canvas.style.display="none";
         var printResult = document.getElementById("printResult")
         printResult.style.display = "grid";
-        printResult.style.width = "100%";
-        printResult.style.height = "100%";
-        printResult.style.backgroundColor = "white";
 
         currentMode = PRINT_MODE;
     }
@@ -283,6 +280,12 @@ var onRun = () => {
     // and show the error message in the diagnostics area.
     const ret = compileShader("");
 
+    if (!ret)
+    {
+        toggleDisplayMode(SlangCompiler.PRINT_SHADER);
+        return;
+    }
+
     toggleDisplayMode(compiler.shaderType);
 
     render(0);
@@ -295,6 +298,11 @@ function compileShader(entryPoint)
 {
     // compile the compute shader code from input text area
     var slangSource = monacoEditor.getValue();
+    if (!compiler)
+    {
+        diagnosticsArea.setValue("Failed to initialize the Slang compiler.");
+        return false;
+    }
     var compiledCode = compiler.compile(slangSource, entryPoint, SlangCompiler.SLANG_STAGE_COMPUTE);
 
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
