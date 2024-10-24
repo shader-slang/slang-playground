@@ -51,57 +51,109 @@
     <div class="mainContainer">
       <div class="leftContainer">
         <div class="navbar">
+          <!-- Logo section -->
+          <div class="navbar-logo navbar-item">
+            <img src="./static/slang-logo.png" alt="Logo" class="logo-img" />
+          </div>
+
+          <!-- Load Demo section -->
           <div class="navbar-actions navbar-item">
             <div class="navbar-group">
-              <!-- Runnable Dropdown -->
-              <div class="dropdown" id="runnable-dropdown">
-                <label for="">Shader:</label>
-                <select class="dropdown-select">
-                  <option>Runnable Print Shader</option>
-                  <option>Runnable Image Shader</option>
-                  <option>Option 3</option>
-                </select>
-              </div>
               <div class="dropdown" id="demo-dropdown">
-                <label for="">Demo:</label>
-                <select class="dropdown-select">
-                  <option>Circles</option>
-                  <option>Water</option>
+                <select
+                  class="dropdown-select"
+                  id="demo-select"
+                  name="demo"
+                  aria-label="Load Demo"
+                >
+                  <option value="" disabled selected>Load Demo</option>
+                  <option value="(Empty Image Shader)">
+                    (Empty Image Shader)
+                  </option>
+                  <option value="(Empty Print Shader)">
+                    (Empty Print Shader)
+                  </option>
+                  <option disabled>──────────</option>
+                  <option value="Circle">Circle</option>
+                  <option value="Ocean">Ocean</option>
                 </select>
               </div>
             </div>
           </div>
 
+          <!-- Run section -->
+          <div class="navbar-run navbar-item">
+            <button id="run-btn" onclick="onRun()" disabled>&#9658; Run</button>
+          </div>
+
+          <!-- Entry/Compile section -->
           <div class="navbar-compile navbar-item">
-            <div class="input">
-              <label for="entryPoint">Entry point:</label>
-              <input
-                type="text"
-                id="entryPoint"
-                name="entryPoint"
-                class="input-textbox"
-                placeholder="imageMain"
+            <div class="dropdown" id="entrypoint-dropdown">
+              <select
+                class="dropdown-select"
+                id="entrypoint-select"
+                name="entrypoint"
                 aria-label="Entry point"
-                required
-              />
-            </div>
-            <div class="dropdown" id="compile-dropdown">
-              <label for="">Compiler:</label>
-              <select class="dropdown-select">
-                <option>SPIRV</option>
-                <option>Runnable Image Shader</option>
-                <option>Option 3</option>
+              >
+                <option value="" disabled selected>Entry point</option>
+                <option value="imageMain">imageMain</option>
+                <option value="printMain">printMain</option>
+                <option value="renderMain">renderMain</option>
               </select>
             </div>
-          </div>
 
-          <div class="navbar-run navbar-item">
+            <div class="dropdown" id="target-dropdown">
+              <select
+                class="dropdown-select"
+                id="target-select"
+                name="target"
+                aria-label="target"
+              >
+                <option value="SPIR-V">SPIR-V</option>
+                <option value="DXIL">DXIL</option>
+                <option value="GLSL">GLSL</option>
+              </select>
+            </div>
+
+            <div class="dropdown" id="profile-dropdown">
+              <select
+                class="dropdown-select"
+                id="profile-select"
+                name="profile"
+                aria-label="profile"
+              >
+                <!-- Profile options will be populated dynamically -->
+              </select>
+            </div>
+
             <button id="compile-btn" onclick="onCompile()" disabled>
               Compile
             </button>
-            <button id="run-btn" onclick="onRun()" disabled>Run</button>
+          </div>
+
+          <!-- Help button section -->
+          <div class="navbar-help navbar-item">
+            <button class="help-btn" id="helpButton">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="feather feather-help-circle"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <line x1="12" y1="17" x2="12" y2="17" />
+              </svg>
+            </button>
           </div>
         </div>
+
         <div class="workSpace">
           <div class="codingSpace" id="codeEditor"></div>
           <div class="gutter gutter-vertical"></div>
@@ -113,13 +165,52 @@
         <div class="resultSpace">
           <div class="outputSpace" id="output">
             <canvas class="renderCanvas" id="canvas"></canvas>
-            <textarea readonly class="printSpace" id="printResult" style="display:none"></textarea>
+            <textarea
+              readonly
+              class="printSpace"
+              id="printResult"
+              style="display: none"
+            ></textarea>
           </div>
           <div class="gutter gutter-vertical"></div>
           <div class="codeGenSpace" id="codeGen"></div>
         </div>
       </div>
     </div>
+
+    <div id="helpModal" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3>Slang Playground</h3>
+        <p>
+          <a href="https://github.com/shader-slang/slang" target="_blank"
+            >https://github.com/shader-slang/slang</a
+          >
+        </p>
+        <p>
+          Slang is a shading language that extends HLSL with new capabilities
+          for building modular, extensible, and high-performance real-time
+          shading systems.
+        </p>
+        <h3>Input formats</h3>
+        <ul>
+          <li>Slang</li>
+          <li>HLSL</li>
+        </ul>
+        <h3>Output formats</h3>
+        <ul>
+          <li>DXIL</li>
+          <li>SPIR-V</li>
+          <li>DXBC</li>
+          <li>HLSL</li>
+          <li>GLSL</li>
+          <li>C++</li>
+          <li>CUDA</li>
+          <li>PTX</li>
+        </ul>
+      </div>
+    </div>
+
     <script src="ui.js"></script>
   </body>
 </html>
