@@ -1,8 +1,8 @@
 // target -> profile mappings
 const targetProfileMap = {
   "SPIR-V": ["spirv_1_3", "spirv_1_4", "spirv_1_5"],
-  DXIL: ["dxil_1_0", "dxil_1_1"],
-  GLSL: ["glsl_450", "glsl_460"],
+  "HLSL": ["cs", "vs", "ps", "gs", "ds", "hs", "lib"],
+  "GLSL": ["glsl_450", "glsl_460"],
 };
 
 // Function to update the profile dropdown based on the selected target
