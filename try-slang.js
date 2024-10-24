@@ -371,7 +371,11 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
         if (containerId == "codeEditor")
             monacoEditor = editor;
         else if (containerId == "diagnostics")
+        {
+            var model = editor.getModel();
+            monaco.editor.setModelLanguage(model, "text")
             diagnosticsArea = editor;
+        }
         else if (containerId == "codeGen")
         {
             codeGenArea = editor;
