@@ -83,7 +83,7 @@
 
           <!-- Run section -->
           <div class="navbar-run navbar-item">
-            <button id="run-btn" onclick="onRun()" disabled>&#9658; Run</button>
+            <button id="run-btn" onclick="onRun()" disabled title="Compile and run the shader. (Requires shader to define either a 'imageMain' or a 'printMain' function.)">&#9658; Run</button>
           </div>
 
           <!-- Entry/Compile section -->
@@ -126,7 +126,7 @@
               </select>
             </div>
 
-            <button id="compile-btn" onclick="onCompile()" disabled>
+            <button id="compile-btn" onclick="onCompile()" disabled title='Compile the shader to the selected target. Requires the shader to provide a `[shader("stage")]` attribute on the entrypoint function.'>
               Compile
             </button>
           </div>
