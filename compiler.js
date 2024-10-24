@@ -12,9 +12,13 @@ class SlangCompiler
     globalSlangSession = null;
     slangSession = null;
 
+    compileTargetMap = null;
+
     slangWasmModule;
     diagnosticsMsg;
     shaderType;
+
+    spirvToolsModule = null;
 
     constructor(module)
     {
@@ -27,9 +31,11 @@ class SlangCompiler
     {
         try {
             this.globalSlangSession = this.slangWasmModule.createGlobalSession();
-            if(!this.globalSlangSession)
+            this.compileTargetMap = this.slangWasmModule.getCompileTargets();
+
+            if(!this.globalSlangSession || !this.compileTargetMap)
             {
-                var error = Slang.getLastError();
+                var error = this.slangWasmModule.getLastError();
                 return {ret: false, msg: (error.type + " error: " + error.message)};
             }
             else
@@ -89,11 +95,47 @@ class SlangCompiler
         }
     }
 
-    compile(shaderSource, entryPointName, stage)
+    async initSpirvTools()
+    {
+        if (!this.spirvToolsModule)
+        {
+            const spirvTools = BrowserCJS.require("./spirv-tools.js");
+            this.spirvToolsModule = await spirvTools();
+        }
+    }
+
+    spirvDisassembly(spirvBinary)
+    {
+
+        const disAsmCode = this.spirvToolsModule.dis(
+                spirvBinary,
+                this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
+                this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_INDENT |
+                this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES
+            );
+
+
+        if (disAsmCode == "Error")
+        {
+            this.diagnosticsMsg += ("SPIRV disassembly error");
+            disAsmCode = "";
+        }
+
+        return disAsmCode;
+    }
+
+    compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
+        const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
+
+        if(!compileTarget) {
+            this.diagnosticsMsg = "unknown compile target: " + compileTargetStr;
+            return null;
+        }
+
         try {
-            var slangSession = this.globalSlangSession.createSession();
+            var slangSession = this.globalSlangSession.createSession(compileTarget);
             if(!slangSession) {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
@@ -118,18 +160,33 @@ class SlangCompiler
             var components = new this.slangWasmModule.ComponentTypeList();
             components.push_back(module);
             components.push_back(entryPoint);
+
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
-            var wgslCode =
-                linkedProgram.getEntryPointCode(
-                    0 /* entryPointIndex */, 0 /* targetIndex */
+
+            var outCode;
+            if (compileTargetStr == "SPIRV")
+            {
+                const spirvCode = linkedProgram.getEntryPointCodeSpirv(
+                            0 /* entryPointIndex */, 0 /* targetIndex */
                 );
-            if(wgslCode == "") {
+                outCode = this.spirvDisassembly(spirvCode);
+            }
+            else
+            {
+                outCode = linkedProgram.getEntryPointCode(
+                            0 /* entryPointIndex */, 0 /* targetIndex */
+                );
+            }
+
+            if(outCode == "") {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
+
+
         } catch (e) {
             console.log(e);
             return null;
@@ -150,7 +207,7 @@ class SlangCompiler
             if (slangSession) {
                 slangSession.delete();
             }
-            return wgslCode;
+            return outCode;
         }
     }
 };

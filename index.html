@@ -17,6 +17,11 @@
     />
     <link href="./styles/styles.css" rel="stylesheet" />
     <script src="https://unpkg.com/split-grid/dist/split-grid.js"></script>
+    <script src="https://unpkg.com/browser-cjs/require.min.js"></script>
+    <script>
+      let BrowserCJS = {};
+      BrowserCJS.require = require;
+    </script>
     <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
     <script>
       require.config({
@@ -98,7 +103,7 @@
                 <option value="" disabled selected>Entry point</option>
                 <option value="imageMain">imageMain</option>
                 <option value="printMain">printMain</option>
-                <option value="renderMain">renderMain</option>
+                <option value="computeMain">computeMain</option>
               </select>
             </div>
 
@@ -109,9 +114,11 @@
                 name="target"
                 aria-label="target"
               >
-                <option value="SPIR-V">SPIR-V</option>
+                <option value="SPIRV">SPIR-V</option>
                 <option value="HLSL">HLSL</option>
                 <option value="GLSL">GLSL</option>
+                <option value="METAL">METAL</option>
+                <option value="WGSL">WGSL</option>
               </select>
             </div>
 

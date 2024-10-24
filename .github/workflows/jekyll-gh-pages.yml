@@ -39,8 +39,16 @@ jobs:
           popd
           echo "$(git -C slang-repo/slang rev-parse HEAD)" >> key.txt
 
+      - name: get spirv-tool head commit
+        run: |
+          git clone https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools
+          pushd spirv-tools
+          git checkout vulkan-sdk-1.3.290.0
+          popd
+          echo "$(git -C spirv-tools rev-parse HEAD)" >> key-spirv-tool.txt
+
       - name: restore slang-wasm
-        id: cache
+        id: cache_slang
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -48,10 +56,48 @@ jobs:
             ./slang-wasm.js
           key: ${{hashFiles('key.txt')}}
 
+      - name: restore spirv-tools
+        id: cache_spirv_tools
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ./spirv-tools.wasm
+            ./spirv-tools.js
+          key: ${{hashFiles('key-spirv-tool.txt')}}
+
       - name: slang-wasm build
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.cache_slang.outputs.cache-hit != 'true'
         run: |
           ./slang-wasm-build.sh
+
+      - name: save slang-wasm
+        if: always() && steps.cache_slang.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ./slang-wasm.wasm
+            ./slang-wasm.js
+          key: ${{hashFiles('key.txt')}}
+
+      - name: spirv-tools-wasm build
+        if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
+        run: |
+          ./spirv-tool-wasm-build.sh
+
+      - name: save spirv-tools-wasm
+        if: always() && steps.cache_spirv_tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ./spirv-tools.wasm
+            ./spirv-tools.js
+          key: ${{hashFiles('key-spirv-tool.txt')}}
+
+      - name: Cleanup workspace
+        run: |
+          rm -rf slang-repo
+          rm -rf emsdk
+          rm -rf spirv-tools
 
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
@@ -60,15 +106,6 @@ jobs:
           destination: ./_site
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
-
-      - name: save slang-wasm
-        if: always() && steps.cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ./slang-wasm.wasm
-            ./slang-wasm.js
-          key: ${{hashFiles('key.txt')}}
 
   # Deployment job
   deploy:
