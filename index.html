@@ -183,15 +183,25 @@
         <span class="close">&times;</span>
         <h3>Slang Playground</h3>
         <p>
-          <a href="https://github.com/shader-slang/slang" target="_blank"
-            >https://github.com/shader-slang/slang</a
-          >
+          Welcome to Slang Playground. Here you can write, compile and run Slang shaders locally within your browser.
+          The Slang compiler runs locally in your browser and no data is sent to any server.
         </p>
+        <h4>Compiling Shaders (the "Compile" button)</h3>
         <p>
-          Slang is a shading language that extends HLSL with new capabilities
-          for building modular, extensible, and high-performance real-time
-          shading systems.
+          You can compile shaders to many targets supported by Slang here, including SPIR-V, HLSL, GLSL, Metal, and WGSL.
+          Generating DXIL requires DXC, which doesn't run in the browser so it's not supported here.
         </p>
+        <h4>Run Shaders (the "Run" button)</h3>
+        <p>
+          In addition to compiling shaders, this playground can also run simple shaders via WebGPU.
+          The playground supports running two types of shaders:
+        </p>
+        <ul>
+          <li><b>Image Compute Shader</b>: This is a compute shader that returns a pixel value at a given image coordinate, similar to ShaderToys.
+          An image compute shader must define a imageMain function, see the "Circle" demo for an example.</li>
+          <li><b>Print Shader</b>: This is a shader that prints text to the text output window.
+            A print shader must define a printMain function, see the "Ocean" demo for an example.</li>
+        </ul>
       </div>
     </div>
 

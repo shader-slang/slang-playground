@@ -333,10 +333,14 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
     require(["vs/editor/editor.main"], function () {
       var editor = monaco.editor.create(document.getElementById(containerId), {
                   value: preloadCode,
-                  language: 'javascript',
+                  language: 'csharp',
+                  quickSuggestions: false,
                   theme: 'vs-dark',
                   readOnly: readOnlyMode,
                   automaticLayout: true,
+                  minimap: {
+                    enabled: false
+                },
               });
 
         if (containerId == "codeEditor")

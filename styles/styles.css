@@ -142,6 +142,7 @@ h2 {
   display: inline-block;
   font-size: 14px;
   background-color: var(--button-face);
+  min-width:max-content
 }
 
 #run-btn:hover {
@@ -176,7 +177,6 @@ button[disabled] {
   width: 100%;
   background-color: var(--panel-background);
   padding: 10px;
-  max-height: 95px;
   flex-wrap: wrap;
 }
 
@@ -245,7 +245,7 @@ button[disabled] {
   flex-direction: column;
   gap: 4px;
   font-size: var(--font-size);
-  min-width:50px;
+  min-width:90px;
 }
 
 .input {
@@ -304,9 +304,9 @@ label {
 }
 
 #entrypoint-dropdown {
-  flex: 1 1 auto;
-  max-width: 300px;
-  width: 200px;
+  flex: 1 1 0;
+  width: auto;
+  min-width:max-content;
 }
 
 .navbar-group {
@@ -316,10 +316,10 @@ label {
 
 .navbar-item {
   background-color: var(--light-grey);
+  flex: 1 1 0; 
   color: var(--white);
   padding: 8px 16px;
   text-align: center;
-  height: 98%;
   box-sizing: border-box;
   display: flex;
   justify-content: center;
@@ -328,6 +328,9 @@ label {
   border-radius: 10px;
   margin-left: 10px;
   max-width: fit-content;
+  height: 50px;
+  margin-top:5px;
+  margin-bottom: 5px;
 }
 
 .modal {
