@@ -161,13 +161,13 @@ button {
   cursor: pointer;
   background-color: var(--button-face);
   border-radius: 10px;
+  color: white;
 }
 
 button[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
   background-color: var(--button-face-disabled);
-  color:white;
 }
 
 .navbar {
