@@ -1,6 +1,7 @@
 'use strict';
 
 var compiler = null;
+var slangd = null;
 var device;
 var context;
 var computePipeline;
@@ -346,9 +347,10 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
       var container = document.getElementById(containerId);
+      initMonaco();
       var editor = monaco.editor.create(container, {
-                  value: preloadCode,
-                  language: 'csharp',
+                  value: readOnlyMode?preloadCode:"",
+                  language: readOnlyMode?'csharp':'slang',
                   quickSuggestions: false,
                   theme: 'vs-dark',
                   readOnly: readOnlyMode,
@@ -358,6 +360,11 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
                     enabled: false
                 },
               });
+        if (!readOnlyMode)
+        {
+            editor.getModel().onDidChangeContent(codeEditorChangeContent);
+            editor.setValue(preloadCode);
+        }
         const leftContainer = document.getElementsByClassName("leftContainer").item(0);
         const rightContainer = document.getElementsByClassName("rightContainer").item(0);
         const resizeObserver = new ResizeObserver(() => {
@@ -390,8 +397,11 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 // Event when loading the WebAssembly module
 var moduleLoadingMessage = "";
 var Module = {
-    onRuntimeInitialized: function() {
+    onRuntimeInitialized: function()
+    {
         compiler = new SlangCompiler(Module);
+        slangd = Module.createLanguageServer();
+        initLanguageServer();
         var result = compiler.init();
         if (result.ret)
         {
@@ -403,11 +413,11 @@ var Module = {
             console.log(result.msg);
             moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
         }
-    },
+    }
 };
 
 // event when loading the page
-window.onload = function ()
+window.onload = async function ()
 {
     webgpuInit();
     var promise = webgpuInit();

@@ -25,6 +25,7 @@ class SlangCompiler
         this.slangWasmModule = module;
         this.diagnosticsMsg = "";
         this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
+        FS.createDataFile("/", "user.slang", "", true, true);
     }
 
     init()
