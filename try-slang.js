@@ -260,7 +260,10 @@ function formatResult(output)
 var onRun = () => {
     if (!device)
         return;
-
+    if (!monacoEditor)
+        return;
+    if (!compiler)
+        return;
     if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);
@@ -348,22 +351,26 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
     require(["vs/editor/editor.main"], function () {
       var container = document.getElementById(containerId);
       initMonaco();
+      var model = readOnlyMode
+        ? monaco.editor.createModel(preloadCode)
+        : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
       var editor = monaco.editor.create(container, {
-                  value: readOnlyMode?preloadCode:"",
+                  model: model,
                   language: readOnlyMode?'csharp':'slang',
-                  quickSuggestions: false,
-                  theme: 'vs-dark',
+                  theme: 'slang-dark',
                   readOnly: readOnlyMode,
                   lineNumbers: readOnlyMode?"off":"on",
                   automaticLayout: true,
+                  "semanticHighlighting.enabled": true,
+                  renderValidationDecorations: "on",
                   minimap: {
                     enabled: false
                 },
               });
         if (!readOnlyMode)
         {
-            editor.getModel().onDidChangeContent(codeEditorChangeContent);
-            editor.setValue(preloadCode);
+            model.onDidChangeContent(codeEditorChangeContent);
+            model.setValue(preloadCode);
         }
         const leftContainer = document.getElementsByClassName("leftContainer").item(0);
         const rightContainer = document.getElementsByClassName("rightContainer").item(0);
