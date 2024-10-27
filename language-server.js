@@ -187,7 +187,7 @@ function initMonaco() {
             for (var i = 0; i < result.size(); i++) {
                 let lspResult = result.get(i);
                 resultArray.push({
-                    uri: lspResult.uri,
+                    uri: monaco.Uri.parse(lspResult.uri),
                     range: {
                         startLineNumber: lspResult.range.start.line + 1,
                         startColumn: lspResult.range.start.character + 1,
