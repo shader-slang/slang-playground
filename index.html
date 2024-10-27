@@ -51,9 +51,17 @@
     <script src="compiler.js"></script>
     <script src="try-slang.js"></script>
     <script src="slang-wasm.js"></script>
+    <script src="language-server.js"></script>
   </head>
   <body>
-    <div class="mainContainer">
+    <div id="loading-screen">
+      <img height="80px" src="./static/slang-logo.png" alt="Slang Logo" />
+      <div id="loading-status-line">
+        <div class="spinner"></div>
+        <p class="loading-status">Loading Playground...</p>
+      </div>
+    </div>
+    <div id="contentDiv" class="mainContainer" style="display: none;">
       <div class="leftContainer">
         <div class="navbar">
           <!-- Logo section -->

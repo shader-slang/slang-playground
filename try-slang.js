@@ -1,6 +1,7 @@
 'use strict';
 
 var compiler = null;
+var slangd = null;
 var device;
 var context;
 var computePipeline;
@@ -259,7 +260,10 @@ function formatResult(output)
 var onRun = () => {
     if (!device)
         return;
-
+    if (!monacoEditor)
+        return;
+    if (!compiler)
+        return;
     if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);
@@ -346,18 +350,28 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
       var container = document.getElementById(containerId);
+      initMonaco();
+      var model = readOnlyMode
+        ? monaco.editor.createModel(preloadCode)
+        : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
       var editor = monaco.editor.create(container, {
-                  value: preloadCode,
-                  language: 'csharp',
-                  quickSuggestions: false,
-                  theme: 'vs-dark',
+                  model: model,
+                  language: readOnlyMode?'csharp':'slang',
+                  theme: 'slang-dark',
                   readOnly: readOnlyMode,
                   lineNumbers: readOnlyMode?"off":"on",
                   automaticLayout: true,
+                  "semanticHighlighting.enabled": true,
+                  renderValidationDecorations: "on",
                   minimap: {
                     enabled: false
                 },
               });
+        if (!readOnlyMode)
+        {
+            model.onDidChangeContent(codeEditorChangeContent);
+            model.setValue(preloadCode);
+        }
         const leftContainer = document.getElementsByClassName("leftContainer").item(0);
         const rightContainer = document.getElementsByClassName("rightContainer").item(0);
         const resizeObserver = new ResizeObserver(() => {
@@ -390,37 +404,61 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 // Event when loading the WebAssembly module
 var moduleLoadingMessage = "";
 var Module = {
-    onRuntimeInitialized: function() {
+    onRuntimeInitialized: function()
+    {
         compiler = new SlangCompiler(Module);
+        slangd = Module.createLanguageServer();
+        initLanguageServer();
         var result = compiler.init();
         if (result.ret)
         {
             document.getElementById("compile-btn").disabled = false;
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";
+            runIfFullyInitialized();
         }
         else
         {
             console.log(result.msg);
             moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
         }
-    },
+    }
 };
 
+var pageLoaded = false;
 // event when loading the page
-window.onload = function ()
+window.onload = async function ()
 {
-    webgpuInit();
-    var promise = webgpuInit();
-    promise.then(() => {
+    pageLoaded = true;
+
+    await webgpuInit();
+    if (device)
+    {
+        document.getElementById("run-btn").disabled = false;
+    }
+    else
+    {
+        diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
+        document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
+    }
+    runIfFullyInitialized();
+}
+
+function runIfFullyInitialized()
+{
+    if (compiler && slangd && pageLoaded)
+    {
+        const loadingScreen = document.getElementById('loading-screen');
+        // Start fade-out by setting opacity to 0
+        loadingScreen.style.opacity = '0';
+        // Wait for the transition to finish before hiding completely
+        loadingScreen.addEventListener('transitionend', () => {
+            loadingScreen.style.display = 'none';
+        });
+        document.getElementById('contentDiv').style="";
+        
         if (device)
         {
-            document.getElementById("run-btn").disabled = false;
-            document.getElementById("run-btn").click();
+            onRun();
         }
-        else
-        {
-            diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
-            document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
-        }
-    });
+    }
 }
