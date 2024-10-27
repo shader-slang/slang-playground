@@ -414,6 +414,7 @@ var Module = {
         {
             document.getElementById("compile-btn").disabled = false;
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";
+            runIfFullyInitialized();
         }
         else
         {
@@ -426,18 +427,23 @@ var Module = {
 // event when loading the page
 window.onload = async function ()
 {
-    webgpuInit();
-    var promise = webgpuInit();
-    promise.then(() => {
-        if (device)
-        {
-            document.getElementById("run-btn").disabled = false;
-            document.getElementById("run-btn").click();
-        }
-        else
-        {
-            diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
-            document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
-        }
-    });
+    await webgpuInit();
+    if (device)
+    {
+        document.getElementById("run-btn").disabled = false;
+        runIfFullyInitialized();
+    }
+    else
+    {
+        diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
+        document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
+    }
+}
+
+function runIfFullyInitialized()
+{
+    if (compiler && slangd && device)
+    {
+        onRun();
+    }
 }
