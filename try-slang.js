@@ -424,25 +424,28 @@ var Module = {
     }
 };
 
+var pageLoaded = false;
 // event when loading the page
 window.onload = async function ()
 {
+    pageLoaded = true;
+
     await webgpuInit();
     if (device)
     {
         document.getElementById("run-btn").disabled = false;
-        runIfFullyInitialized();
     }
     else
     {
         diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
         document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
     }
+    runIfFullyInitialized();
 }
 
 function runIfFullyInitialized()
 {
-    if (compiler && slangd && device)
+    if (compiler && slangd && pageLoaded)
     {
         const loadingScreen = document.getElementById('loading-screen');
         // Start fade-out by setting opacity to 0
@@ -452,7 +455,10 @@ function runIfFullyInitialized()
             loadingScreen.style.display = 'none';
         });
         document.getElementById('contentDiv').style="";
-
-        onRun();
+        
+        if (device)
+        {
+            onRun();
+        }
     }
 }
