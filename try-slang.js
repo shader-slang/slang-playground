@@ -444,6 +444,15 @@ function runIfFullyInitialized()
 {
     if (compiler && slangd && device)
     {
+        const loadingScreen = document.getElementById('loading-screen');
+        // Start fade-out by setting opacity to 0
+        loadingScreen.style.opacity = '0';
+        // Wait for the transition to finish before hiding completely
+        loadingScreen.addEventListener('transitionend', () => {
+            loadingScreen.style.display = 'none';
+        });
+        document.getElementById('contentDiv').style="";
+
         onRun();
     }
 }
