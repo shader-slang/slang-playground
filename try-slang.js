@@ -105,7 +105,7 @@ function resizeCanvas(entries)
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
 
-    if (canvas.width !== width || canvas.height !== height)
+    if (width != currentWindowSize[0] || height != currentWindowSize[1])
     {
         // ensure the size won't be 0 nor exceed the limit, otherwise WebGPU will throw an errors
         canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
@@ -118,43 +118,51 @@ function resizeCanvas(entries)
     return false;
 }
 
+var renderDelayTimer = null;
+
+function startRendering() {
+    if (renderDelayTimer)
+        clearTimeout(renderDelayTimer);
+
+    renderDelayTimer = setTimeout(() => {
+        if (computePipeline && passThroughPipeline &&
+            currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
+            computePipeline.createOutput(true, currentWindowSize);
+            computePipeline.createBindGroup();
+            passThroughPipeline.inputTexture = computePipeline.outputTexture;
+            passThroughPipeline.createBindGroup();
+            if (canvas.style.display != "none") {
+                requestAnimationFrame(render);
+            }
+        }
+    }, 100);
+}
+
 // We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
 // multiple useless frames.
 function resizeCanvasHandler(entries)
 {
-    setTimeout(() => {
-        var needResize = resizeCanvas(entries);
-        if (needResize)
-        {
-            if (computePipeline && passThroughPipeline)
-            {
-                computePipeline.createOutput(true, currentWindowSize);
-                computePipeline.createBindGroup();
-                passThroughPipeline.inputTexture = computePipeline.outputTexture;
-                passThroughPipeline.createBindGroup();
-                if (canvas.style.display != "none")
-                {
-                    requestAnimationFrame(render);
-                }
-            }
-        }
-    }, 100);
+    var needResize = resizeCanvas(entries);
+    if (needResize) {
+        startRendering();
+    }
 }
 
 function toggleDisplayMode(displayMode)
 {
     if (currentMode == displayMode)
         return;
-
+    if (currentMode == HIDDEN_MODE && displayMode != HIDDEN_MODE)
+    {
+        document.getElementById("resultSplitContainer").style.gridTemplateRows="50% 14px 1fr";
+    }
     if (displayMode == RENDER_MODE)
     {
         var printResult = document.getElementById("printResult")
         printResult.style.display = "none";
-
         canvas.style.display="grid";
         canvas.style.width = "100%";
         canvas.style.height = "100%";
-
         currentMode = RENDER_MODE;
     }
     else if (displayMode == PRINT_MODE)
@@ -169,7 +177,7 @@ function toggleDisplayMode(displayMode)
     {
         canvas.style.display="none";
         document.getElementById("printResult").style.display = "none";
-
+        document.getElementById("resultSplitContainer").style.gridTemplateRows="0px 14px 1fr";
         currentMode = HIDDEN_MODE;
     }
     else
@@ -182,15 +190,8 @@ async function render(timeMS)
 {
     if (currentMode == HIDDEN_MODE)
         return;
-
-    // we only need to re-create the pipeline when the source code is changed and recompiled.
-    if (sourceCodeChange)
-    {
-        var shaderCode = codeGenArea.getValue();
-        const module = device.createShaderModule({code:shaderCode});
-        computePipeline.createPipeline(module);
-        sourceCodeChange = false;
-    }
+    if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
+        return;
 
     computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
@@ -284,18 +285,22 @@ var onRun = () => {
     // and show the error message in the diagnostics area.
     const ret = compileShader("", "WGSL");
 
-    if (!ret)
+    // Recompile the pipeline.
+    if (ret.succ)
     {
-        toggleDisplayMode(SlangCompiler.PRINT_SHADER);
-        return;
+        const module = device.createShaderModule({code:ret.code});
+        computePipeline.createPipeline(module);
     }
 
     toggleDisplayMode(compiler.shaderType);
-
-    render(0);
-
     if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
+    {
         printResult(computePipeline.outputBufferRead);
+    }
+    else if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+    {
+        startRendering();
+    }
 }
 
 function compileShader(entryPoint, compileTarget)
@@ -303,38 +308,36 @@ function compileShader(entryPoint, compileTarget)
     // compile the compute shader code from input text area
     var slangSource = monacoEditor.getValue();
     var compiledCode = compiler.compile(slangSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
-
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
     // If compile is failed, we just clear the codeGenArea
     if (!compiledCode)
     {
-        codeGenArea.setValue('');
-        return false;
+        codeGenArea.setValue('Compilation returned empty result.');
+        return {succ: false, code: compiledCode};
     }
 
     codeGenArea.setValue(compiledCode);
-    return true;
+    return {succ: true, code: compiledCode};
 }
 
 var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
+    const compileTarget = document.getElementById("target-select").value;
 
     const entryPoint = document.getElementById("entrypoint-select").value;
-    if (entryPoint == "")
+    if (entryPoint == "" && !isWholeProgramTarget(compileTarget))
     {
         diagnosticsArea.setValue("Please select the entry point name");
         return;
     }
 
-    const compileTarget = document.getElementById("target-select").value;
-
     if (compileTarget == "SPIRV")
         await compiler.initSpirvTools();
 
-    const ret = compileShader(entryPoint, compileTarget);
-    if (!ret)
+    compileShader(entryPoint, compileTarget);
+    if (compiler.diagnosticsMsg.length > 0)
     {
         diagnosticsArea.setValue(compiler.diagnosticsMsg);
         return;
@@ -406,6 +409,7 @@ var moduleLoadingMessage = "";
 var Module = {
     onRuntimeInitialized: function()
     {
+        document.getElementById("loadingStatusLabel").innerText = "Initializing Slang Compiler...";
         compiler = new SlangCompiler(Module);
         slangd = Module.createLanguageServer();
         initLanguageServer();
@@ -455,7 +459,7 @@ function runIfFullyInitialized()
             loadingScreen.style.display = 'none';
         });
         document.getElementById('contentDiv').style="";
-        
+
         if (device)
         {
             onRun();
