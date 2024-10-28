@@ -47,6 +47,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js
 
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm &:
@@ -89,4 +90,7 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/st
 	$(COPY) $^ $@
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compiler.js
+	$(COPY) $^ $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/language-server.js
 	$(COPY) $^ $@

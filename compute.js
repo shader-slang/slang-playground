@@ -94,7 +94,9 @@ class ComputePipeline
         {
             this.destroyResources();
             let usage = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC;
-            const numberElements = windowSize[0] * windowSize[1];
+
+            // we will fix the size of the workgroup to be 32x32 for printMain.
+            const numberElements = 16 * 16 /*windowSize[0] * windowSize[1]*/;
             const size = numberElements * 4; // int type
             this.outputBuffer = this.device.createBuffer({lable: 'outputBuffer', size, usage});
 

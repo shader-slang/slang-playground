@@ -27,38 +27,25 @@ var currentMode = RENDER_MODE;
 // code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
 // looking at the generated shader code?
 const defaultShaderCode = `
-uniform float time;
-RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
 
-
-[shader("compute")]
-void imageMain(int3 dispatchThreadID : SV_DispatchThreadID)
+export float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 {
-    int idx = dispatchThreadID.x * 32 + dispatchThreadID.y;
-    outputBuffer[idx] = idx;
-
-    uint width = 0;
-    uint height = 0;
-    texture.GetDimensions(width, height);
-
-    float2 size = float2(width, height);
+    float2 size = float2(screenSize.x, screenSize.y);
     float2 center = size / 2.0;
 
     float2 pos = float2(dispatchThreadID.xy);
 
-    float stripSize = width / 40;
+    float stripSize = screenSize.x / 40;
 
     float dist = distance(pos, center) + time;
     float strip = dist / stripSize % 2.0;
 
     uint color = 0;
     if (strip < 1.0f)
-        color = 0xFF0000FF;
+        return float4(1.0f, 0.0f, 0.0f, 1.0f);
     else
         color = 0x00FFFFFF;
-
-    texture[dispatchThreadID.xy] = float(color);
+        return float4(0.0f, 1.0f, 1.0f, 1.0f);
 }
 `;
 
@@ -228,23 +215,39 @@ async function render(timeMS)
         requestAnimationFrame(render);
 }
 
-async function printResult(outputBufferRead)
+async function printResult()
 {
-    render(0);
+    // Encode commands to do the computation
+    const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+    const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
+
+    pass.setBindGroup(0, computePipeline.bindGroup);
+    pass.setPipeline(computePipeline.pipeline);
+    pass.dispatchWorkgroups(1, 1);
+    pass.end();
+
+    // copy output buffer back in print mode
+    encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+
+    // Finish encoding and submit the commands
+    const commandBuffer = encoder.finish();
+    device.queue.submit([commandBuffer]);
+
     await device.queue.onSubmittedWorkDone();
     // Read the results once the job is done
     await Promise.all([
-        outputBufferRead.mapAsync(GPUMapMode.READ),
+        computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ),
     ]);
 
-    const output = new Int32Array(outputBufferRead.getMappedRange());
+    const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
 
-    const textResult = formatResult(output);
-    outputBufferRead.unmap();
+    let textArray = output.toString().split(','); // "1,2,3,4..."
+    const result = textArray.map((element, index) => index + ': ' + element);
+    const resultStr = result.toString().replaceAll(',', '\n');
 
-    console.log(canvas.style.display);
+    computePipeline.outputBufferRead.unmap();
 
-    document.getElementById("printResult").value = textResult;
+    document.getElementById("printResult").value = resultStr + '\n';
 }
 
 function formatResult(output)
@@ -258,6 +261,25 @@ function formatResult(output)
     return result;
 }
 
+function checkShaderType(userSource)
+{
+    // we did a pre-filter on the user input source code.
+    const isImageMain = userSource.match("imageMain");
+    const isPrintMain = userSource.match("printMain");
+
+    // Only one of the main function should be defined.
+    // In this case, we will know that the shader is not runnable, so we can only compile it.
+    if ( (!isImageMain && !isPrintMain) ||
+         (isImageMain && isPrintMain) )
+    {
+        return SlangCompiler.NON_RUNNABLE_SHADER;
+    }
+
+    if (isImageMain)
+        return SlangCompiler.RENDER_SHADER;
+    else
+        return SlangCompiler.PRINT_SHADER;
+}
 
 var onRun = () => {
     if (!device)
@@ -281,10 +303,21 @@ var onRun = () => {
         passThroughPipeline.createPipeline(shaderModule, inputTexture);
     }
 
-    // When click the run button, we won't provide the entrypoint name, the compiler will try
-    // the all the runnable entry points, and if it can't find it, it will not run the shader
-    // and show the error message in the diagnostics area.
-    const ret = compileShader("", "WGSL");
+    // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
+    // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
+    const userSource = monacoEditor.getValue();
+    const shaderType = checkShaderType(userSource);
+    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER)
+    {
+        diagnosticsArea.setValue("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
+        // clear content in render area and code-gen area
+        toggleDisplayMode(HIDDEN_MODE);
+        codeGenArea.setValue("");
+        return;
+    }
+
+    const entryPointName = shaderType == SlangCompiler.RENDER_SHADER? "imageMain" : "printMain";
+    const ret = compileShader(userSource, entryPointName, "WGSL");
 
     // Recompile the pipeline.
     if (ret.succ)
@@ -296,7 +329,7 @@ var onRun = () => {
     toggleDisplayMode(compiler.shaderType);
     if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
     {
-        printResult(computePipeline.outputBufferRead);
+        printResult();
     }
     else if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
     {
@@ -304,11 +337,9 @@ var onRun = () => {
     }
 }
 
-function compileShader(entryPoint, compileTarget)
+function compileShader(userSource, entryPoint, compileTarget)
 {
-    // compile the compute shader code from input text area
-    var slangSource = monacoEditor.getValue();
-    var compiledCode = compiler.compile(slangSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
+    var compiledCode = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
     // If compile is failed, we just clear the codeGenArea
@@ -322,6 +353,9 @@ function compileShader(entryPoint, compileTarget)
     return {succ: true, code: compiledCode};
 }
 
+// For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.
+// But if it doesn't define any of them, then user code has to define a entry point function name. Because our built-in shader
+// have no way to call the user defined function, and compile engine cannot compile the source code.
 var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
@@ -337,7 +371,10 @@ var onCompile = async () => {
     if (compileTarget == "SPIRV")
         await compiler.initSpirvTools();
 
-    compileShader(entryPoint, compileTarget);
+    // compile the compute shader code from input text area
+    const userSource = monacoEditor.getValue();
+    compileShader(userSource, entryPoint, compileTarget);
+
     if (compiler.diagnosticsMsg.length > 0)
     {
         diagnosticsArea.setValue(compiler.diagnosticsMsg);
