@@ -40,7 +40,7 @@ void test()
         }
     )";
 
-    slang::wgsl::Module* module1 = session->loadModuleFromSource(source1.c_str());
+    slang::wgsl::Module* module1 = session->loadModuleFromSource(source1.c_str(), "user", "/user.slang");
     if (module1 == nullptr)
     {
         std::cout << "Failed to load module1" << std::endl;
@@ -55,7 +55,7 @@ void test()
     }
 
 
-    slang::wgsl::Module* module2 = session->loadModuleFromSource(source2.c_str());
+    slang::wgsl::Module* module2 = session->loadModuleFromSource(source2.c_str(), "user", "/user.slang");
     if (module2 == nullptr)
     {
         std::cout << "Failed to load module1" << std::endl;

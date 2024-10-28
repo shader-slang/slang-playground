@@ -139,7 +139,7 @@ class SlangCompiler
                 return [];
             }
 
-            var module = slangSession.loadModuleFromSource(shaderSource);
+            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if(!module) {
                 return [];
             }
@@ -184,7 +184,7 @@ class SlangCompiler
                 return null;
             }
 
-            var module = slangSession.loadModuleFromSource(shaderSource);
+            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if(!module) {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
