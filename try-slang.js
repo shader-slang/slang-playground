@@ -230,6 +230,7 @@ async function render(timeMS)
 
 async function printResult(outputBufferRead)
 {
+    render(0);
     await device.queue.onSubmittedWorkDone();
     // Read the results once the job is done
     await Promise.all([
