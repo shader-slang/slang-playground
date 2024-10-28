@@ -1,3 +1,7 @@
+function isWholeProgramTarget(compileTarget)
+{
+    return compileTarget == "METAL" || compileTarget == "SPIRV";
+}
 
 class SlangCompiler
 {
@@ -125,6 +129,42 @@ class SlangCompiler
         return disAsmCode;
     }
 
+    findDefinedEntryPoints(shaderSource)
+    {
+        var result = [];
+        try {
+            var slangSession = this.globalSlangSession.createSession(
+                this.compileTargetMap.findCompileTarget("SPIRV"));
+            if(!slangSession) {
+                return [];
+            }
+
+            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
+            if(!module) {
+                return [];
+            }
+
+            var count = module.getDefinedEntryPointCount();
+            for (var i = 0; i < count; i++)
+            {
+                var entryPoint = module.getDefinedEntryPoint(i);
+                result.push(entryPoint.getName());
+                entryPoint.delete();
+            }
+        } catch (e) {
+            return [];
+        }
+        finally {
+            if(module) {
+                module.delete();
+            }
+            if (slangSession) {
+                slangSession.delete();
+            }
+        }
+        return result;
+    }
+
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
@@ -144,7 +184,7 @@ class SlangCompiler
                 return null;
             }
 
-            var module = slangSession.loadModuleFromSource(shaderSource);
+            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if(!module) {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
@@ -152,32 +192,38 @@ class SlangCompiler
                 return null;
             }
 
-            // If no entrypoint is specified, try to find a runnable entry point
-            var entryPoint = this.findEntryPoint(module, entryPointName, stage);
-            if(!entryPoint) {
-                return null;
-            }
-
             var components = new this.slangWasmModule.ComponentTypeList();
             components.push_back(module);
-            components.push_back(entryPoint);
 
+            let isWholeProgram = isWholeProgramTarget(compileTargetStr);
+            if (!isWholeProgram)
+            {
+                // If no entrypoint is specified, try to find a runnable entry point
+                var entryPoint = this.findEntryPoint(module, entryPointName, stage);
+                if(!entryPoint) {
+                    return null;
+                }
+
+                components.push_back(entryPoint);
+            }
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
 
             var outCode;
             if (compileTargetStr == "SPIRV")
             {
-                const spirvCode = linkedProgram.getEntryPointCodeSpirv(
-                            0 /* entryPointIndex */, 0 /* targetIndex */
+                const spirvCode = linkedProgram.getTargetCodeBlob(
+                            0 /* targetIndex */
                 );
                 outCode = this.spirvDisassembly(spirvCode);
             }
             else
             {
-                outCode = linkedProgram.getEntryPointCode(
-                            0 /* entryPointIndex */, 0 /* targetIndex */
-                );
+                if (isWholeProgram)
+                    outCode = linkedProgram.getTargetCode(0);
+                else
+                    outCode = linkedProgram.getEntryPointCode(
+                        0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
             if(outCode == "") {
@@ -186,8 +232,6 @@ class SlangCompiler
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
-
-
         } catch (e) {
             console.log(e);
             return null;

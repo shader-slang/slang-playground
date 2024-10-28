@@ -58,7 +58,7 @@
       <img height="80px" src="./static/slang-logo.png" alt="Slang Logo" />
       <div id="loading-status-line">
         <div class="spinner"></div>
-        <p class="loading-status">Loading Playground...</p>
+        <p class="loading-status" id="loadingStatusLabel">Loading Playground...</p>
       </div>
     </div>
     <div id="contentDiv" class="mainContainer" style="display: none;">
@@ -101,20 +101,6 @@
 
           <!-- Entry/Compile section -->
           <div class="navbar-compile navbar-item">
-            <div class="dropdown" id="entrypoint-dropdown">
-              <select
-                class="dropdown-select"
-                id="entrypoint-select"
-                name="entrypoint"
-                aria-label="Entry point"
-              >
-                <option value="" disabled selected>Entry point</option>
-                <option value="imageMain">imageMain</option>
-                <option value="printMain">printMain</option>
-                <option value="computeMain">computeMain</option>
-              </select>
-            </div>
-
             <div class="dropdown" id="target-dropdown">
               <select
                 class="dropdown-select"
@@ -141,6 +127,17 @@
               </select>
             </div>
 
+            <div class="dropdown" id="entrypoint-dropdown">
+              <select
+                class="dropdown-select"
+                id="entrypoint-select"
+                name="entrypoint"
+                aria-label="Entrypoint"
+              >
+                <option value="" disabled selected>Entrypoint</option>
+              </select>
+            </div>
+            
             <button id="compile-btn" onclick="onCompile()" disabled title='Compile the shader to the selected target. Requires the shader to provide a `[shader("stage")]` attribute on the entrypoint function.'>
               Compile
             </button>
@@ -177,7 +174,7 @@
       </div>
       <div class="gutter gutter-horizontal"></div>
       <div class="rightContainer">
-        <div class="resultSpace">
+        <div class="resultSpace" id="resultSplitContainer">
           <div class="outputSpace" id="output">
             <canvas class="renderCanvas" id="canvas"></canvas>
             <textarea

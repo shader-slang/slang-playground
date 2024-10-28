@@ -152,6 +152,7 @@ button {
   background-color: var(--button-face);
   border-radius: 10px;
   color: white;
+  min-width: max-content;
   transition: background-color 0.2s ease-in-out;
 }
 
@@ -241,7 +242,6 @@ button:disabled:hover {
   flex-direction: column;
   gap: 4px;
   font-size: var(--font-size);
-  min-width:90px;
 }
 
 .input {
@@ -279,7 +279,7 @@ label {
   font-size: 14px;
   cursor: pointer;
   border-radius: 4px;
-  width: 100%;
+  min-width:max-content;
   box-sizing: border-box;
   transition: background-color 0.2s ease-in-out;
 }
@@ -305,7 +305,6 @@ label {
 }
 
 #entrypoint-dropdown {
-  flex: 1 1 0;
   width: auto;
   min-width:max-content;
 }

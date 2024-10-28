@@ -1,25 +1,80 @@
 // target -> profile mappings
 const targetProfileMap = {
-  "SPIR-V": ["spirv_1_3", "spirv_1_4", "spirv_1_5"],
-  "HLSL": ["cs", "vs", "ps", "gs", "ds", "hs", "lib"],
-  "GLSL": ["glsl_450", "glsl_460"],
+  // TODO: uncomment when we support specifying profiles.
+  //"SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
+
+var entrypointSelect = null;
 
 // Function to update the profile dropdown based on the selected target
 function updateProfileOptions(targetSelect, profileSelect) {
   const selectedTarget = targetSelect.value;
-  const profiles = targetProfileMap[selectedTarget] || [];
-
   // Clear the existing options in profile dropdown
   profileSelect.innerHTML = "";
 
-  // Populate the profile dropdown with new options
-  profiles.forEach((profile) => {
+  // If the selected target does not have any profiles, hide the profile dropdown.
+  const profiles = targetProfileMap[selectedTarget] || null;
+  if (!profiles) {
+    document.getElementById("profile-dropdown").style.display = "none";
+  }
+  else{
+    document.getElementById("profile-dropdown").style = "";
+
+    // Populate the profile dropdown with new options
+    profiles.options.forEach((profile) => {
+      const option = document.createElement("option");
+      option.value = profile;
+      option.textContent = profile;
+      profileSelect.appendChild(option);
+    });
+    profileSelect.value = profiles.default;
+  }
+
+  // If the target can be compiled as a whole program without entrypoint selection, hide the entrypoint dropdown.
+  if (isWholeProgramTarget(targetSelect.value)) {
+    document.getElementById("entrypoint-dropdown").style.display = "none";
+  } else {
+    document.getElementById("entrypoint-dropdown").style = "";
+    updateEntryPointOptions();
+  }
+}
+
+function updateEntryPointOptions()
+{
+  if (!compiler)
+    return;
+  if (!entrypointSelect)
+    return;
+  const prevValue = entrypointSelect.value;
+  entrypointSelect.innerHTML = "";
+  var defaultOption = document.createElement("option");
+  defaultOption.value = "";
+  defaultOption.textContent = "Entrypoint";
+  defaultOption.disabled = true;
+  entrypointSelect.appendChild(defaultOption);
+
+  const entryPoints = compiler.findDefinedEntryPoints(monacoEditor.getValue());
+  var prevValueExists = false;
+  entryPoints.forEach((entryPoint) => {
     const option = document.createElement("option");
-    option.value = profile;
-    option.textContent = profile;
-    profileSelect.appendChild(option);
+    option.value = entryPoint;
+    option.textContent = entryPoint;
+    entrypointSelect.appendChild(option);
+    if (entryPoint === prevValue)
+    {
+      option.selected = true;
+      prevValueExists = true;
+    }
   });
+  if (prevValue == "" && entryPoints.length > 0)
+    entrypointSelect.value = entryPoints[0];
+  else if (prevValueExists)
+    entrypointSelect.value = prevValue;
+  else
+  {
+    entrypointSelect.value = "";
+    defaultOption.selected = true;
+  }
 }
 
 function initializeModal() {
@@ -89,6 +144,9 @@ document.addEventListener("DOMContentLoaded", function () {
   // Target -> Profile handling
   const targetSelect = document.getElementById("target-select");
   const profileSelect = document.getElementById("profile-select");
+  entrypointSelect = document.getElementById("entrypoint-select");
+  entrypointSelect.addEventListener('focus', updateEntryPointOptions); // for keyboard access
+  entrypointSelect.addEventListener('mousedown', updateEntryPointOptions); // for mouse access
 
   updateProfileOptions(targetSelect, profileSelect);
 
