@@ -27,8 +27,9 @@ var currentMode = RENDER_MODE;
 // code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
 // looking at the generated shader code?
 const defaultShaderCode = `
+import playground;
 
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
     float2 size = float2(screenSize.x, screenSize.y);
     float2 center = size / 2.0;
@@ -37,6 +38,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 
     float stripSize = screenSize.x / 40;
 
+    const float time = getTime(); // from playgournd
     float dist = distance(pos, center) + time;
     float strip = dist / stripSize % 2.0;
 

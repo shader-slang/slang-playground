@@ -28,10 +28,14 @@ cmake --install build --prefix generators --component generators
 emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
 cmake --build --preset emscripten --target slang-wasm
 
+cmakeRet=$?
 popd
 
-
 popd
+
+if [ $cmakeRet -ne 0 ]; then
+    exit -1;
+fi
 
 cp slang-repo/slang/build.em/Release/bin/* ./
 cp slang-repo/slang/build.em/Release/bin/* ./
