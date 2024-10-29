@@ -345,6 +345,12 @@ function compileShader(userSource, entryPoint, compileTarget)
     }
 
     codeGenArea.setValue(compiledCode);
+    if (compileTarget == "WGSL")
+        codeGenArea.getModel().setLanguage("wgsl");
+    else if (compileTarget == "SPIRV")
+        codeGenArea.getModel().setLanguage("spirv");
+    else
+        codeGenArea.getModel().setLanguage("generic-shader");
     return {succ: true, code: compiledCode};
 }
 
@@ -382,6 +388,7 @@ function onSourceCodeChange()
     sourceCodeChange = true;
 }
 
+
 function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
@@ -408,15 +415,6 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
             model.onDidChangeContent(codeEditorChangeContent);
             model.setValue(preloadCode);
         }
-        const leftContainer = document.getElementsByClassName("leftContainer").item(0);
-        const rightContainer = document.getElementsByClassName("rightContainer").item(0);
-        const resizeObserver = new ResizeObserver(() => {
-            const width = leftContainer.contains(container)? leftContainer.clientWidth : rightContainer.clientWidth;
-            const height = container.clientHeight;
-            editor.layout({ width, height });
-        });
-        resizeObserver.observe(container);
-        resizeObserver.observe(leftContainer);
 
         if (containerId == "codeEditor")
             monacoEditor = editor;
@@ -434,37 +432,48 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
             });
         }
     });
-}
+  }
 
 
 // Event when loading the WebAssembly module
 var moduleLoadingMessage = "";
+
+// Define the Module object with a callback for initialization
 var Module = {
-    onRuntimeInitialized: function()
-    {
-        document.getElementById("loadingStatusLabel").innerText = "Initializing Slang Compiler...";
+    onRuntimeInitialized: function () {
+        var label = document.getElementById("loadingStatusLabel");
+        if (label)
+            label.innerText = "Initializing Slang Compiler...";
         compiler = new SlangCompiler(Module);
         slangd = Module.createLanguageServer();
         initLanguageServer();
         var result = compiler.init();
-        if (result.ret)
-        {
+        if (result.ret) {
             document.getElementById("compile-btn").disabled = false;
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";
             runIfFullyInitialized();
         }
-        else
-        {
+        else {
             console.log(result.msg);
             moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
         }
     }
 };
 
+function loadSlangWasm() {
+    var label = document.getElementById("loadingStatusLabel");
+    if (label)
+        label.innerText = "Loading Slang Compiler...";
+    const script = document.createElement("script");
+    script.src = "slang-wasm.js";
+    document.head.appendChild(script);
+}
+
 var pageLoaded = false;
 // event when loading the page
 window.onload = async function ()
 {
+    loadSlangWasm();
     pageLoaded = true;
 
     await webgpuInit();
@@ -492,6 +501,8 @@ function runIfFullyInitialized()
             loadingScreen.style.display = 'none';
         });
         document.getElementById('contentDiv').style="";
+
+        restoreSelectedTargetFromURL();
 
         if (device)
         {

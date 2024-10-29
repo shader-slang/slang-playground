@@ -140,9 +140,8 @@ class SlangCompiler
             var entryPoint = this.findRunnableEntryPoint(module);
             if (!entryPoint)
             {
-                this.diagnosticsMsg += "Warning: Only entrypoint with name 'imageMain' or 'printMain' is runnable, ";
-                this.diagnosticsMsg += "please correct the entrypoint name and run it.\n";
-                this.diagnosticsMsg += "Otherwise specify the entrypoint name in 'Compile Option' and only compile it\n";
+                this.diagnosticsMsg += "Warning: The current shader code is not runnable because 'imageMain' or 'printMain' functions are not found.\n";
+                this.diagnosticsMsg += "Use the 'Compile' button to compile it to different targets.\n";
             }
             return entryPoint;
         }
