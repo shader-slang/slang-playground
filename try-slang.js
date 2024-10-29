@@ -189,7 +189,9 @@ async function render(timeMS)
 
     pass.setBindGroup(0, computePipeline.bindGroup);
     pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(currentWindowSize[0], currentWindowSize[1]);
+    const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
+    const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
+    pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
     pass.end();
 
     if (currentMode == RENDER_MODE)

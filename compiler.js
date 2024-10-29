@@ -22,11 +22,16 @@ inline float encodeColor(float4 color)
 }
 
 [shader("compute")]
+[numthreads(16, 16, 1)]
 void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
     texture.GetDimensions(width, height);
+
+    if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
+        return;
+
     float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
     float encodedColor = encodeColor(color);
 
