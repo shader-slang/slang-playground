@@ -423,12 +423,15 @@ class SlangCompiler
             if(program) {
                 program.delete();
             }
-            if(userModule) {
-                userModule.delete();
+
+            if (components)
+            {
+                for (let i = 0; i < components.size(); i++)
+                {
+                    components.get(i).delete();
+                }
             }
-            // if(playgroundModule) {
-            //     playground.delete();
-            // }
+
             if (slangSession) {
                 slangSession.delete();
             }
