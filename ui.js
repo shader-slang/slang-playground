@@ -146,8 +146,31 @@ function handleDemoDropdown() {
   });
 }
 
+function restoreSelectedTargetFromURL()
+{
+  const urlParams = new URLSearchParams(window.location.search);
+  const target = urlParams.get('target');
+  if (target) {
+    const targetSelect = document.getElementById("target-select");
+    const profileSelect = document.getElementById("profile-select");
+    targetSelect.value = target;
+    updateProfileOptions(targetSelect, profileSelect);
+  }  
+}
+
 document.addEventListener("DOMContentLoaded", function () {
-  loadEditor(false, "codeEditor", defaultShaderCode);
+  var initShaderCode = defaultShaderCode;
+  const urlParams = new URLSearchParams(window.location.search);
+  const code = urlParams.get('code');
+  if (code) {
+    decompressFromBase64URL(code).then((decompressed) => {
+      initShaderCode = decompressed;
+      loadEditor(false, "codeEditor", initShaderCode);
+    });
+  }
+  else {
+    loadEditor(false, "codeEditor", defaultShaderCode);
+  }
   loadEditor(true, "diagnostics", "Diagnostic Output");
   loadEditor(true, "codeGen", "Generated Target Code");
 
@@ -189,3 +212,69 @@ document.addEventListener("DOMContentLoaded", function () {
   // modal functionality
   initializeModal();
 });
+
+
+let pakoLoaded = false;
+var pako = null;
+// Lazy load function that loads pako on the first call
+function loadPako() {
+  if (pako == null)
+    pako = BrowserCJS.require("https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js");
+  return pako;
+}
+
+// Function to compress and decompress text, loading pako if necessary
+async function compressToBase64URL(text) {
+  const pako = loadPako(); // Ensure pako is loaded
+
+  // Compress the text
+  const compressed = pako.deflate(text, { to: 'string' });
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
+
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function decompressFromBase64URL(base64) {
+  const pako = loadPako(); // Ensure pako is loaded
+  // Decode the base64 URL
+  base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+  const compressed = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+  // Decompress the data
+  const decompressed = pako.inflate(compressed, { to: 'string' });
+
+  return decompressed;
+}
+
+function showTooltip(button, text) {
+  document.getElementById("tooltip").textContent = text;
+  // Position the tooltip near the button
+  const rect = button.getBoundingClientRect();
+  tooltip.style.top = `${rect.bottom + window.scrollY + 15}px`;
+  tooltip.style.left = `${rect.left + window.scrollX}px`;
+
+  // Show the tooltip
+  tooltip.classList.add('show');
+
+  // Hide the tooltip after 3 seconds
+  setTimeout(() => {
+      tooltip.classList.remove('show');
+  }, 3000);
+}
+
+var btnShareLink = document.getElementById("shareButton");
+btnShareLink.onclick = async function () {
+  if (!monacoEditor) return;
+  try{
+    const code = monacoEditor.getValue();
+    const compressed = await compressToBase64URL(code);
+    let url = new URL(window.location.href.split('?')[0]);
+    const compileTarget = document.getElementById("target-select").value;
+    url.searchParams.set("target", compileTarget)
+    url.searchParams.set("code", compressed);
+    navigator.clipboard.writeText(url.href);
+    showTooltip(btnShareLink, "Link copied to clipboard.");
+  }
+  catch(e){
+    showTooltip(btnShareLink, "Failed to copy link to clipboard.");
+  }
+};

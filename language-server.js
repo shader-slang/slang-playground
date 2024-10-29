@@ -18,13 +18,7 @@ function initMonaco() {
             "discard", "defer", "cbuffer", "tbuffer", "func", "is",
             "as", "nullptr", "none", "true", "false", "functype",
             "sizeof", "alignof", "__target_switch", "__intrinsic_asm",
-            "each", "expand", "throws", "static", "const", "in", "out", "inout",
-            "ref", "__subscript", "__init", "property", "get", "set",
-            "class", "struct", "interface", "public", "private", "internal",
-            "protected", "typedef", "typealias", "uniform", "export", "groupshared",
-            "extension", "associatedtype", "namespace", "This", "using",
-            "__generic", "__exported", "import", "enum", "cbuffer", "tbuffer", "func",
-            "functype", "typename", "each", "expand", "where"
+            "typename", "each", "expand", "where", "register", "packoffset",
         ],
         brackets: [
             { open: '{', close: '}', token: 'delimiter.curly' },
@@ -55,17 +49,22 @@ function initMonaco() {
         // The main tokenizer for our languages
         tokenizer: {
             root: [
+                // Builtin types
+                [/(((RW|RasterizerOrdered|Feedback)?(StructuredBuffer|Texture[A-Za-z0-9]+|ByteAddressBuffer))|ConstantBuffer|ParameterBlock|SamplerState|SamplerComparisonState|(image|sampler)[A-Z0-9]+D(Array)?(MS)?(Shadow)?)\b/, 'type'],
+                [/(bool|int|uint|float|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|int8_t|uint8_t|half|float|double|vec|ivec|mat)((1|2|3|4)(x(1|2|3|4))?)?\b/, 'keyword'],
+
                 // identifiers and keywords
                 [/\@?[a-zA-Z_]\w*/, {
                     cases: {
                         '@typeKeywords': 'keyword',
                         '@namespaceFollows': { token: 'keyword.$0', next: '@namespace' },
                         '@keywords': { token: 'keyword.$0', next: '@qualified' },
-                        '@default': { token: 'identifier', next: '@qualified' }
+                        '@default': { token: 'identifier', next: '@qualified' },
                     }
                 }],
 
-                [/((bool|int|uint|float|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|int8_t|uint8_t|half|float|double)(1|2|3|4)?)|void/, 'keyword'],
+                // Preprocessor directives
+                [/#[a-z]+\w*/, 'keyword'],
 
                 // whitespace
                 { include: '@whitespace' },
@@ -79,6 +78,151 @@ function initMonaco() {
                         '@default': ''
                     }
                 }],
+
+                // @ annotations.
+                // As an example, we emit a debugging log message on these tokens.
+                // Note: message are supressed during the first load -- change some lines to see them.
+                [/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
+
+                // numbers
+                [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+                [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+                [/\d+/, 'number'],
+
+                // delimiter: after number because of .\d floats
+                [/[;,.]/, 'delimiter'],
+
+                // strings
+                [/"([^"\\]|\\.)*$/, 'string.invalid'],  // non-teminated string
+                [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+
+                // characters
+                [/'[^\\']'/, 'string'],
+                [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+                [/'/, 'string.invalid']
+            ],
+
+            comment: [
+                [/[^\/*]+/, 'comment'],
+                [/\/\*/, 'comment', '@push'],    // nested comment
+                ["\\*/", 'comment', '@pop'],
+                [/[\/*]/, 'comment']
+            ],
+
+            string: [
+                [/[^\\"]+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+            ],
+
+            whitespace: [
+                [/[ \t\r\n]+/, 'white'],
+                [/\/\*/, 'comment', '@comment'],
+                [/\/\/.*$/, 'comment'],
+            ],
+            qualified: [
+                [/[a-zA-Z_][\w]*/, {
+                    cases: {
+                        '@keywords': { token: 'keyword.$0' },
+                        '@default': 'identifier'
+                    }
+                }],
+                [/\./, 'delimiter'],
+                ['', '', '@pop'],
+            ],
+            namespace: [
+                { include: '@whitespace' },
+                [/[A-Z]\w*/, 'namespace'],
+                [/[\.=]/, 'delimiter'],
+                ['', '', '@pop'],
+            ],
+        },
+    });
+
+    // A general highlighting rule for all shading languages we care about.
+    monaco.languages.register({ id: "generic-shader" });
+    monaco.languages.setMonarchTokensProvider("generic-shader", {
+        keywords: [
+            "if", "else", "switch", "case", "default", "return",
+            "while", "for", "do", "static", "const", "in", "out", "inout",
+            "ref", "class", "struct", "interface", "public", "private", "internal",
+            "protected", "typedef", "uniform", "export", "groupshared",
+             "this", "namespace", "using", "enum", "break", "continue",
+            "discard", "cbuffer", "tbuffer", "true", "false", 
+            "sizeof", "alignof", "layout", "buffer", "register",
+            "packoffset", "nointerpolation"
+        ],
+        brackets: [
+            { open: '{', close: '}', token: 'delimiter.curly' },
+            { open: '[', close: ']', token: 'delimiter.square' },
+            { open: '(', close: ')', token: 'delimiter.parenthesis' },
+            { open: '<', close: '>', token: 'delimiter.angle' }
+        ],
+        namespaceFollows: [
+            'namespace', 'using',
+        ],
+        typeKeywords: [
+            'bool', 'double', 'uint', 'int', 'short', 'char', 'void', 'float'
+        ],
+        operators: [
+            '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+            '&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
+            '<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+            '%=', '<<=', '>>=', '>>>='
+        ],
+
+        // we include these common regular expressions
+        symbols: /[=><!~?:&|+\-*\/\^%]+/,
+
+        // C# style strings
+        escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+        // The main tokenizer for our languages
+        tokenizer: {
+            root: [
+                [/(((RW|RasterizerOrdered|Feedback)?(StructuredBuffer|Texture[A-Za-z0-9]+|ByteAddressBuffer))|ConstantBuffer|SamplerState|SamplerComparisonState|(image|sampler)[A-Z0-9]+D(Array)?(MS)?(Shadow)?)\b/, 'type'],
+                [/(bool|int|uint|float|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|int8_t|uint8_t|half|float|double|vec|ivec|mat)((1|2|3|4)(x(1|2|3|4))?)?\b/, 'keyword'],
+                // SPIRV-opcode
+                [/Op[A-Z][A-Za-z0-9]+\w*/, 'function'],
+
+                // Match function names
+                [/\b([a-zA-Z_][\w]*)\s*(?=\()/, {
+                    cases: {
+                        '@keywords': 'keyword', // Use this if you have keywords to highlight
+                        '@default': 'function' // Apply 'functionName' class for function names
+                    }
+                }],
+
+                // other identifiers and keywords
+                [/\@?[a-zA-Z_]\w*/, {
+                    cases: {
+                        '@typeKeywords': 'keyword',
+                        '@namespaceFollows': { token: 'keyword.$0', next: '@namespace' },
+                        '@keywords': { token: 'keyword.$0', next: '@qualified' },
+                        '@default': { token: 'identifier', next: '@qualified' }
+                    }
+                }],
+
+                // SPIRV-variable
+                [/%[A-Za-z0-9_]+\w*/, 'variable'],
+
+                // Preprocessor directives
+                [/#[a-z]+\w*/, 'keyword'],
+
+                // whitespace
+                { include: '@whitespace' },
+
+                // delimiters and operators
+                [/[{}()\[\]]/, '@brackets'],
+                [/[<>](?!@symbols)/, '@brackets'],
+                [/@symbols/, {
+                    cases: {
+                        '@operators': 'operator',
+                        '@default': ''
+                    }
+                }],
+
 
                 // @ annotations.
                 // As an example, we emit a debugging log message on these tokens.

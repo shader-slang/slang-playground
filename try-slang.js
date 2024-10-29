@@ -319,6 +319,10 @@ function compileShader(entryPoint, compileTarget)
     }
 
     codeGenArea.setValue(compiledCode);
+    if (compileTarget == "WGSL")
+        codeGenArea.getModel().setLanguage("wgsl");
+    else
+        codeGenArea.getModel().setLanguage("generic-shader");
     return {succ: true, code: compiledCode};
 }
 
@@ -463,6 +467,8 @@ function runIfFullyInitialized()
             loadingScreen.style.display = 'none';
         });
         document.getElementById('contentDiv').style="";
+
+        restoreSelectedTargetFromURL();
 
         if (device)
         {
