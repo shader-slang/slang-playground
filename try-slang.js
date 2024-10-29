@@ -28,7 +28,7 @@ var currentMode = RENDER_MODE;
 // looking at the generated shader code?
 const defaultShaderCode = `
 
-export float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 {
     float2 size = float2(screenSize.x, screenSize.y);
     float2 center = size / 2.0;

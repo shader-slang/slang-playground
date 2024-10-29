@@ -87,8 +87,8 @@ class SlangCompiler
         this.slangWasmModule = module;
         this.diagnosticsMsg = "";
         this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
-        this.mainModules['imageMain'] = {source: imageMainSource, module: null, entryPoint: null};
-        this.mainModules['printMain'] = {source: printMainSource, module: null, entryPoint: null};
+        this.mainModules['imageMain'] = {source: imageMainSource};
+        this.mainModules['printMain'] = {source: printMainSource};
         FS.createDataFile("/", "user.slang", "", true, true);
     }
 
@@ -273,13 +273,10 @@ class SlangCompiler
         if (moduleName != "printMain" && moduleName != "imageMain")
             return null;
 
-        if (this.mainModules[moduleName].module)
-            return this.mainModules[moduleName];
-
-        this.mainModules[moduleName] = this.compileEntryPointModule(slangSession, moduleName);
+        let mainModule = this.compileEntryPointModule(slangSession, moduleName);
 
         this.shaderType = SlangCompiler.RENDER_SHADER;
-        return this.mainModules[moduleName];
+        return mainModule;
     }
 
     addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, userModule, componentList)
