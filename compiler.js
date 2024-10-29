@@ -48,12 +48,11 @@ RWStructuredBuffer<int>               outputBuffer;
 
 // TODO: We will fix the threads size
 [shader("compute")]
-[numthreads(16, 16, 1)]
+[numthreads(2, 2, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-
-    int res = printMain(dispatchThreadID.xy, int2(16, 16));
-    int index = dispatchThreadID.y * 16 + dispatchThreadID.x;
+    int res = printMain(dispatchThreadID.xy, int2(2, 2));
+    int index = dispatchThreadID.y * 2 + dispatchThreadID.x;
 
     outputBuffer[index] = res;
 }
