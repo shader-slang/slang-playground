@@ -49,6 +49,9 @@ function initMonaco() {
         // The main tokenizer for our languages
         tokenizer: {
             root: [
+                // C++ raw string literal
+                [/(R"([a-zA-Z0-9_]*?)\()/, { token: 'string.raw.quote', next: '@rawstring.$2' }], // Capture delimiter and enter raw string state
+
                 // Builtin types
                 [/(((RW|RasterizerOrdered|Feedback)?(StructuredBuffer|Texture[A-Za-z0-9]+|ByteAddressBuffer))|ConstantBuffer|ParameterBlock|SamplerState|SamplerComparisonState|(image|sampler)[A-Z0-9]+D(Array)?(MS)?(Shadow)?)\b/, 'type'],
                 [/(bool|int|uint|float|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|int8_t|uint8_t|half|float|double|vec|ivec|mat)((1|2|3|4)(x(1|2|3|4))?)?\b/, 'keyword'],
@@ -78,11 +81,6 @@ function initMonaco() {
                         '@default': ''
                     }
                 }],
-
-                // @ annotations.
-                // As an example, we emit a debugging log message on these tokens.
-                // Note: message are supressed during the first load -- change some lines to see them.
-                [/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
 
                 // numbers
                 [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
@@ -114,6 +112,17 @@ function initMonaco() {
                 [/@escapes/, 'string.escape'],
                 [/\\./, 'string.escape.invalid'],
                 [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+            ],
+
+            rawstring: [
+                // Closing of raw string literal with matching delimiter
+                [/\)([a-zA-Z0-9_]*?)"/, {
+                    cases: {
+                        '$1==$S2': { token: 'string.raw.quote', next: '@pop' }, // Match delimiter with initial delimiter
+                        '@default': 'string.raw'  // Otherwise, continue within raw string
+                    }
+                }],
+                [/./, 'string.raw'] // Match any character within the raw string
             ],
 
             whitespace: [
@@ -183,8 +192,6 @@ function initMonaco() {
             root: [
                 [/(((RW|RasterizerOrdered|Feedback)?(StructuredBuffer|Texture[A-Za-z0-9]+|ByteAddressBuffer))|ConstantBuffer|SamplerState|SamplerComparisonState|(image|sampler)[A-Z0-9]+D(Array)?(MS)?(Shadow)?)\b/, 'type'],
                 [/(bool|int|uint|float|int16_t|uint16_t|int32_t|uint32_t|int64_t|uint64_t|int8_t|uint8_t|half|float|double|vec|ivec|mat)((1|2|3|4)(x(1|2|3|4))?)?\b/, 'keyword'],
-                // SPIRV-opcode
-                [/Op[A-Z][A-Za-z0-9]+\w*/, 'function'],
 
                 // Match function names
                 [/\b([a-zA-Z_][\w]*)\s*(?=\()/, {
@@ -204,9 +211,6 @@ function initMonaco() {
                     }
                 }],
 
-                // SPIRV-variable
-                [/%[A-Za-z0-9_]+\w*/, 'variable'],
-
                 // Preprocessor directives
                 [/#[a-z]+\w*/, 'keyword'],
 
@@ -222,12 +226,6 @@ function initMonaco() {
                         '@default': ''
                     }
                 }],
-
-
-                // @ annotations.
-                // As an example, we emit a debugging log message on these tokens.
-                // Note: message are supressed during the first load -- change some lines to see them.
-                [/@\s*[a-zA-Z_\$][\w\$]*/, { token: 'annotation', log: 'annotation token: $0' }],
 
                 // numbers
                 [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
@@ -285,6 +283,184 @@ function initMonaco() {
         },
     });
 
+    monaco.languages.register({ id: "spirv" });
+    monaco.languages.setMonarchTokensProvider("spirv", {
+        brackets: [
+            { open: '{', close: '}', token: 'delimiter.curly' },
+            { open: '[', close: ']', token: 'delimiter.square' },
+            { open: '(', close: ')', token: 'delimiter.parenthesis' },
+        ],
+        operators: [
+            '=',
+        ],
+
+        symbols: /[=><!~?:&|+\-*\/\^%]+/,
+
+        escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+        tokenizer: {
+            root: [
+                // SPIRV-opcode
+                [/Op[A-Za-z]*Decorate\b/, 'keyword'],
+                [/OpFunction\b/, 'keyword'],
+                [/OpLabel\b/, 'parameter'],
+                [/Op[A-Za-z]*Name\b/, 'parameter'],
+                [/Op[A-Z][A-Za-z0-9]+\w*/, 'function'],
+
+                // other identifiers and keywords
+                [/[A-Z][a-zA-Z0-9_]+\b/, 'enumMember'],
+
+                // SPIRV-variable
+                [/%[A-Za-z0-9_]+\w*/, 'variable'],
+
+                // whitespace
+                { include: '@whitespace' },
+
+                // Comments
+                [/;.*/, 'comment'],
+
+                // delimiters and operators
+                [/[{}()\[\]]/, '@brackets'],
+                [/[<>](?!@symbols)/, '@brackets'],
+                [/@symbols/, {
+                    cases: {
+                        '@operators': 'operator',
+                        '@default': ''
+                    }
+                }],
+
+                // numbers
+                [/\d*\.\d+([eE][\-+]?\d+)?/, 'number.float'],
+                [/0[xX][0-9a-fA-F]+/, 'number.hex'],
+                [/\d+/, 'number'],
+
+                // delimiter: after number because of .\d floats
+                [/[;,.]/, 'delimiter'],
+
+                // strings
+                [/"([^"\\]|\\.)*$/, 'string.invalid'],  // non-teminated string
+                [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+
+                // characters
+                [/'[^\\']'/, 'string'],
+                [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+                [/'/, 'string.invalid']
+            ],
+
+            string: [
+                [/[^\\"]+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+            ],
+
+            whitespace: [
+                [/[ \t\r\n]+/, 'white'],
+            ],
+        },
+    });
+
+    monaco.languages.registerDefinitionProvider("spirv", {
+        provideDefinition: function (model, position) {
+            const word = model.getWordAtPosition(position);
+            if (!word) return null;
+
+            const wordRange = new monaco.Range(
+                position.lineNumber,
+                word.startColumn,
+                position.lineNumber,
+                word.endColumn
+            );
+
+            // Extract the identifier under the cursor
+            const identifier = word.word;
+
+            // Find the definition of the identifier (either a register or function)
+            for (let i = 1; i <= model.getLineCount(); i++) {
+                const lineContent = model.getLineContent(i);
+                
+                // Check for register definitions (%register)
+                if (lineContent.includes(`${identifier} =`)) {
+                    return {
+                        range: new monaco.Range(i, 1, i, lineContent.length + 1),
+                        uri: model.uri
+                    };
+                }
+
+                // Check for function definitions (OpFunction)
+                if (lineContent.includes(`OpFunction ${identifier}`)) {
+                    return {
+                        range: new monaco.Range(i, 1, i, lineContent.length + 1),
+                        uri: model.uri
+                    };
+                }
+            }
+
+            // Return null if no definition was found
+            return null;
+        }
+    });
+
+    monaco.languages.registerHoverProvider('spirv', {
+        provideHover: function(model, position) {
+            const word = model.getWordAtPosition(position);
+            if (!word) return null;
+    
+            const identifier = word.word;
+            let currentFunction = null;
+
+            // Check for %register or OpFunction definitions
+            for (let i = 1; i <= model.getLineCount(); i++) {
+                const lineContent = model.getLineContent(i);
+    
+                // Detect function definitions
+                if (lineContent.includes(`OpFunction`)) {
+                    const funcMatch = lineContent.match(/%?(\w+)\s+=\s+OpFunction\s+/);
+                    if (funcMatch) {
+                        currentFunction = funcMatch[1]; // Store the current function name
+                    }
+                }
+
+                // Detect function end to reset the current function
+                if (lineContent.includes(`OpFunctionEnd`)) {
+                    currentFunction = null;
+                }
+
+                // Hover text for register
+                if (lineContent.includes(`${identifier} =`)) {
+                    var hoverContents = [
+                        { value: `**Register:** \`${identifier}\`` },
+                        { value: '---' },
+                        { value: `**Definition:** \n\n\`${lineContent.trim()}\`` }
+                    ];
+                    // Add function context if inside a function
+                    if (currentFunction) {
+                        hoverContents.push({ value: `**In Function:** \`${currentFunction}\`` });
+                    }
+                    return {
+                        range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+                        contents: hoverContents
+                    };
+                }
+    
+                // Hover text for function
+                if (lineContent.includes(`OpFunction ${identifier}`)) {
+                    return {
+                        range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+                        contents: [
+                            { value: `**Function:** \`${identifier}\`` },
+                            { value: '---' },
+                            { value: `**Definition:** \n\n\`${lineContent.trim()}\`` }
+                        ]
+                    };
+                }
+            }
+    
+            // If no match is found, return null
+            return null;
+        }
+    });    
+
     monaco.editor.defineTheme("slang-dark", {
         base: "vs-dark",
         inherit: true,
@@ -292,6 +468,7 @@ function initMonaco() {
             { token: "function", foreground: "DCDCAA" },
             { token: "parameter", foreground: "B0B0B0" },
             { token: "variable", foreground: "8CDCFE" },
+            { token: "enumMember", foreground: "4EC9B0" },
         ],
         colors: {
             "editor.foreground": "#F0F0F0",
