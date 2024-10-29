@@ -235,9 +235,7 @@ async function printResult()
 
     await device.queue.onSubmittedWorkDone();
     // Read the results once the job is done
-    await Promise.all([
-        computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ),
-    ]);
+    await computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ);
 
     const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
 
@@ -269,11 +267,8 @@ function checkShaderType(userSource)
 
     // Only one of the main function should be defined.
     // In this case, we will know that the shader is not runnable, so we can only compile it.
-    if ( (!isImageMain && !isPrintMain) ||
-         (isImageMain && isPrintMain) )
-    {
+    if (isImageMain == isPrintMain)
         return SlangCompiler.NON_RUNNABLE_SHADER;
-    }
 
     if (isImageMain)
         return SlangCompiler.RENDER_SHADER;
