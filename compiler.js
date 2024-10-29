@@ -381,7 +381,7 @@ class SlangCompiler
 
     loadModule(slangSession, moduleName, source, componentTypeList)
     {
-        var module = slangSession.loadModuleFromSource(source, moduleName, "/"+ moduleName + "slang");
+        var module = slangSession.loadModuleFromSource(source, moduleName, "/"+ moduleName + ".slang");
         if(!module) {
             var error = this.slangWasmModule.getLastError();
             console.error(error.type + " error: " + error.message);
