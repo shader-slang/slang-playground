@@ -40,9 +40,10 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 `;
 
 const playgroundSource = `
-uniform float time;
+internal uniform float time;
 
-float getTime()
+// Return the current time in milliseconds
+public float getTime()
 {
     return time;
 }
@@ -56,15 +57,12 @@ import playground;
 RWStructuredBuffer<int>               outputBuffer;
 [format("r32f")] RWTexture2D<float>   texture;
 
-// TODO: We will fix the threads size
 [shader("compute")]
-[numthreads(2, 2, 1)]
+[numthreads(1, 1, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int res = printMain(dispatchThreadID.xy, int2(2, 2));
-    int index = dispatchThreadID.y * 2 + dispatchThreadID.x;
-
-    outputBuffer[index] = res;
+    int res = printMain();
+    outputBuffer[0] = res;
 }
 `;
 
@@ -80,7 +78,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 const emptyPrintShader = `
 import playground;
 
-int printMain(uint2 dispatchThreadID, int2 threadGroupSize)
+int printMain()
 {
     return 1;
 }
@@ -467,6 +465,7 @@ class SlangCompiler
                 {
                     components.get(i).delete();
                 }
+                components.delete();
             }
 
             if (slangSession) {

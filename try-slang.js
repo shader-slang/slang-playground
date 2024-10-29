@@ -243,13 +243,11 @@ async function printResult()
 
     const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
 
-    let textArray = output.toString().split(','); // "1,2,3,4..."
-    const result = textArray.map((element, index) => index + ': ' + element);
-    const resultStr = result.toString().replaceAll(',', '\n');
+    const textResult = output.toString() + "\n";
 
     computePipeline.outputBufferRead.unmap();
 
-    document.getElementById("printResult").value = resultStr + '\n';
+    document.getElementById("printResult").value = textResult;
 }
 
 function formatResult(output)
