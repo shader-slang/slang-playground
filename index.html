@@ -50,8 +50,7 @@
     <script src="compute.js"></script>
     <script src="compiler.js"></script>
     <script src="try-slang.js"></script>
-    <script src="slang-wasm.js"></script>
-    <script src="language-server.js"></script>
+    <script src="language-server.js" defer></script>
   </head>
   <body>
     <div id="loading-screen">
@@ -62,7 +61,7 @@
       </div>
     </div>
     <div id="contentDiv" class="mainContainer" style="display: none;">
-      <div class="leftContainer">
+      <div class="leftContainer" id="leftContainerDiv">
         <div class="navbar">
           <!-- Logo section -->
           <div class="navbar-logo">
@@ -142,14 +141,26 @@
               Compile
             </button>
           </div>
+          <!-- Share button section -->
+          <div class="navbar-standalone-button-item">
+            <button class="svg-btn" id="shareButton" title="Create sharable link">
+              <svg xmlns="http://www.w3.org/2000/svg"
+              width="28px"
+              height="28px"
+              viewBox="0 0 64 64"
+              fill="currentColor">
+              <path d="M 9 9 L 9 14 L 9 54 L 51 54 L 56 54 L 55 42 L 51 42 L 51 49.095703 L 13 50 L 13.900391 14 L 21 14 L 21 10 L 9 9 z M 44 9 L 44 17.072266 C 29.919275 17.731863 19 23.439669 19 44 L 23 44 C 23 32.732824 29.174448 25.875825 44 25.080078 L 44 33 L 56 20.5 L 44 9 z"></path>
+              </svg>
+            </button>
+          </div>
 
           <!-- Help button section -->
-          <div class="navbar-help navbar-item">
-            <button class="help-btn" id="helpButton" title="Show Help">
+          <div class="navbar-standalone-button-item">
+            <button class="svg-btn" id="helpButton" title="Show Help">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
+                width="28px"
+                height="28px"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -166,26 +177,26 @@
           </div>
         </div>
 
-        <div class="workSpace">
-          <div class="codingSpace" id="codeEditor"></div>
-          <div class="gutter gutter-vertical"></div>
-          <div class="diagnosticSpace" id="diagnostics"></div>
+        <div class="workSpace" id="workSpaceDiv">
+          <div class="codingSpace editorContainer" id="codeEditor"></div>
+          <div class="gutter gutter-vertical" id="workSpaceGutter"></div>
+          <div class="diagnosticSpace editorContainer" id="diagnostics"></div>
         </div>
       </div>
       <div class="gutter gutter-horizontal"></div>
-      <div class="rightContainer">
+      <div class="rightContainer" id="rightContainerDiv">
         <div class="resultSpace" id="resultSplitContainer">
           <div class="outputSpace" id="output">
             <canvas class="renderCanvas" id="canvas"></canvas>
             <textarea
               readonly
-              class="printSpace"
+              class="printSpace editorContainer"
               id="printResult"
               style="display: none"
             ></textarea>
           </div>
           <div class="gutter gutter-vertical"></div>
-          <div class="codeGenSpace" id="codeGen"></div>
+          <div class="codeGenSpace editorContainer" id="codeGen"></div>
         </div>
       </div>
     </div>

@@ -186,7 +186,7 @@ button:disabled:hover {
   height: auto;
 }
 
-.help-btn {
+.svg-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -197,7 +197,7 @@ button:disabled:hover {
   align-items: center;
   transition: color 0.2s ease-in-out;
 }
-.help-btn:hover{
+.svg-btn:hover{
   color: var(--orange);
   background:none;
 }
@@ -229,12 +229,6 @@ button:disabled:hover {
   justify-content: space-between;
   gap: 15px;
   /* align-items: center; */
-}
-
-.navbar-help {
-  flex-basis: 2%;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .dropdown {
@@ -322,6 +316,24 @@ label {
   text-align: center;
   box-sizing: border-box;
   display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  border-radius: 10px;
+  margin-left: 10px;
+  max-width: fit-content;
+  height: 50px;
+  margin-top:5px;
+  margin-bottom: 5px;
+}
+.navbar-standalone-button-item {
+  background-color: var(--light-grey);
+  color: var(--white);
+  padding: 8px 8px;
+  text-align: center;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
   justify-content: center;
   align-items: center;
   flex-shrink: 0;

@@ -77,6 +77,37 @@ function updateEntryPointOptions()
   }
 }
 
+// Set all containers to overflow:hidden before resizing so they can properly shrink.
+function prepareForResize() {
+  var codeEditors = document.getElementsByClassName("editorContainer");
+
+  for (var i = 0; i < codeEditors.length; i++) {
+    codeEditors[i].style.overflow = "hidden";
+  }
+  document.getElementById("workSpaceDiv").style.overflow = "hidden";
+  document.getElementById("leftContainerDiv").style.overflow = "hidden";
+}
+// Restore the containers to overflow:visible after resizing.
+function finishResizing() {
+    var codeEditors = document.getElementsByClassName("editorContainer");
+    document.getElementById("workSpaceDiv").style.overflow = "visible";
+    document.getElementById("leftContainerDiv").style.overflow = "visible";
+    for (var i = 0; i < codeEditors.length; i++) {
+      codeEditors[i].style.overflow = "visible";
+    }
+}
+
+var finishResizingTimeout = null;
+window.onresize = function () {
+  prepareForResize();
+  if (finishResizingTimeout)
+    clearTimeout(finishResizingTimeout);
+  finishResizingTimeout = setTimeout(() => {
+    finishResizing();
+    finishResizingTimeout = null;
+  }, 50);
+};
+
 function initializeModal() {
   const modal = document.getElementById("helpModal");
   const btn = document.getElementById("helpButton");
@@ -137,8 +168,9 @@ document.addEventListener("DOMContentLoaded", function () {
         element: document.querySelector(".resultSpace > .gutter-vertical"),
       },
     ],
+    onDragStart: ()=>prepareForResize(),
+    onDragEnd: ()=>finishResizing(),
   });
-
   handleDemoDropdown();
 
   // Target -> Profile handling
