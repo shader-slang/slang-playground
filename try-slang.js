@@ -321,6 +321,8 @@ function compileShader(entryPoint, compileTarget)
     codeGenArea.setValue(compiledCode);
     if (compileTarget == "WGSL")
         codeGenArea.getModel().setLanguage("wgsl");
+    else if (compileTarget == "SPIRV")
+        codeGenArea.getModel().setLanguage("spirv");
     else
         codeGenArea.getModel().setLanguage("generic-shader");
     return {succ: true, code: compiledCode};
