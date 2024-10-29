@@ -305,6 +305,7 @@ function initMonaco() {
                 [/OpFunction\b/, 'keyword'],
                 [/OpLabel\b/, 'parameter'],
                 [/Op[A-Za-z]*Name\b/, 'parameter'],
+                [/OpType[A-Za-z0-9]+\b/, 'type'],
                 [/Op[A-Z][A-Za-z0-9]+\w*/, 'function'],
 
                 // other identifiers and keywords
@@ -468,7 +469,7 @@ function initMonaco() {
             { token: "function", foreground: "DCDCAA" },
             { token: "parameter", foreground: "B0B0B0" },
             { token: "variable", foreground: "8CDCFE" },
-            { token: "enumMember", foreground: "4EC9B0" },
+            { token: "enumMember", foreground: "98AD1C" },
         ],
         colors: {
             "editor.foreground": "#F0F0F0",
