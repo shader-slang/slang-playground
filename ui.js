@@ -33,6 +33,7 @@ function updateProfileOptions(targetSelect, profileSelect) {
   // If the target can be compiled as a whole program without entrypoint selection, hide the entrypoint dropdown.
   if (isWholeProgramTarget(targetSelect.value)) {
     document.getElementById("entrypoint-dropdown").style.display = "none";
+    document.getElementById("entrypoint-select").value = "";
   } else {
     document.getElementById("entrypoint-dropdown").style = "";
     updateEntryPointOptions();
