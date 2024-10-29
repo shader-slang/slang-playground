@@ -377,21 +377,7 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
             model.onDidChangeContent(codeEditorChangeContent);
             model.setValue(preloadCode);
         }
-       // const leftContainer = document.getElementsByClassName("leftContainer").item(0);
-        // const rightContainer = document.getElementsByClassName("rightContainer").item(0);
-        // const resizeObserver = new ResizeObserver((entries) => {
-        //     // const width = leftContainer.contains(container)? leftContainer.clientWidth : rightContainer.clientWidth;
-        //     // const height = container.clientHeight;
-        //     // editor.layout({ width, height });
-        //     if (leftContainer == entries[0].target){
-        //         var gutterSize = 14;
-        //         var newEditorHeight = leftContainer.clientHeight - gutterSize - document.getElementById("diagnostics").clientHeight;
-        //         document.getElementById("workSpaceDiv").style["grid-template-rows"] = `${newEditorHeight}px ${gutterSize}px 1fr`;
-        //     }
-        // });
-        //resizeObserver.observe(container);
-        //resizeObserver.observe(leftContainer);
-  
+
         if (containerId == "codeEditor")
             monacoEditor = editor;
         else if (containerId == "diagnostics")
