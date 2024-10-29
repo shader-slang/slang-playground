@@ -63,6 +63,25 @@ void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 `;
 
+const emptyImageShader = `
+import playground;
+
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
+{
+    return float4(0);
+}
+`;
+
+const emptyPrintShader = `
+import playground;
+
+int printMain(uint2 dispatchThreadID, int2 threadGroupSize)
+{
+    return 1;
+}
+`;
+
+
 class SlangCompiler
 {
     static SLANG_STAGE_VERTEX = 1;
