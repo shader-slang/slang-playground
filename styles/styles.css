@@ -363,11 +363,13 @@ label {
 
 .modal-content {
   background-color: #fff;
-  margin: 15% auto;
+  margin: auto;
   padding: 20px;
   border-radius: 10px;
   width: 80%;
   max-width: 500px;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .close {
