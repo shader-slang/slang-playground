@@ -1,4 +1,5 @@
 const userCodeURI = "file:///user.slang";
+const playgroundCodeURI = "file:///playground.slang";
 var languageRegistered = false;
 function initMonaco() {
     if (languageRegistered)
@@ -649,6 +650,7 @@ function initLanguageServer() {
         text = monacoEditor.getValue();
     }
     slangd.didOpenTextDocument(userCodeURI, text);
+    slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 
 var diagnosticTimeout = null;

@@ -142,6 +142,12 @@ function handleDemoDropdown() {
       case "Ocean":
         monacoEditor.setValue(oceanDemoCode);
         break;
+      case "Empty Image Shader":
+        monacoEditor.setValue(emptyImageShader);
+        break;
+      case "Empty Print Shader":
+        monacoEditor.setValue(emptyPrintShader);
+        break;
     }
     sourceCodeChange = true;
   });

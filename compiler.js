@@ -5,8 +5,8 @@ function isWholeProgramTarget(compileTarget)
 
 const imageMainSource = `
 import user;
+import playground;
 
-uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
 [format("r32f")] RWTexture2D<float>   texture;
 
@@ -22,41 +22,68 @@ inline float encodeColor(float4 color)
 }
 
 [shader("compute")]
+[numthreads(16, 16, 1)]
 void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
     texture.GetDimensions(width, height);
-    float4 color = imageMain(dispatchThreadID.xy, int2(width, height), time);
+
+    if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
+        return;
+
+    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
     float encodedColor = encodeColor(color);
 
     texture[dispatchThreadID.xy] = encodedColor;
 }
 `;
 
-// TODO: add any utility functions here
 const playgroundSource = `
+internal uniform float time;
+
+// Return the current time in milliseconds
+public float getTime()
+{
+    return time;
+}
 
 `;
 
 const printMainSource = `
 import user;
+import playground;
 
-uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
 [format("r32f")] RWTexture2D<float>   texture;
 
-// TODO: We will fix the threads size
 [shader("compute")]
-[numthreads(2, 2, 1)]
+[numthreads(1, 1, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int res = printMain(dispatchThreadID.xy, int2(2, 2));
-    int index = dispatchThreadID.y * 2 + dispatchThreadID.x;
-
-    outputBuffer[index] = res;
+    int res = printMain();
+    outputBuffer[0] = res;
 }
 `;
+
+const emptyImageShader = `
+import playground;
+
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
+{
+    return float4(0);
+}
+`;
+
+const emptyPrintShader = `
+import playground;
+
+int printMain()
+{
+    return 1;
+}
+`;
+
 
 class SlangCompiler
 {
@@ -89,6 +116,7 @@ class SlangCompiler
         this.mainModules['imageMain'] = {source: imageMainSource};
         this.mainModules['printMain'] = {source: printMainSource};
         FS.createDataFile("/", "user.slang", "", true, true);
+        FS.createDataFile("/", "playground.slang", "", true, true);
     }
 
     init()
@@ -349,6 +377,19 @@ class SlangCompiler
         }
     }
 
+    loadModule(slangSession, moduleName, source, componentTypeList)
+    {
+        var module = slangSession.loadModuleFromSource(source, moduleName, "/"+ moduleName + ".slang");
+        if(!module) {
+            var error = this.slangWasmModule.getLastError();
+            console.error(error.type + " error: " + error.message);
+            this.diagnosticsMsg+=(error.type + " error: " + error.message);
+            return false;
+        }
+        componentTypeList.push_back(module);
+        return true;
+    }
+
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
@@ -369,19 +410,15 @@ class SlangCompiler
                 return null;
             }
 
-            // Load the user module, this is the source code that user inputs in the editor
-            var userModule = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
-            if(!userModule) {
-                var error = this.slangWasmModule.getLastError();
-                console.error(error.type + " error: " + error.message);
-                this.diagnosticsMsg+=(error.type + " error: " + error.message);
-                return null;
-            }
-
             var components = new this.slangWasmModule.ComponentTypeList();
-            components.push_back(userModule);
 
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, userModule, components) == false)
+            if (!this.loadModule(slangSession, "playground", playgroundSource, components))
+                return null;
+
+            if (!this.loadModule(slangSession, "user", shaderSource, components))
+                return null;
+
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(1), components) == false)
                 return null;
 
             var program = slangSession.createCompositeComponentType(components);
@@ -428,6 +465,7 @@ class SlangCompiler
                 {
                     components.get(i).delete();
                 }
+                components.delete();
             }
 
             if (slangSession) {

@@ -2,6 +2,7 @@ const oceanDemoCode =
 `
 // afl_ext 2017-2024
 // MIT License
+import playground;
 
 #define DRAG_MULT 0.38 // changes how much waves pull on the water
 #define WATER_DEPTH 1.0 // how deep is the water
@@ -20,7 +21,7 @@ float2 wavedx(float2 position, float2 direction, float frequency, float timeshif
 }
 
 // Calculates waves by summing octaves of various waves with various parameters
-float getwaves(float2 position, int iterations, float time) {
+float getwaves(float2 position, int iterations) {
   float wavePhaseShift = length(position) * 0.1; // this is to avoid every octave having exactly the same phase everywhere
   float iter = 0.0; // this will help generating well distributed wave directions
   float frequency = 1.0; // frequency of the wave, this will change every iteration
@@ -33,7 +34,7 @@ float getwaves(float2 position, int iterations, float time) {
     float2 p = float2(sin(iter), cos(iter));
     
     // calculate wave data
-    float2 res = wavedx(position, p, frequency, time * timeMultiplier + wavePhaseShift);
+    float2 res = wavedx(position, p, frequency, getTime() * timeMultiplier + wavePhaseShift);
 
     // shift position around according to wave drag and derivative of the wave
     position += p * res.y * weight * DRAG_MULT;
@@ -60,12 +61,12 @@ float3 interpolation(float3 x, float3 y, float factor)
 }
 
 // Raymarches the ray from top water layer boundary to low water layer boundary
-float raymarchwater(float3 camera, float3 start, float3 end, float depth, float time) {
+float raymarchwater(float3 camera, float3 start, float3 end, float depth) {
   float3 pos = start;
   float3 dir = normalize(end - start);
   for(int i=0; i < 64; i++) {
     // the height is from 0 to -depth
-    float height = getwaves(pos.xz, ITERATIONS_RAYMARCH, time) * depth - depth;
+    float height = getwaves(pos.xz, ITERATIONS_RAYMARCH) * depth - depth;
     // if the waves height almost nearly matches the ray height, assume its a hit and return the hit distance
     if(height + 0.01 > pos.y) {
       return distance(pos, camera);
@@ -79,14 +80,14 @@ float raymarchwater(float3 camera, float3 start, float3 end, float depth, float 
 }
 
 // Calculate normal at point by calculating the height at the pos and 2 additional points very close to pos
-float3 normal(float2 pos, float e, float depth, float time) {
+float3 normal(float2 pos, float e, float depth) {
   float2 ex = float2(e, 0);
-  float H = getwaves(pos.xy, ITERATIONS_NORMAL, time) * depth;
+  float H = getwaves(pos.xy, ITERATIONS_NORMAL) * depth;
   float3 a = float3(pos.x, H, pos.y);
   return normalize(
     cross(
-      a - float3(pos.x - e, getwaves(pos.xy - ex.xy, ITERATIONS_NORMAL, time) * depth, pos.y),
-      a - float3(pos.x, getwaves(pos.xy + ex.yx, ITERATIONS_NORMAL, time) * depth, pos.y + e)
+      a - float3(pos.x - e, getwaves(pos.xy - ex.xy, ITERATIONS_NORMAL) * depth, pos.y),
+      a - float3(pos.x, getwaves(pos.xy + ex.yx, ITERATIONS_NORMAL) * depth, pos.y + e)
     )
   );
 }
@@ -139,18 +140,21 @@ float3 extra_cheap_atmosphere(float3 raydir, float3 sundir) {
 }
 
 // Calculate where the sun should be, it will be moving around the sky
-float3 getSunDirection(float time) {
+float3 getSunDirection() {
+  float time = getTime();
   return normalize(float3(sin(time * 0.1), 1.0, cos(time * 0.1)));
 }
 
 // Get atmosphere color for given direction
-float3 getAtmosphere(float3 dir, float time) {
-   return extra_cheap_atmosphere(dir, getSunDirection(time)) * 0.5;
+float3 getAtmosphere(float3 dir) {
+  float time = getTime();
+  return extra_cheap_atmosphere(dir, getSunDirection()) * 0.5;
 }
 
 // Get sun color for given direction
-float getSun(float3 dir, float time) {
-  return pow(max(0.0, dot(dir, getSunDirection(time))), 720.0) * 210.0;
+float getSun(float3 dir) {
+  float time = getTime();
+  return pow(max(0.0, dot(dir, getSunDirection())), 720.0) * 210.0;
 }
 
 // Great tonemapping function from my other shader: https://www.shadertoy.com/view/XsGfWV
@@ -173,7 +177,7 @@ float3 aces_tonemap(float3 color) {
   return pow(clamp(mul(m2, (a / b)), 0.0, 1.0), float3(1.0 / 2.2));
 }
 
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
   float2 size = float2(screenSize.x, screenSize.y);
 
@@ -181,7 +185,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
   float3 ray = getRay(dispatchThreadID.xy, size);
   if(ray.y >= 0.0) {
     // if ray.y is positive, render the sky
-    float3 C = getAtmosphere(ray, time) + getSun(ray, time);
+    float3 C = getAtmosphere(ray) + getSun(ray);
     float4 color = float4(aces_tonemap(C * 2.0),1.0);
     return color;
   }
@@ -192,7 +196,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
   float3 waterPlaneLow = float3(0.0, -WATER_DEPTH, 0.0);
 
   // define ray origin, moving around
-  float3 origin = float3(time * 0.2, CAMERA_HEIGHT, 1);
+  float3 origin = float3(getTime() * 0.2, CAMERA_HEIGHT, 1);
 
   // calculate intersections and reconstruct positions
   float highPlaneHit = intersectPlane(origin, ray, waterPlaneHigh, float3(0.0, 1.0, 0.0));
@@ -201,11 +205,11 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
   float3 lowHitPos = origin + ray * lowPlaneHit;
 
   // raymatch water and reconstruct the hit pos
-  float dist = raymarchwater(origin, highHitPos, lowHitPos, WATER_DEPTH, time);
+  float dist = raymarchwater(origin, highHitPos, lowHitPos, WATER_DEPTH);
   float3 waterHitPos = origin + ray * dist;
 
   // calculate normal at the hit position
-  float3 N = normal(waterHitPos.xz, 0.01, WATER_DEPTH, time);
+  float3 N = normal(waterHitPos.xz, 0.01, WATER_DEPTH);
 
   // smooth the normal with distance to avoid disturbing high frequency noise
   float interpFactor = 0.8 * min(1.0, sqrt(dist*0.01) * 1.1);
@@ -220,7 +224,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
   R.y = abs(R.y);
 
   // calculate the reflection and approximate subsurface scattering
-  float3 reflection = getAtmosphere(R, time) + getSun(R, time);
+  float3 reflection = getAtmosphere(R) + getSun(R);
   float3 scattering = float3(0.0293, 0.0698, 0.1717) * 0.1 * (0.2 + (waterHitPos.y + WATER_DEPTH) / WATER_DEPTH);
 
   // return the combined result
