@@ -48,6 +48,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/playgroundShader.js
 
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm &:
@@ -93,4 +94,7 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js: $(TRY_SLANG_SOURCE_DIRECTORY_PAT
 	$(COPY) $^ $@
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/language-server.js
+	$(COPY) $^ $@
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/playgroundShader.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/playgroundShader.js
 	$(COPY) $^ $@
