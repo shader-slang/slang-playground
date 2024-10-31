@@ -185,6 +185,7 @@ async function render(timeMS)
     computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup);
@@ -223,6 +224,8 @@ async function printResult()
 {
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+    encoder.clearBuffer(computePipeline.printfBufferRead);
+
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup);
@@ -245,8 +248,8 @@ async function printResult()
 
     var textResult = "";
     const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
-    if (formatPrint != "")
-        textResult += "Formatted Printf:\n" + formatPrint + "\n";
+    if (formatPrint.length != 0)
+        textResult += "Formatted Printf:\n" + formatPrint.join("") + "\n";
 
     computePipeline.printfBufferRead.unmap();
     document.getElementById("printResult").value = textResult;
