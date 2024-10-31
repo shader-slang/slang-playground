@@ -83,6 +83,10 @@ function prepareForResize() {
   var codeEditors = document.getElementsByClassName("editorContainer");
 
   for (var i = 0; i < codeEditors.length; i++) {
+    if (codeEditors[i].parentNode.clientWidth < 30)
+      codeEditors[i].style.display = "none";
+    else
+      codeEditors[i].style.display = "inherit";
     codeEditors[i].style.overflow = "hidden";
   }
   document.getElementById("workSpaceDiv").style.overflow = "hidden";
@@ -95,6 +99,10 @@ function finishResizing() {
     document.getElementById("leftContainerDiv").style.overflow = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
       codeEditors[i].style.overflow = "visible";
+      if (codeEditors[i].parentNode.clientWidth < 30)
+        codeEditors[i].style.display = "none";
+      else
+        codeEditors[i].style.display = "inherit";
     }
 }
 
@@ -115,7 +123,7 @@ function initializeModal() {
   const closeBtn = document.querySelector(".close");
 
   btn.onclick = () => {
-    modal.style.display = "block";
+    modal.style.display = "flex";
   };
 
   closeBtn.onclick = () => {
