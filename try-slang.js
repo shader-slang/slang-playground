@@ -232,33 +232,24 @@ async function printResult()
 
     // copy output buffer back in print mode
     encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+    encoder.copyBufferToBuffer(computePipeline.printfBuffer, 0, computePipeline.printfBufferRead, 0, computePipeline.printfBuffer.size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 
     await device.queue.onSubmittedWorkDone();
+
     // Read the results once the job is done
-    await computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ);
+    await computePipeline.printfBufferRead.mapAsync(GPUMapMode.READ);
 
-    const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
+    var textResult = "";
+    const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
+    if (formatPrint != "")
+        textResult += "Formatted Printf:\n" + formatPrint + "\n";
 
-    const textResult = output.toString() + "\n";
-
-    computePipeline.outputBufferRead.unmap();
-
+    computePipeline.printfBufferRead.unmap();
     document.getElementById("printResult").value = textResult;
-}
-
-function formatResult(output)
-{
-    var result = "";
-    for (let i = 0; i < output.length; i++)
-    {
-         result += output[i] + '\n';
-    }
-
-    return result;
 }
 
 function checkShaderType(userSource)

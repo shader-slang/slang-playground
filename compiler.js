@@ -7,8 +7,10 @@ const imageMainSource = `
 import user;
 import playground;
 
-RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+RWStructuredBuffer<int>             outputBuffer;
+
+[format("rgba8")]
+WTexture2D                          outputTexture;
 
 inline float encodeColor(float4 color)
 {
@@ -27,42 +29,32 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
-    texture.GetDimensions(width, height);
+    outputTexture.GetDimensions(width, height);
 
     if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
 
     float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
-    float encodedColor = encodeColor(color);
 
-    texture[dispatchThreadID.xy] = encodedColor;
+    outputTexture.Store(dispatchThreadID.xy, color);
 }
 `;
 
-const playgroundSource = `
-internal uniform float time;
-
-// Return the current time in milliseconds
-public float getTime()
-{
-    return time;
-}
-
-`;
 
 const printMainSource = `
 import user;
 import playground;
 
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+
+[format("rgba8")]
+WTexture2D                          outputTexture;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int res = printMain();
-    outputBuffer[0] = res;
+    printMain();
 }
 `;
 
@@ -78,9 +70,9 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 const emptyPrintShader = `
 import playground;
 
-int printMain()
+void printMain()
 {
-    return 1;
+    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
 }
 `;
 
@@ -107,6 +99,9 @@ class SlangCompiler
     spirvToolsModule = null;
 
     mainModules = new Map();
+
+    // store the string hash if appears in the shader code
+    hashedString = null;
 
     constructor(module)
     {
@@ -197,7 +192,6 @@ class SlangCompiler
 
     spirvDisassembly(spirvBinary)
     {
-
         const disAsmCode = this.spirvToolsModule.dis(
                 spirvBinary,
                 this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
@@ -393,6 +387,12 @@ class SlangCompiler
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
+        if (this.hashedString)
+        {
+            this.hashedString.delete();
+            this.hashedString = null;
+        }
+
         const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
 
@@ -423,6 +423,7 @@ class SlangCompiler
 
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
+            this.hashedString = linkedProgram.loadStrings();
 
             var outCode;
             if (compileTargetStr == "SPIRV")
@@ -441,7 +442,8 @@ class SlangCompiler
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
-            if(outCode == "") {
+            if (outCode == "")
+            {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
