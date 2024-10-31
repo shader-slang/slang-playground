@@ -286,11 +286,6 @@ function initMonaco() {
 
     monaco.languages.register({ id: "spirv" });
     monaco.languages.setMonarchTokensProvider("spirv", {
-        brackets: [
-            { open: '{', close: '}', token: 'delimiter.curly' },
-            { open: '[', close: ']', token: 'delimiter.square' },
-            { open: '(', close: ')', token: 'delimiter.parenthesis' },
-        ],
         operators: [
             '=',
         ],
@@ -322,8 +317,6 @@ function initMonaco() {
                 [/;.*/, 'comment'],
 
                 // delimiters and operators
-                [/[{}()\[\]]/, '@brackets'],
-                [/[<>](?!@symbols)/, '@brackets'],
                 [/@symbols/, {
                     cases: {
                         '@operators': 'operator',

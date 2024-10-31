@@ -439,7 +439,6 @@ var Module = {
             label.innerText = "Initializing Slang Compiler...";
         compiler = new SlangCompiler(Module);
         slangd = Module.createLanguageServer();
-        initLanguageServer();
         var result = compiler.init();
         if (result.ret) {
             document.getElementById("compile-btn").disabled = false;
@@ -486,6 +485,8 @@ function runIfFullyInitialized()
 {
     if (compiler && slangd && pageLoaded)
     {
+        initLanguageServer();
+
         const loadingScreen = document.getElementById('loading-screen');
         // Start fade-out by setting opacity to 0
         loadingScreen.style.opacity = '0';
