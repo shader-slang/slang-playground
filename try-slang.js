@@ -494,7 +494,6 @@ function runIfFullyInitialized()
 {
     if (compiler && slangd && pageLoaded)
     {
-        slangd = Module.createLanguageServer();
         initLanguageServer();
 
         const loadingScreen = document.getElementById('loading-screen');
