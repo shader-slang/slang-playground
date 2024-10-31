@@ -262,11 +262,6 @@ async function printResult()
     document.getElementById("printResult").value = textResult;
 }
 
-function parsePrintfBuffer(buffer)
-{
-
-}
-
 function checkShaderType(userSource)
 {
     // we did a pre-filter on the user input source code.

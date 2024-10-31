@@ -36,7 +36,7 @@ class ComputePipeline
                 {binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'uniform'}},
                 {binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'storage'}},
                 {binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'storage'}},
-                {binding: 3, visibility: GPUShaderStage.COMPUTE, storageTexture: {access: "read-write", format: this.outputTexture.format}},
+                {binding: 3, visibility: GPUShaderStage.COMPUTE, storageTexture: {access: "write-only", format: this.outputTexture.format}},
             ],
         };
 
@@ -126,9 +126,7 @@ class ComputePipeline
             this.outputBufferRead = this.device.createBuffer({lable: 'outputBufferRead', size, usage});
             this.printfBufferRead = this.device.createBuffer({lable: 'outputBufferRead', size: this.printfBufferSize, usage});
 
-            const storageTexture = createOutputTexture(device, windowSize[0], windowSize[1], 'r32float');
-            this.outputTexture = storageTexture;
-
+            this.outputTexture = createOutputTexture(device, windowSize[0], windowSize[1], 'rgba8unorm');
         }
     }
 

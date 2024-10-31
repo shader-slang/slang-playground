@@ -7,8 +7,10 @@ const imageMainSource = `
 import user;
 import playground;
 
-RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+RWStructuredBuffer<int>             outputBuffer;
+
+[format("rgba8")]
+WTexture2D                          outputTexture;
 
 inline float encodeColor(float4 color)
 {
@@ -27,15 +29,14 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
-    texture.GetDimensions(width, height);
+    outputTexture.GetDimensions(width, height);
 
     if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
 
     float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
-    float encodedColor = encodeColor(color);
 
-    texture[dispatchThreadID.xy] = encodedColor;
+    outputTexture.Store(dispatchThreadID.xy, color);
 }
 `;
 
@@ -45,7 +46,9 @@ import user;
 import playground;
 
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+
+[format("rgba8")]
+WTexture2D                          outputTexture;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
