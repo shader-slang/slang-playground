@@ -239,23 +239,16 @@ async function printResult()
     device.queue.submit([commandBuffer]);
 
     await device.queue.onSubmittedWorkDone();
+
     // Read the results once the job is done
-    await Promise.all([
-        computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ),
-        computePipeline.printfBufferRead.mapAsync(GPUMapMode.READ)]);
+    await computePipeline.printfBufferRead.mapAsync(GPUMapMode.READ);
 
-    const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
-
-    // debug testing:
-    let textResult = "Data Output:\n" + output.toString() + "\n\n";
+    var textResult = "";
     const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
     if (formatPrint != "")
         textResult += "Formatted Printf:\n" + formatPrint + "\n";
 
-
-    computePipeline.outputBufferRead.unmap();
     computePipeline.printfBufferRead.unmap();
-
     document.getElementById("printResult").value = textResult;
 }
 

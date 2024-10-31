@@ -54,8 +54,7 @@ WTexture2D                          outputTexture;
 [numthreads(1, 1, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int res = printMain();
-    outputBuffer[0] = res;
+    printMain();
 }
 `;
 
@@ -71,10 +70,9 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 const emptyPrintShader = `
 import playground;
 
-int printMain()
+void printMain()
 {
-    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
-    return 0;
+    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
 }
 `;
 

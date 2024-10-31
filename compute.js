@@ -1,6 +1,4 @@
 
-var sprintf = null;
-
 class ComputePipeline
 {
     pipeline;
