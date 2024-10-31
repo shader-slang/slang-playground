@@ -8,6 +8,7 @@ public float getTime()
     return time;
 }
 
+// type field: 1 for string, 2 for integer, 3 for float, 4 for double
 struct FormatedStruct
 {
     uint32_t type = 0xFFFFFFFF;
@@ -47,7 +48,7 @@ extension int : IPrintf
 
 extension float : IPrintf
 {
-    uint32_t typeFlag() { return 2;}
+    uint32_t typeFlag() { return 3;}
     uint32_t writePrintfWords() { return bit_cast<uint32_t>(this); }
 }
 

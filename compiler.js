@@ -73,7 +73,7 @@ import playground;
 
 int printMain()
 {
-    print("%d\\n", 0);
+    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
     return 0;
 }
 `;

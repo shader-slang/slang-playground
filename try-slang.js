@@ -247,14 +247,11 @@ async function printResult()
     const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
 
     // debug testing:
-    let textResult = output.toString() + "\n";
-    if (compiler.hashedString)
-    {
-        const result = computePipeline.parsePrintfBuffer(compiler.hashedString)
-        textResult += "Format string: " + result.formatString + "\n";
-        textResult += "Data view: " + result.dataArray.toString() + "\n";
-        textResult += "String view: " + result.stringArray.toString() + "\n";
-    }
+    let textResult = "Data Output:\n" + output.toString() + "\n\n";
+    const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
+    if (formatPrint != "")
+        textResult += "Formatted Printf:\n" + formatPrint + "\n";
+
 
     computePipeline.outputBufferRead.unmap();
     computePipeline.printfBufferRead.unmap();

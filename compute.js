@@ -1,4 +1,6 @@
 
+var sprintf = null;
+
 class ComputePipeline
 {
     pipeline;
@@ -166,24 +168,39 @@ class ComputePipeline
         {
             formatString = hashedString.getString(printfBufferArray[1]);    // low field
         }
+        else
+        {
+            // If the first element is not a string, we will just return an empty string, it indicates
+            // that the printf buffer is empty.
+            return "";
+        }
 
         // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
         // so 32-bit array should be able to contain everything we need.
-        var dataArray = new Uint32Array(numberElements);
-        var stringArray = [];
+        var dataArray = [];
         const elementSizeInWords = this.printfBufferElementSize / 4;
         for (elementIndex = 1; elementIndex < numberElements; elementIndex++)
         {
             var offset = elementIndex * elementSizeInWords;
             const type = printfBufferArray[offset];
 
-            if (type == 1)                                  // type field, this is a string
+            if (type == 1)                                      // type field, this is a string
             {
-                stringArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
+                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
             }
-            else if (type == 2)                           // type field
+            else if (type == 2)                                 // type field
             {
-                dataArray[elementIndex - 1] = printfBufferArray[offset + 1];  // low field
+                dataArray.push(printfBufferArray[offset + 1]);  // low field
+            }
+            else if (type == 3)                                 // type field
+            {
+                const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
+                dataArray.push(floatData);                      // low field
+            }
+            else if (type == 4)                                 // type field
+            {
+                // TODO: We can't handle 64-bit data type yet.
+                dataArray.push(0);                      // low field
             }
             else if (type == 0xFFFFFFFF)
             {
@@ -191,11 +208,8 @@ class ComputePipeline
             }
         }
 
-        return {formatString: formatString, dataArray: dataArray.slice(0, elementIndex - 1), stringArray: stringArray};
-    }
-
-    // TODO: construct the final formatted result
-    formatToString(formatString, dataArray, stringArray)
-    {
+        const parsedTokens = parsePrintfFormat(formatString);
+        const output = formatPrintfString(parsedTokens, dataArray);
+        return output;
     }
 }
