@@ -161,53 +161,57 @@ class ComputePipeline
         var elementIndex = 0;
         var numberElements = printfBufferArray.byteLength / this.printfBufferElementSize;
 
-        var formatString;
-        if (printfBufferArray[0] == 1)                                      // type field
-        {
-            formatString = hashedString.getString(printfBufferArray[1]);    // low field
-        }
-        else
-        {
-            // If the first element is not a string, we will just return an empty string, it indicates
-            // that the printf buffer is empty.
-            return "";
-        }
-
         // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
         // so 32-bit array should be able to contain everything we need.
         var dataArray = [];
         const elementSizeInWords = this.printfBufferElementSize / 4;
-        for (elementIndex = 1; elementIndex < numberElements; elementIndex++)
+        var outStrArry = [];
+        var formatString = "";
+        for (elementIndex = 0; elementIndex < numberElements; elementIndex++)
         {
             var offset = elementIndex * elementSizeInWords;
             const type = printfBufferArray[offset];
-
-            if (type == 1)                                      // type field, this is a string
+            switch (type)
             {
-                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
-            }
-            else if (type == 2)                                 // type field
-            {
-                dataArray.push(printfBufferArray[offset + 1]);  // low field
-            }
-            else if (type == 3)                                 // type field
-            {
-                const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
-                dataArray.push(floatData);                      // low field
-            }
-            else if (type == 4)                                 // type field
-            {
-                // TODO: We can't handle 64-bit data type yet.
-                dataArray.push(0);                      // low field
-            }
-            else if (type == 0xFFFFFFFF)
-            {
-                break;
+                case 1: // format string
+                    formatString = hashedString.getString(printfBufferArray[offset + 1]);    // low field
+                    break;
+                case 2: // normal string
+                    dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
+                    break;
+                case 3: // integer
+                    dataArray.push(printfBufferArray[offset + 1]);  // low field
+                    break;
+                case 4: // float
+                    const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
+                    dataArray.push(floatData);                      // low field
+                    break;
+                case 5: // TODO: We can't handle 64-bit data type yet.
+                    dataArray.push(0);                              // low field
+                    break;
+                case 0xFFFFFFFF:
+                {
+                    const parsedTokens = parsePrintfFormat(formatString);
+                    const output = formatPrintfString(parsedTokens, dataArray);
+                    outStrArry.push(output);
+                    formatString = "";
+                    dataArray = [];
+                    if (elementIndex < numberElements - 1)
+                    {
+                        const nextOffset = offset + elementSizeInWords;
+                        // advance to the next element to see if it's a format string, if it's not we just early return
+                        // the results, otherwise just continue processing.
+                        if (printfBufferArray[nextOffset] != 1)          // type field
+                        {
+                            return outStrArry;
+                        }
+                    }
+                    break;
+                }
             }
         }
 
-        const parsedTokens = parsePrintfFormat(formatString);
-        const output = formatPrintfString(parsedTokens, dataArray);
-        return output;
+        return outStrArry;
     }
+
 }
