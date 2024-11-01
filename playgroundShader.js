@@ -84,4 +84,10 @@ public void print<each T>(String format, expand each T values) where T : IPrintf
         g_printedBuffer[g_printBufferIndex++] = {};
     }
 }
+
+[OverloadRank(1)]
+public void printf<each T>(String format, expand each T values) where T : IPrintf
+{
+    print(format, expand each values);
+}
 `;
