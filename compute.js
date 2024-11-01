@@ -12,7 +12,7 @@ class ComputePipeline
 
 
     printfBufferElementSize = 12;
-    printfBufferSize = this.printfBufferElementSize * 100; // 16 bytes per printf struct
+    printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
     printfBuffer;
     printfBufferRead;
 
@@ -209,6 +209,17 @@ class ComputePipeline
                     break;
                 }
             }
+        }
+
+        if (formatString != "")
+        {
+            // If we are here, it means that the printf buffer is used up, and we are in the middle of processing
+            // one printf string, so we are still going to format it, even though there could be some data missing, which
+            // will be shown as 'undef'.
+            const parsedTokens = parsePrintfFormat(formatString);
+            const output = formatPrintfString(parsedTokens, dataArray);
+            outStrArry.push(output);
+            outStrArry.push("Print buffer is out of boundary, some data is missing!!!");
         }
 
         return outStrArry;
