@@ -249,7 +249,7 @@ async function printResult()
     var textResult = "";
     const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
     if (formatPrint.length != 0)
-        textResult += "Formatted Printf:\n" + formatPrint.join("") + "\n";
+        textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
     computePipeline.printfBufferRead.unmap();
     document.getElementById("printResult").value = textResult;

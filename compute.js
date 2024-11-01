@@ -12,7 +12,7 @@ class ComputePipeline
 
 
     printfBufferElementSize = 12;
-    printfBufferSize = this.printfBufferElementSize * 100; // 16 bytes per printf struct
+    printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
     printfBuffer;
     printfBufferRead;
 
