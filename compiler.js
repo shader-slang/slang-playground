@@ -12,17 +12,6 @@ RWStructuredBuffer<int>             outputBuffer;
 [format("rgba8")]
 WTexture2D                          outputTexture;
 
-inline float encodeColor(float4 color)
-{
-    uint4 colorInt = { uint(color.x * 255.0f),
-                       uint(color.y * 255.0f),
-                       uint(color.z * 255.0f),
-                       uint(color.w * 255.0f) };
-
-    float encodedColor = float(colorInt.x << 24 | colorInt.y << 16 | colorInt.z << 8 | colorInt.w);
-    return encodedColor;
-}
-
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -63,7 +52,7 @@ import playground;
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
-    return float4(0);
+    return float4(0.3, 0.7, 0.55, 1.0);
 }
 `;
 
