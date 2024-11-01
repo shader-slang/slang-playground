@@ -10,6 +10,11 @@ function initMonaco() {
         keywords: [
             "if", "else", "switch", "case", "default", "return",
             "try", "throw", "throws", "catch", "while", "for",
+            "let", "var", "spirv_asm", "no_diff", "dynamic_uniform",
+            "fwd_diff", "bwd_diff", "module", "implementing",
+            "__include", "__dispatch_kernel", 
+            "row_major", "column_major", "nointerpolation", "snorm",
+            "unorm", "globallycoherent", "extern", "layout",
             "do", "static", "const", "in", "out", "inout",
             "ref", "__subscript", "__init", "property", "get", "set",
             "class", "struct", "interface", "public", "private", "internal",
