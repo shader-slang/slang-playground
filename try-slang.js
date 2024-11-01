@@ -11,9 +11,6 @@ var monacoEditor;
 var diagnosticsArea;
 var codeGenArea;
 
-
-var sourceCodeChange = true;
-
 var currentWindowSize = [300, 150];
 
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
@@ -379,12 +376,6 @@ var onCompile = async () => {
     }
 }
 
-function onSourceCodeChange()
-{
-    sourceCodeChange = true;
-}
-
-
 function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
@@ -423,9 +414,6 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
         else if (containerId == "codeGen")
         {
             codeGenArea = editor;
-            codeGenArea.onDidChangeModelContent(function (e) {
-              onSourceCodeChange();
-            });
         }
     });
   }
