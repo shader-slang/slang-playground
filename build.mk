@@ -36,19 +36,20 @@ $(eval $(foreach var,$(required_variables),\
 	$(call ensure_defined,$(var))))
 
 .PHONY: website_runtime
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\index.html
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\slang-wasm.wasm
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\try-slang.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\util.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\pass_through.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\compute.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\water_demo.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\image_demo.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\ui.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\compiler.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\language-server.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/index.html
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/try-slang.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/image_demo.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/playgroundShader.js
 
 .PHONY: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js
 $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.js $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)\build.em\Release\bin\slang-wasm.wasm &:
@@ -93,8 +94,8 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\st
 	mkdir -p $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles
 	$(COPY) "$^" "$@"
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\compiler.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\compiler.js
-	$(COPY) "$^" "$@"
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/language-server.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/language-server.js
+	$(COPY) $^ $@
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)\language-server.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\language-server.js
-	$(COPY) "$^" "$@"
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/playgroundShader.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/playgroundShader.js
+	$(COPY) $^ $@

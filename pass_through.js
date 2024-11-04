@@ -45,12 +45,7 @@ var passThroughshaderCode = `
 
       @fragment fn fs(fsInput: VertexShaderOutput) -> @location(0) vec4f {
           let color = textureSample(ourTexture, ourSampler, fsInput.texcoord);
-          let value = u32(color.x);
-          let r = ((value & 0xFF000000) >> 24);
-          let g = ((value & 0x00FF0000) >> 16);
-          let b = ((value & 0x0000FF00) >> 8);
-
-          return vec4f(f32(r)/255.0f, f32(g)/255.0f, f32(b)/255.0f, 1.0f);
+          return color;
       }
 `;
 
@@ -98,7 +93,7 @@ class GraphicsPipeline
             fragment:
             {
               module: shaderModule,
-              targets: [{format: navigator.gpu.getPreferredCanvasFormat()}]
+              targets: [{format: navigator.gpu.getPreferredCanvasFormat(),}]
             },
             });
         this.pipeline = pipeline;

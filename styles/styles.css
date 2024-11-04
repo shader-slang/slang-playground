@@ -184,6 +184,7 @@ button:disabled:hover {
   background-color: var(--panel-background);
   padding: 10px;
   flex-wrap: wrap;
+  overflow-x: hidden;
 }
 
 .logo-img {
@@ -363,11 +364,13 @@ label {
 
 .modal-content {
   background-color: #fff;
-  margin: 15% auto;
+  margin: auto;
   padding: 20px;
   border-radius: 10px;
   width: 80%;
   max-width: 500px;
+  max-height: 100%;
+  overflow-y: auto;
 }
 
 .close {
@@ -446,4 +449,14 @@ label {
 /* Visible tooltip styling */
 .tooltip.show {
   opacity: 1;
+}
+
+/* Narrow screen */
+@media screen and (max-width: 450px) {
+  .dropdown-select{
+    min-width: 100px;
+  }
+  #demo-select{
+    width: 150px;
+  }
 }

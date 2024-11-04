@@ -30,7 +30,9 @@ var currentMode = RENDER_MODE;
 // code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
 // looking at the generated shader code?
 const defaultShaderCode = `
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
+import playground;
+
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
     float2 size = float2(screenSize.x, screenSize.y);
     float2 center = size / 2.0;
@@ -39,6 +41,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 
     float stripSize = screenSize.x / 40;
 
+    const float time = getTime(); // from playgournd
     float dist = distance(pos, center) + time;
     float strip = dist / stripSize % 2.0;
 
@@ -199,11 +202,14 @@ async function render(timeMS)
     // computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup);
     pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(currentWindowSize[0], currentWindowSize[1]);
+    const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
+    const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
+    pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
     pass.end();
 
     if (currentMode == RENDER_MODE)
@@ -240,6 +246,8 @@ async function printResult()
 {
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+    encoder.clearBuffer(computePipeline.printfBufferRead);
+
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup);
@@ -249,35 +257,24 @@ async function printResult()
 
     // copy output buffer back in print mode
     encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+    encoder.copyBufferToBuffer(computePipeline.printfBuffer, 0, computePipeline.printfBufferRead, 0, computePipeline.printfBuffer.size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
 
     await device.queue.onSubmittedWorkDone();
+
     // Read the results once the job is done
-    await computePipeline.outputBufferRead.mapAsync(GPUMapMode.READ);
+    await computePipeline.printfBufferRead.mapAsync(GPUMapMode.READ);
 
-    const output = new Int32Array(computePipeline.outputBufferRead.getMappedRange());
+    var textResult = "";
+    const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
+    if (formatPrint.length != 0)
+        textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
-    let textArray = output.toString().split(','); // "1,2,3,4..."
-    const result = textArray.map((element, index) => index + ': ' + element);
-    const resultStr = result.toString().replaceAll(',', '\n');
-
-    computePipeline.outputBufferRead.unmap();
-
-    document.getElementById("printResult").value = resultStr + '\n';
-}
-
-function formatResult(output)
-{
-    var result = "";
-    for (let i = 0; i < output.length; i++)
-    {
-         result += output[i] + '\n';
-    }
-
-    return result;
+    computePipeline.printfBufferRead.unmap();
+    document.getElementById("printResult").value = textResult;
 }
 
 function checkShaderType(userSource)
@@ -584,12 +581,6 @@ var onCompile = async () => {
     }
 }
 
-function onSourceCodeChange()
-{
-    sourceCodeChange = true;
-}
-
-
 function loadEditor(readOnlyMode = false, containerId, preloadCode) {
 
     require(["vs/editor/editor.main"], function () {
@@ -628,9 +619,6 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
         else if (containerId == "codeGen")
         {
             codeGenArea = editor;
-            codeGenArea.onDidChangeModelContent(function (e) {
-              onSourceCodeChange();
-            });
         }
     });
   }
@@ -647,7 +635,6 @@ var Module = {
             label.innerText = "Initializing Slang Compiler...";
         compiler = new SlangCompiler(Module);
         slangd = Module.createLanguageServer();
-        initLanguageServer();
         var result = compiler.init();
         if (result.ret) {
             document.getElementById("compile-btn").disabled = false;
@@ -694,6 +681,8 @@ function runIfFullyInitialized()
 {
     if (compiler && slangd && pageLoaded)
     {
+        initLanguageServer();
+
         const loadingScreen = document.getElementById('loading-screen');
         // Start fade-out by setting opacity to 0
         loadingScreen.style.opacity = '0';

@@ -5,58 +5,66 @@ function isWholeProgramTarget(compileTarget)
 
 const imageMainSource = `
 import user;
+import playground;
 
-uniform float time;
-RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   outputTexture;
+RWStructuredBuffer<int>             outputBuffer;
 
-inline float encodeColor(float4 color)
-{
-    uint4 colorInt = { uint(color.x * 255.0f),
-                       uint(color.y * 255.0f),
-                       uint(color.z * 255.0f),
-                       uint(color.w * 255.0f) };
-
-    float encodedColor = float(colorInt.x << 24 | colorInt.y << 16 | colorInt.z << 8 | colorInt.w);
-    return encodedColor;
-}
+[format("rgba8")]
+WTexture2D                          outputTexture;
 
 [shader("compute")]
+[numthreads(16, 16, 1)]
 void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
     outputTexture.GetDimensions(width, height);
-    float4 color = imageMain(dispatchThreadID.xy, int2(width, height), time);
-    float encodedColor = encodeColor(color);
 
-    outputTexture[dispatchThreadID.xy] = encodedColor;
+    if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
+        return;
+
+    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
+
+    outputTexture.Store(dispatchThreadID.xy, color);
 }
 `;
 
-// TODO: add any utility functions here
-const playgroundSource = `
-
-`;
 
 const printMainSource = `
 import user;
+import playground;
 
-uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   outputTexture;
 
-// TODO: We will fix the threads size
+[format("rgba8")]
+WTexture2D                          outputTexture;
+
 [shader("compute")]
-[numthreads(2, 2, 1)]
+[numthreads(1, 1, 1)]
 void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    int res = printMain(dispatchThreadID.xy, int2(2, 2));
-    int index = dispatchThreadID.y * 2 + dispatchThreadID.x;
-
-    outputBuffer[index] = res;
+    printMain();
 }
 `;
+
+const emptyImageShader = `
+import playground;
+
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
+{
+    return float4(0.3, 0.7, 0.55, 1.0);
+}
+`;
+
+const emptyPrintShader = `
+import playground;
+
+void printMain()
+{
+    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
+}
+`;
+
 
 class SlangCompiler
 {
@@ -81,6 +89,9 @@ class SlangCompiler
 
     mainModules = new Map();
 
+    // store the string hash if appears in the shader code
+    hashedString = null;
+
     constructor(module)
     {
         this.slangWasmModule = module;
@@ -89,6 +100,7 @@ class SlangCompiler
         this.mainModules['imageMain'] = {source: imageMainSource};
         this.mainModules['printMain'] = {source: printMainSource};
         FS.createDataFile("/", "user.slang", "", true, true);
+        FS.createDataFile("/", "playground.slang", "", true, true);
     }
 
     init()
@@ -169,7 +181,6 @@ class SlangCompiler
 
     spirvDisassembly(spirvBinary)
     {
-
         const disAsmCode = this.spirvToolsModule.dis(
                 spirvBinary,
                 this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
@@ -412,10 +423,29 @@ class SlangCompiler
         
         return resourceDescriptors;
     }
+    
+    loadModule(slangSession, moduleName, source, componentTypeList)
+    {
+        var module = slangSession.loadModuleFromSource(source, moduleName, "/"+ moduleName + ".slang");
+        if(!module) {
+            var error = this.slangWasmModule.getLastError();
+            console.error(error.type + " error: " + error.message);
+            this.diagnosticsMsg+=(error.type + " error: " + error.message);
+            return false;
+        }
+        componentTypeList.push_back(module);
+        return true;
+    }
 
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
+        if (this.hashedString)
+        {
+            this.hashedString.delete();
+            this.hashedString = null;
+        }
+
         const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
 
@@ -433,23 +463,20 @@ class SlangCompiler
                 return null;
             }
 
-            // Load the user module, this is the source code that user inputs in the editor
-            var userModule = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
-            if(!userModule) {
-                var error = this.slangWasmModule.getLastError();
-                console.error(error.type + " error: " + error.message);
-                this.diagnosticsMsg+=(error.type + " error: " + error.message);
-                return null;
-            }
-
             var components = new this.slangWasmModule.ComponentTypeList();
-            components.push_back(userModule);
 
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, userModule, components) == false)
+            if (!this.loadModule(slangSession, "playground", playgroundSource, components))
+                return null;
+
+            if (!this.loadModule(slangSession, "user", shaderSource, components))
+                return null;
+
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(1), components) == false)
                 return null;
 
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
+            this.hashedString = linkedProgram.loadStrings();
 
             var outCode;
             if (compileTargetStr == "SPIRV")
@@ -470,7 +497,8 @@ class SlangCompiler
 
             var bindings = this.getResourceBindings(linkedProgram);
 
-            if(outCode == "") {
+            if (outCode == "") 
+            {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
@@ -494,6 +522,7 @@ class SlangCompiler
                 {
                     components.get(i).delete();
                 }
+                components.delete();
             }
 
             if (slangSession) {

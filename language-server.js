@@ -1,4 +1,5 @@
 const userCodeURI = "file:///user.slang";
+const playgroundCodeURI = "file:///playground.slang";
 var languageRegistered = false;
 function initMonaco() {
     if (languageRegistered)
@@ -9,6 +10,11 @@ function initMonaco() {
         keywords: [
             "if", "else", "switch", "case", "default", "return",
             "try", "throw", "throws", "catch", "while", "for",
+            "let", "var", "spirv_asm", "no_diff", "dynamic_uniform",
+            "fwd_diff", "bwd_diff", "module", "implementing",
+            "__include", "__dispatch_kernel", 
+            "row_major", "column_major", "nointerpolation", "snorm",
+            "unorm", "globallycoherent", "extern", "layout",
             "do", "static", "const", "in", "out", "inout",
             "ref", "__subscript", "__init", "property", "get", "set",
             "class", "struct", "interface", "public", "private", "internal",
@@ -285,11 +291,6 @@ function initMonaco() {
 
     monaco.languages.register({ id: "spirv" });
     monaco.languages.setMonarchTokensProvider("spirv", {
-        brackets: [
-            { open: '{', close: '}', token: 'delimiter.curly' },
-            { open: '[', close: ']', token: 'delimiter.square' },
-            { open: '(', close: ')', token: 'delimiter.parenthesis' },
-        ],
         operators: [
             '=',
         ],
@@ -321,8 +322,6 @@ function initMonaco() {
                 [/;.*/, 'comment'],
 
                 // delimiters and operators
-                [/[{}()\[\]]/, '@brackets'],
-                [/[<>](?!@symbols)/, '@brackets'],
                 [/@symbols/, {
                     cases: {
                         '@operators': 'operator',
@@ -649,6 +648,7 @@ function initLanguageServer() {
         text = monacoEditor.getValue();
     }
     slangd.didOpenTextDocument(userCodeURI, text);
+    slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 
 var diagnosticTimeout = null;
