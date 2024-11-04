@@ -142,6 +142,9 @@ function handleDemoDropdown() {
       case "Ocean":
         monacoEditor.setValue(oceanDemoCode);
         break;
+      case "Image":
+        monacoEditor.setValue(imageDemoCode);
+        break;
     }
     sourceCodeChange = true;
   });

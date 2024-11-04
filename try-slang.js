@@ -11,6 +11,9 @@ var monacoEditor;
 var diagnosticsArea;
 var codeGenArea;
 
+var resourceBindings;
+var resourceCommands;
+var allocatedResources;
 
 var sourceCodeChange = true;
 
@@ -27,7 +30,6 @@ var currentMode = RENDER_MODE;
 // code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
 // looking at the generated shader code?
 const defaultShaderCode = `
-
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 {
     float2 size = float2(screenSize.x, screenSize.y);
@@ -105,7 +107,7 @@ function resizeCanvas(entries)
     return false;
 }
 
-var renderDelayTimer = null;
+var renderDelayTimer = null; 
 
 function startRendering() {
     if (renderDelayTimer)
@@ -114,13 +116,23 @@ function startRendering() {
     renderDelayTimer = setTimeout(() => {
         if (computePipeline && passThroughPipeline &&
             currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
-            computePipeline.createOutput(true, currentWindowSize);
-            computePipeline.createBindGroup();
-            passThroughPipeline.inputTexture = computePipeline.outputTexture;
-            passThroughPipeline.createBindGroup();
-            if (canvas.style.display != "none") {
-                requestAnimationFrame(render);
-            }
+            //computePipeline.createOutput(true, currentWindowSize);
+            //computePipeline.createBindGroup();
+
+            processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
+                computePipeline.createBindGroup(allocatedResources);
+                globalThis.allocatedResources = allocatedResources;
+    
+                passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+                passThroughPipeline.createBindGroup();
+
+                if (canvas.style.display != "none") 
+                {
+                    requestAnimationFrame(render);
+                }
+            }).catch((error) => {
+                diagnosticsArea.setValue(error.message);
+            });
         }
     }, 100);
 }
@@ -180,7 +192,11 @@ async function render(timeMS)
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
         return;
 
-    computePipeline.updateUniformBuffer(timeMS * 0.01);
+    var timeArray = new Float32Array(4);
+    timeArray[0] = timeMS * 0.001;
+    computePipeline.device.queue.writeBuffer(allocatedResources.get("time"), 0, timeArray);
+
+    // computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
@@ -204,7 +220,12 @@ async function render(timeMS)
 
     // copy output buffer back in print mode
     if (currentMode == PRINT_MODE)
-        encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
+        encoder.copyBufferToBuffer(
+            allocatedResources.get("outputBuffer"),
+            0,
+            allocatedResources.get("outputBufferRead"),
+            0,
+            allocatedResources.get("outputBuffer").size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
@@ -276,6 +297,171 @@ function checkShaderType(userSource)
         return SlangCompiler.PRINT_SHADER;
 }
 
+function parseCommand(command)
+{
+    const match = command.match(/(\w+)\((.*)\)/);
+    if (match)
+    {
+        const funcName = match[1];
+
+        // TODO: This isn't a very robust parser.. any commas in the url will break it.
+        const args = match[2].split(',').map(arg => arg.trim());
+
+        if (funcName === "ZEROS")
+        {
+            return { type: "ZEROS", size: args.map(Number) };
+        }
+        else if (funcName === "URL")
+        {
+            // remove the quotes
+            const validURLMatch = args[0].match(/"(.*)"/)
+            if (!validURLMatch)
+            {
+                throw new Error(`Invalid URL: ${url}`);
+            }
+            
+            return { type: "URL", url: validURLMatch[1] };
+        }
+    }
+    else
+    {
+        throw new Error(`Invalid command: ${command}`);
+    }
+}
+
+function parseResourceCommands(userSource)
+{
+    // Now we'll handle some special comments that the user can provide to initialize their resources.
+    //
+    // Here are some patterns we support:
+    // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
+    // 2. //! @myBuffer: URL("https://example.com/image.png", 512, 512)   ==> Initialize "myBuffer" with image from URL.
+    //
+
+    const resourceCommands = [];
+    const lines = userSource.split('\n');
+    for (let line of lines)
+    {
+        const match = line.match(/\/\/!\s+@(\w+):\s*(.*)/);
+        if (match)
+        {
+            const resourceName = match[1];
+            const command = match[2];
+            const parsedCommand = parseCommand(command);
+            resourceCommands.push({ resourceName, parsedCommand });
+        }
+    }
+
+    return resourceCommands;
+}
+
+async function processResourceCommands(pipeline, resourceBindings, resourceCommands) 
+{
+    var allocatedResources = new Map();
+    const safeSet = (map, key, value) => { if (map.has(key)) { map.get(key).destroy(); } map.set(key, value); };
+
+    for (const { resourceName, parsedCommand } of resourceCommands)
+    {
+        if (parsedCommand.type === "ZEROS")
+        {
+            const size = command.size.reduce((a, b) => a * b);
+            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
+            const bindingInfo = resourceBindings.get(resourceName);
+            if (!bindingInfo)
+            {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            if (!bindingInfo.buffer)
+            {
+                throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
+            }
+
+            const buffer = pipeline.device.createBuffer({
+                size: size * elementSize,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            });
+
+            safeSet(allocatedResources, resourceName, buffer);
+
+            // Initialize the buffer with zeros.
+            const zeros = new Float32Array(size);
+            pipeline.device.queue.writeBuffer(buffer, 0, zeros);
+        }
+        else if (parsedCommand.type === "URL")
+        {   
+            // Load image from URL and wait for it to be ready.
+            const bindingInfo = resourceBindings.get(resourceName);
+            
+            if (!bindingInfo)
+            {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            if (!bindingInfo.texture)
+            {
+                throw new Error(`Resource ${resourceName} is not a texture.`);
+            }
+            
+            const image = new Image();
+            try
+            {
+                image.src = parsedCommand.url;
+                await image.decode();
+            }
+            catch (error)
+            {
+                throw new Error(`Failed to load & decode image from URL: ${parsedCommand.url}`);
+            }
+
+            try 
+            {
+                const imageBitmap = await createImageBitmap(image);
+                const texture = pipeline.device.createTexture({
+                    size: [imageBitmap.width, imageBitmap.height],
+                    format: 'rgba8unorm',
+                    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+                });
+                pipeline.device.queue.copyExternalImageToTexture({ source: imageBitmap }, { texture: texture }, [imageBitmap.width, imageBitmap.height]);
+                safeSet(allocatedResources, resourceName, texture);
+            }
+            catch (error)
+            {
+                throw new Error(`Failed to create texture from image: ${error}`);
+            }
+        }
+    }
+
+    //
+    // Some special-case allocations
+    //
+
+    allocatedResources.set("outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'r32float'));
+    
+    allocatedResources.set("outputBuffer", pipeline.device.createBuffer({
+        size: 2 * 2 * 4,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    }));
+
+    allocatedResources.set("outputBufferRead", pipeline.device.createBuffer({
+        size: 2 * 2 * 4,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    }));
+
+    var length = new Float32Array(4).byteLength;
+    allocatedResources.set("time", pipeline.device.createBuffer({size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
+
+    return allocatedResources;
+}
+
+function freeAllocatedResources(resources)
+{
+    for (const resource of resources.values())
+    {
+        resource.destroy();
+    }
+}
+
 var onRun = () => {
     if (!device)
         return;
@@ -286,16 +472,6 @@ var onRun = () => {
     if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);
-        computePipeline.setupComputePipeline(currentWindowSize);
-        computePipeline.createUniformBuffer(4); // 4 bytes for float number
-    }
-
-    if (!passThroughPipeline)
-    {
-        passThroughPipeline = new GraphicsPipeline(device);
-        const shaderModule = device.createShaderModule({code: passThroughshaderCode});
-        const inputTexture = computePipeline.outputTexture;
-        passThroughPipeline.createPipeline(shaderModule, inputTexture);
     }
 
     // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
@@ -314,27 +490,52 @@ var onRun = () => {
     const entryPointName = shaderType == SlangCompiler.RENDER_SHADER? "imageMain" : "printMain";
     const ret = compileShader(userSource, entryPointName, "WGSL");
 
-    // Recompile the pipeline.
-    if (ret.succ)
-    {
-        const module = device.createShaderModule({code:ret.code});
-        computePipeline.createPipeline(module);
+    try {
+        resourceCommands = parseResourceCommands(userSource); 
+    } catch (error) {
+        diagnosticsArea.setValue(error.message);
+        return;
     }
 
-    toggleDisplayMode(compiler.shaderType);
-    if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
-    {
-        printResult();
-    }
-    else if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
-    {
-        startRendering();
-    }
+    resourceBindings = ret.layout;
+    // create a pipeline resource 'signature' based on the bindings found in the program.
+    computePipeline.createPipelineLayout(resourceBindings); 
+
+    processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
+        globalThis.allocatedResources = allocatedResources;
+
+        if (!passThroughPipeline)
+        {
+            passThroughPipeline = new GraphicsPipeline(device);
+            const shaderModule = device.createShaderModule({code: passThroughshaderCode});
+            const inputTexture = allocatedResources.get("outputTexture");
+            passThroughPipeline.createPipeline(shaderModule, inputTexture);
+        }
+
+        if (ret.succ)
+        {
+            const module = device.createShaderModule({code:ret.code});
+            computePipeline.createPipeline(module, allocatedResources);
+        }
+
+        toggleDisplayMode(compiler.shaderType);
+        if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
+        {
+            printResult();
+        }
+        else if (compiler.shaderType == SlangCompiler.RENDER_SHADER)
+        {
+            startRendering();
+        }
+
+    }).catch((error) => {
+        diagnosticsArea.setValue(error.message);
+    });
 }
 
 function compileShader(userSource, entryPoint, compileTarget)
 {
-    var compiledCode = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
+    let [compiledCode, layout] = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
     // If compile is failed, we just clear the codeGenArea
@@ -351,7 +552,7 @@ function compileShader(userSource, entryPoint, compileTarget)
         codeGenArea.getModel().setLanguage("spirv");
     else
         codeGenArea.getModel().setLanguage("generic-shader");
-    return {succ: true, code: compiledCode};
+    return {succ: true, code: compiledCode, layout: layout};
 }
 
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.

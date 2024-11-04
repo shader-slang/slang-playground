@@ -8,7 +8,7 @@ import user;
 
 uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+[format("r32f")] RWTexture2D<float>   outputTexture;
 
 inline float encodeColor(float4 color)
 {
@@ -26,11 +26,11 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint width = 0;
     uint height = 0;
-    texture.GetDimensions(width, height);
+    outputTexture.GetDimensions(width, height);
     float4 color = imageMain(dispatchThreadID.xy, int2(width, height), time);
     float encodedColor = encodeColor(color);
 
-    texture[dispatchThreadID.xy] = encodedColor;
+    outputTexture[dispatchThreadID.xy] = encodedColor;
 }
 `;
 
@@ -44,7 +44,7 @@ import user;
 
 uniform float time;
 RWStructuredBuffer<int>               outputBuffer;
-[format("r32f")] RWTexture2D<float>   texture;
+[format("r32f")] RWTexture2D<float>   outputTexture;
 
 // TODO: We will fix the threads size
 [shader("compute")]
@@ -349,6 +349,70 @@ class SlangCompiler
         }
     }
 
+    getBindingDescriptor(index, programReflection, parameter)
+    {
+        const globalLayout = programReflection.getGlobalParamsTypeLayout();
+
+        //const resourceInfo = {};
+        //const resourceTypeLayout = parameter.getTypeLayout();
+        //const bindingType = resourceTypeLayout.getBindingRangeType(0); //resourceTypeLayout.getBindingRangeType();
+        const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
+        
+        const mapFormatIDToName = 
+        {
+            6: "r32float",
+            33: "rgba8unorm"
+        };
+
+        if (bindingType == this.slangWasmModule.BindingType.Texture)
+        {
+            return { texture: {} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableTexture)
+        {
+            return { storageTexture: {access: "read-write", format: "r32float"} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.ConstantBuffer)
+        {
+            return { buffer: {type: 'uniform'} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableTypedBuffer)
+        {
+            return { buffer: {type: 'storage'} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableRawBuffer)
+        {
+            return { buffer: {type: 'storage'} };
+        }
+    }
+
+    getResourceBindings(linkedProgram)
+    {
+        const reflection = linkedProgram.getLayout(0); // assume target-index = 0
+
+        const count = reflection.getParameterCount();
+
+        var resourceDescriptors = new Map();
+        for (let i = 0; i < count; i++)
+        {
+            const parameter = reflection.getParameterByIndex(i);
+            const name = parameter.getName();
+            var binding = {
+                binding: parameter.getBindingIndex(),
+                visibility: GPUShaderStage.COMPUTE,
+            };
+            
+            const resourceInfo = this.getBindingDescriptor(parameter.getBindingIndex(), reflection, parameter);
+
+            // extend binding with resourceInfo
+            Object.assign(binding, resourceInfo);
+
+            resourceDescriptors.set(name, binding);
+        }
+        
+        return resourceDescriptors;
+    }
+
     compile(shaderSource, entryPointName, compileTargetStr, stage)
     {
         this.diagnosticsMsg = "";
@@ -404,6 +468,8 @@ class SlangCompiler
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
+            var bindings = this.getResourceBindings(linkedProgram);
+
             if(outCode == "") {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
@@ -433,7 +499,8 @@ class SlangCompiler
             if (slangSession) {
                 slangSession.delete();
             }
-            return outCode;
+
+            return [outCode, bindings];
         }
     }
 };

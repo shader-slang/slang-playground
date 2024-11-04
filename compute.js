@@ -16,21 +16,26 @@ class ComputePipeline
     device;
     bindGroup;
 
+    // resource name (string) -> binding descriptor 
+    resourceBindings;
+
     constructor(device)
     {
         this.device = device;
     }
 
-    createComputePipelineLayout()
+    createPipelineLayout(resourceDescriptors)
     {
-        // We fill fix our bind group layout to have 2 entries in our playground.
+        this.resourceBindings = resourceDescriptors;
+
+        const entries = [];
+        for (const [name, binding] of this.resourceBindings)
+        {
+            entries.push(binding);
+        }
         const bindGroupLayoutDescriptor = {
-            lable: 'compute pipeline bind group layout',
-            entries: [
-                {binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'uniform'}},
-                {binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: {type: 'storage'}},
-                {binding: 2, visibility: GPUShaderStage.COMPUTE, storageTexture: {access: "read-write", format: this.outputTexture.format}},
-            ],
+            label: 'compute pipeline bind group layout',
+            entries: entries,
         };
 
         const bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDescriptor);
@@ -39,7 +44,7 @@ class ComputePipeline
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule)
+    createPipeline(shaderModule, resources)
     {
         const pipeline = device.createComputePipeline({
             label: 'compute pipeline',
@@ -48,43 +53,56 @@ class ComputePipeline
             });
 
         this.pipeline = pipeline;
-        this.createBindGroup();
+        this.createBindGroup(resources);
     }
 
-    createBindGroup()
+    createBindGroup(allocatedResources)
     {
-        const bindGroup = device.createBindGroup({
+        const entries = [];
+        for (const [name, resource] of allocatedResources)
+        {
+            const bindInfo = this.resourceBindings.get(name);
+            
+            if (bindInfo)
+            {
+                if (bindInfo.buffer)
+                {
+                    entries.push({binding: bindInfo.binding, resource: {buffer: resource}});
+                }
+                else if (bindInfo.storageTexture)
+                {
+                    entries.push({binding: bindInfo.binding, resource: resource.createView()});
+                }
+                else if (bindInfo.texture)
+                {
+                    entries.push({binding: bindInfo.binding, resource: resource.createView()});
+                }
+            }
+        }
+
+        // Check that all resources are bound
+        if (entries.length != resourceBindings.size)
+        {
+            // print out the name of the resource that is not bound
+            for (const [name, resource] of resourceBindings)
+            {
+                var missingEntries = []
+                if (!entries.find(entry => entry.resource == resource))
+                {
+                    missingEntries.push(name);
+                }
+            }
+
+            // throw
+            throw new Error("Cannot create bind-group. The following resources are not bound: " + missingEntries.join(", "));
+        }
+        
+        this.bindGroup = device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
-            entries: [
-                    { binding: 0, resource: { buffer: this.uniformBuffer }},
-                    { binding: 1, resource: { buffer: this.outputBuffer }},
-                    { binding: 2, resource: this.outputTexture.createView() },
-                    ],
-            });
-
-        this.bindGroup = bindGroup;
+            entries: entries,
+        });
     }
 
-    destroyResources()
-    {
-        if (this.outputBuffer)
-        {
-            this.outputBuffer.destroy();
-            this.outputBuffer = null;
-        }
-
-        if (this.outputBufferRead)
-        {
-            this.outputBufferRead.destroy();
-            this.outputBufferRead = null;
-        }
-
-        if (this.outputTexture)
-        {
-            this.outputTexture.destroy();
-            this.outputTexture = null;
-        }
-    }
     // All out compute pipeline will have 2 outputs:
     // 1. A buffer that will be used to read the result back to the CPU
     // 2. A texture that will be used to display the result on the screen
@@ -98,32 +116,15 @@ class ComputePipeline
             // we will fix the size of the workgroup to be 2 x 2 for printMain.
             const numberElements = 2 * 2;
             const size = numberElements * 4; // int type
-            this.outputBuffer = this.device.createBuffer({lable: 'outputBuffer', size, usage});
+            this.outputBuffer = this.device.createBuffer({label: 'outputBuffer', size, usage});
 
             usage = GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST;
-            const outputBufferRead = this.device.createBuffer({lable: 'outputBufferRead', size, usage});
+            const outputBufferRead = this.device.createBuffer({label: 'outputBufferRead', size, usage});
             this.outputBufferRead = outputBufferRead;
 
             const storageTexture = createOutputTexture(device, windowSize[0], windowSize[1], 'r32float');
             this.outputTexture = storageTexture;
 
         }
-    }
-
-    createUniformBuffer()
-    {
-        this.uniformBuffer = this.device.createBuffer({size: this.uniformBufferHost.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST});
-    }
-
-    updateUniformBuffer(data)
-    {
-        this.uniformBufferHost[0] = data;
-        this.device.queue.writeBuffer(this.uniformBuffer, 0, this.uniformBufferHost);
-    }
-
-    setupComputePipeline(windowSize)
-    {
-        this.createOutput(true, windowSize);
-        this.createComputePipelineLayout();
     }
 }
