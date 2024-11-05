@@ -14,6 +14,10 @@ var codeGenArea;
 var resourceBindings;
 var resourceCommands;
 var allocatedResources;
+var hashedStrings;
+
+var printfBufferElementSize = 12;
+var printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
 
 var sourceCodeChange = true;
 
@@ -24,6 +28,9 @@ const PRINT_MODE = SlangCompiler.PRINT_SHADER;
 const HIDDEN_MODE = SlangCompiler.NON_RUNNABLE_SHADER;
 
 var currentMode = RENDER_MODE;
+
+var randFloatPipeline;
+var randFloatResources;
 
 // TODO: Question?
 // When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
@@ -242,11 +249,96 @@ async function render(timeMS)
         requestAnimationFrame(render);
 }
 
+
+
+// This is the definition of the printf buffer.
+// struct FormatedStruct
+// {
+//     uint32_t type = 0xFFFFFFFF;
+//     uint32_t low = 0;
+//     uint32_t high = 0;
+// };
+//
+function parsePrintfBuffer()
+{
+    const hashedString = globalThis.hashedStrings;
+    const printfValueResource = globalThis.allocatedResources.get("printfBufferRead");
+
+    // Read the printf buffer
+    const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
+
+    var elementIndex = 0;
+    var numberElements = printfBufferArray.byteLength / globalThis.printfBufferElementSize;
+
+    // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
+    // so 32-bit array should be able to contain everything we need.
+    var dataArray = [];
+    const elementSizeInWords = globalThis.printfBufferElementSize / 4;
+    var outStrArry = [];
+    var formatString = "";
+    for (elementIndex = 0; elementIndex < numberElements; elementIndex++)
+    {
+        var offset = elementIndex * elementSizeInWords;
+        const type = printfBufferArray[offset];
+        switch (type)
+        {
+            case 1: // format string
+                formatString = hashedString.getString(printfBufferArray[offset + 1]);    // low field
+                break;
+            case 2: // normal string
+                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
+                break;
+            case 3: // integer
+                dataArray.push(printfBufferArray[offset + 1]);  // low field
+                break;
+            case 4: // float
+                const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
+                dataArray.push(floatData);                      // low field
+                break;
+            case 5: // TODO: We can't handle 64-bit data type yet.
+                dataArray.push(0);                              // low field
+                break;
+            case 0xFFFFFFFF:
+            {
+                const parsedTokens = parsePrintfFormat(formatString);
+                const output = formatPrintfString(parsedTokens, dataArray);
+                outStrArry.push(output);
+                formatString = "";
+                dataArray = [];
+                if (elementIndex < numberElements - 1)
+                {
+                    const nextOffset = offset + elementSizeInWords;
+                    // advance to the next element to see if it's a format string, if it's not we just early return
+                    // the results, otherwise just continue processing.
+                    if (printfBufferArray[nextOffset] != 1)          // type field
+                    {
+                        return outStrArry;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    if (formatString != "")
+    {
+        // If we are here, it means that the printf buffer is used up, and we are in the middle of processing
+        // one printf string, so we are still going to format it, even though there could be some data missing, which
+        // will be shown as 'undef'.
+        const parsedTokens = parsePrintfFormat(formatString);
+        const output = formatPrintfString(parsedTokens, dataArray);
+        outStrArry.push(output);
+        outStrArry.push("Print buffer is out of boundary, some data is missing!!!");
+    }
+
+    return outStrArry;
+}
+
 async function printResult()
 {
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
-    encoder.clearBuffer(computePipeline.printfBufferRead);
+    encoder.clearBuffer(allocatedResources.get("printfBufferRead"));
 
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
@@ -256,8 +348,10 @@ async function printResult()
     pass.end();
 
     // copy output buffer back in print mode
-    encoder.copyBufferToBuffer(computePipeline.outputBuffer, 0, computePipeline.outputBufferRead, 0, computePipeline.outputBuffer.size);
-    encoder.copyBufferToBuffer(computePipeline.printfBuffer, 0, computePipeline.printfBufferRead, 0, computePipeline.printfBuffer.size);
+    encoder.copyBufferToBuffer(
+        allocatedResources.get("outputBuffer"), 0, allocatedResources.get("outputBufferRead"), 0, allocatedResources.get("outputBuffer").size);
+    encoder.copyBufferToBuffer(
+        allocatedResources.get("g_printedBuffer"), 0, allocatedResources.get("printfBufferRead"), 0, allocatedResources.get("g_printedBuffer").size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
@@ -266,14 +360,14 @@ async function printResult()
     await device.queue.onSubmittedWorkDone();
 
     // Read the results once the job is done
-    await computePipeline.printfBufferRead.mapAsync(GPUMapMode.READ);
+    await allocatedResources.get("printfBufferRead").mapAsync(GPUMapMode.READ);
 
     var textResult = "";
-    const formatPrint = computePipeline.parsePrintfBuffer(compiler.hashedString);
+    const formatPrint = parsePrintfBuffer();
     if (formatPrint.length != 0)
         textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
-    computePipeline.printfBufferRead.unmap();
+    allocatedResources.get("printfBufferRead").unmap();
     document.getElementById("printResult").value = textResult;
 }
 
@@ -319,6 +413,11 @@ function parseCommand(command)
             
             return { type: "URL", url: validURLMatch[1] };
         }
+        else if (funcName === "RAND")
+        {
+            return { type: "RAND", size: args.map(Number) };
+        };
+
     }
     else
     {
@@ -333,6 +432,7 @@ function parseResourceCommands(userSource)
     // Here are some patterns we support:
     // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
     // 2. //! @myBuffer: URL("https://example.com/image.png", 512, 512)   ==> Initialize "myBuffer" with image from URL.
+    // 3. //! @noiseBuffer: RAND(1000)   ==> Initialize "myBuffer" with random numbers of the provided size.
     //
 
     const resourceCommands = [];
@@ -403,6 +503,11 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
             const image = new Image();
             try
             {
+                // TODO: Pop-up a warning if the image is not CORS-enabled.
+                // TODO: Pop-up a warning for the user to confirm that its okay to load a cross-origin image (i.e. do you trust this code..)
+                //
+                image.crossOrigin = "anonymous"; 
+
                 image.src = parsedCommand.url;
                 await image.decode();
             }
@@ -427,26 +532,119 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                 throw new Error(`Failed to create texture from image: ${error}`);
             }
         }
+        else if (parsedCommand.type === "RAND")
+        {
+            const size = parsedCommand.size.reduce((a, b) => a * b);
+            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
+            const bindingInfo = resourceBindings.get(resourceName);
+            if (!bindingInfo)
+            {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            if (!bindingInfo.buffer)
+            {
+                throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
+            }
+
+            const buffer = pipeline.device.createBuffer({
+                size: size * elementSize,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            });
+
+            safeSet(allocatedResources, resourceName, buffer);
+
+            // Place a call to a shader that fills the buffer with random numbers.
+            if (!globalThis.randFloatPipeline)
+            {
+                var randomPipeline = new ComputePipeline(pipeline.device);
+
+                // Load randFloat shader code from the file.
+                const randFloatShaderCode = await (await fetch('rand_float.slang')).text();
+                const ret = compileShader(randFloatShaderCode, "randFloatMain", "WGSL", false);
+                if (!ret.succ)
+                {
+                    throw new Error("[Internal] Failed to compile randFloat shader");
+                }
+
+                const module = pipeline.device.createShaderModule({code:ret.code});
+                
+                randomPipeline.createPipelineLayout(ret.layout);
+
+                // Create the pipeline (without resource bindings for now)
+                randomPipeline.createPipeline(module, null);
+
+                globalThis.randFloatPipeline = randomPipeline;
+            }
+            
+            // Dispatch a random number generation shader.
+            {
+                var randomPipeline = globalThis.randFloatPipeline;
+
+                // Alloc resources for the shader.
+                if (!globalThis.randFloatResources)
+                    globalThis.randFloatResources = new Map();
+                
+                globalThis.randFloatResources.set("outputBuffer", buffer);
+
+                if (!globalThis.randFloatResources.has("seed"))
+                    globalThis.randFloatResources.set("seed", 
+                        pipeline.device.createBuffer({size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
+                
+                const seedBuffer = globalThis.randFloatResources.get("seed");
+
+                // Set bindings on the pipeline.
+                globalThis.randFloatPipeline.createBindGroup(globalThis.randFloatResources);
+
+                const seedValue = new Float32Array([Math.random(), 0, 0, 0]);
+                pipeline.device.queue.writeBuffer(seedBuffer, 0, seedValue);
+
+                // Encode commands to do the computation
+                var encoder = pipeline.device.createCommandEncoder({ label: 'compute builtin encoder' });
+                var pass = encoder.beginComputePass({ label: 'compute builtin pass' });
+                
+                pass.setBindGroup(0, randomPipeline.bindGroup);
+                pass.setPipeline(randomPipeline.pipeline);
+
+                const workGroupSizeX = Math.floor((size + 63) / 64);
+                pass.dispatchWorkgroups(workGroupSizeX, 1);
+                pass.end();
+
+                // Finish encoding and submit the commands
+                var commandBuffer = encoder.finish();
+                pipeline.device.queue.submit([commandBuffer]);
+            }
+        }
     }
 
     //
     // Some special-case allocations
     //
 
-    allocatedResources.set("outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'r32float'));
+    safeSet(allocatedResources, "outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'rgba8unorm'));
     
-    allocatedResources.set("outputBuffer", pipeline.device.createBuffer({
+    safeSet(allocatedResources, "outputBuffer", pipeline.device.createBuffer({
         size: 2 * 2 * 4,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
 
-    allocatedResources.set("outputBufferRead", pipeline.device.createBuffer({
+    safeSet(allocatedResources, "outputBufferRead", pipeline.device.createBuffer({
         size: 2 * 2 * 4,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
 
+    safeSet(allocatedResources, "g_printedBuffer", pipeline.device.createBuffer({
+        size: printfBufferSize,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    }));
+
+    safeSet(allocatedResources, "printfBufferRead", pipeline.device.createBuffer({
+        size: printfBufferSize,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    }));
+
     var length = new Float32Array(4).byteLength;
-    allocatedResources.set("time", pipeline.device.createBuffer({size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
+    safeSet(allocatedResources, "time", pipeline.device.createBuffer({size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
 
     return allocatedResources;
 }
@@ -486,6 +684,13 @@ var onRun = () => {
 
     const entryPointName = shaderType == SlangCompiler.RENDER_SHADER? "imageMain" : "printMain";
     const ret = compileShader(userSource, entryPointName, "WGSL");
+
+    if (!ret.succ)
+    {
+        return;
+    }
+
+    globalThis.hashedStrings = ret.hashedStrings;
 
     try {
         resourceCommands = parseResourceCommands(userSource); 
@@ -530,17 +735,19 @@ var onRun = () => {
     });
 }
 
-function compileShader(userSource, entryPoint, compileTarget)
+function compileShader(userSource, entryPoint, compileTarget, includePlaygroundModule = true)
 {
-    let [compiledCode, layout] = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
+    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE, includePlaygroundModule);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
     // If compile is failed, we just clear the codeGenArea
-    if (!compiledCode)
+    if (!compiledResult)
     {
         codeGenArea.setValue('Compilation returned empty result.');
-        return {succ: false, code: compiledCode};
+        return {succ: false};
     }
+
+    let [compiledCode, layout, hashedStrings] = compiledResult;
 
     codeGenArea.setValue(compiledCode);
     if (compileTarget == "WGSL")
@@ -549,7 +756,7 @@ function compileShader(userSource, entryPoint, compileTarget)
         codeGenArea.getModel().setLanguage("spirv");
     else
         codeGenArea.getModel().setLanguage("generic-shader");
-    return {succ: true, code: compiledCode, layout: layout};
+    return {succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings};
 }
 
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.
