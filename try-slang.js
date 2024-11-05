@@ -313,6 +313,11 @@ var onRun = () => {
         const module = device.createShaderModule({code:ret.code});
         computePipeline.createPipeline(module);
     }
+    else
+    {
+        toggleDisplayMode(HIDDEN_MODE);
+        return;
+    }
 
     toggleDisplayMode(compiler.shaderType);
     if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
