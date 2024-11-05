@@ -689,6 +689,11 @@ var onRun = () => {
     {
         return;
     }
+    else
+    {
+        toggleDisplayMode(HIDDEN_MODE);
+        return;
+    }
 
     globalThis.hashedStrings = ret.hashedStrings;
 
