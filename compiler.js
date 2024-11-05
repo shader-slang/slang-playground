@@ -89,9 +89,6 @@ class SlangCompiler
 
     mainModules = new Map();
 
-    // store the string hash if appears in the shader code
-    hashedString = null;
-
     constructor(module)
     {
         this.slangWasmModule = module;
@@ -364,16 +361,13 @@ class SlangCompiler
     {
         const globalLayout = programReflection.getGlobalParamsTypeLayout();
 
-        //const resourceInfo = {};
-        //const resourceTypeLayout = parameter.getTypeLayout();
-        //const bindingType = resourceTypeLayout.getBindingRangeType(0); //resourceTypeLayout.getBindingRangeType();
         const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
-        
-        const mapFormatIDToName = 
+
+        // Special case.. TODO: Remove this as soon as the reflection API properly reports write-only textures.
+        if (parameter.getName() == "outputTexture")
         {
-            6: "r32float",
-            33: "rgba8unorm"
-        };
+            return { storageTexture: {access: "write-only", format: "rgba8unorm"} };
+        }
 
         if (bindingType == this.slangWasmModule.BindingType.Texture)
         {
@@ -437,14 +431,9 @@ class SlangCompiler
         return true;
     }
 
-    compile(shaderSource, entryPointName, compileTargetStr, stage)
+    compile(shaderSource, entryPointName, compileTargetStr, stage, includePlaygroundModule = true)
     {
         this.diagnosticsMsg = "";
-        if (this.hashedString)
-        {
-            this.hashedString.delete();
-            this.hashedString = null;
-        }
 
         const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
@@ -465,18 +454,25 @@ class SlangCompiler
 
             var components = new this.slangWasmModule.ComponentTypeList();
 
-            if (!this.loadModule(slangSession, "playground", playgroundSource, components))
-                return null;
+            if (includePlaygroundModule)
+            {
+                if (!this.loadModule(slangSession, "playground", playgroundSource, components))
+                    return null;
+            }
 
             if (!this.loadModule(slangSession, "user", shaderSource, components))
                 return null;
 
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(1), components) == false)
+            var userComponent = components.get(1);
+            if (!includePlaygroundModule)
+                userComponent = components.get(0);
+
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, userComponent, components) == false)
                 return null;
 
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
-            this.hashedString = linkedProgram.loadStrings();
+            var hashedStrings = linkedProgram.loadStrings();
 
             var outCode;
             if (compileTargetStr == "SPIRV")
@@ -529,7 +525,10 @@ class SlangCompiler
                 slangSession.delete();
             }
 
-            return [outCode, bindings];
+            if (!outCode || outCode == "")
+                return null;
+
+            return [outCode, bindings, hashedStrings];
         }
     }
 };

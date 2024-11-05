@@ -1,8 +1,10 @@
 const imageDemoCode =
 `
+import playground;
+
 //! @myImage: URL("static/jeep.jpg")
 Texture2D<float4> myImage;
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
+float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
     float2 size = float2(screenSize.x, screenSize.y);
     float2 center = size / 2.0;
@@ -11,7 +13,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize, float time)
 
     float stripSize = screenSize.x / 40;
 
-    float dist = distance(pos, center) + time * 3;
+    float dist = distance(pos, center) + getTime() * 3;
     float strip = dist / stripSize % 2.0;
 
     uint imageW;
