@@ -142,22 +142,29 @@ function handleDemoDropdown() {
   const selectInput = demoDropdown.querySelector(".dropdown-select");
 
   selectInput.addEventListener("change", function () {
-    const selectedDemo = this.value;
-    switch (selectedDemo) {
-      case "Circle":
-        monacoEditor.setValue(defaultShaderCode);
-        break;
-      case "Ocean":
-        monacoEditor.setValue(oceanDemoCode);
-        break;
-      case "Simple Image Shader":
-        monacoEditor.setValue(emptyImageShader);
-        break;
-      case "Simple Print Shader":
-        monacoEditor.setValue(emptyPrintShader);
-        break;
+    var selectedDemoURL = this.value;
+    if (selectedDemoURL != "")
+    {
+      // Is `selectedDemoURL` a relative path?
+      var finalURL;
+      if (!selectedDemoURL.startsWith("http"))
+      {
+        // If so, append the current origin to it.
+        // Combine the url to point to demos/${selectedDemoURL}.
+        finalURL = new URL("demos/" + selectedDemoURL, window.location.href);
+      }
+      else
+      {
+        finalURL = new URL(selectedDemoURL);
+      }
+      // Retrieve text from selectedDemoURL.
+      fetch(finalURL)
+        .then((response) => response.text())
+        .then((data) => {
+          monacoEditor.setValue(data);
+          compileOrRun();
+        });
     }
-    onRun();
   });
 }
 
@@ -171,6 +178,31 @@ function restoreSelectedTargetFromURL()
     targetSelect.value = target;
     updateProfileOptions(targetSelect, profileSelect);
   }  
+}
+
+function loadDemoList()
+{
+  // Fill in demo-select dropdown using demoList.
+  let demoDropdown = document.getElementById("demo-select");
+  let firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "Load Demo";
+  firstOption.disabled = true;
+  firstOption.selected = true;
+  demoDropdown.appendChild(firstOption);
+
+  // Create an option for each demo in the list.
+  demoList.forEach((demo) => {
+    let option = document.createElement("option");
+    option.value = demo.url;
+    option.textContent = demo.name;
+    if (demo.name == "-")
+    {
+      option.disabled = true;
+      option.textContent = "──────────";
+    }
+    demoDropdown.appendChild(option);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -209,6 +241,8 @@ document.addEventListener("DOMContentLoaded", function () {
     onDragStart: ()=>prepareForResize(),
     onDragEnd: ()=>finishResizing(),
   });
+
+  loadDemoList();
   handleDemoDropdown();
 
   // Target -> Profile handling

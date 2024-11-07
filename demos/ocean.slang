@@ -1,5 +1,3 @@
-const oceanDemoCode =
-`
 // afl_ext 2017-2024
 // MIT License
 import playground;
@@ -232,4 +230,3 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   float4 color = float4(aces_tonemap(C * 2.0), 1.0);
   return color;
 }
-`;

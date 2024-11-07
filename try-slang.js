@@ -330,6 +330,20 @@ var onRun = () => {
     }
 }
 
+function compileOrRun()
+{
+    const userSource = monacoEditor.getValue();
+    const shaderType = checkShaderType(userSource);
+    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER)
+    {
+        onCompile();
+    }
+    else
+    {
+        onRun();
+    }
+}
+
 function compileShader(userSource, entryPoint, compileTarget)
 {
     var compiledCode = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
@@ -496,7 +510,7 @@ function runIfFullyInitialized()
 
         if (device)
         {
-            onRun();
+            compileOrRun();
         }
     }
 }
