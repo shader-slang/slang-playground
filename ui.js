@@ -327,3 +327,17 @@ btnShareLink.onclick = async function () {
     showTooltip(btnShareLink, "Failed to copy link to clipboard.");
   }
 };
+
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'F5')
+  {
+      event.preventDefault();
+      compileOrRun();
+  }
+  else if (event.ctrlKey && event.key === 'b')
+  {
+      event.preventDefault();
+      // Your custom code here
+      onCompile();
+  }
+});
