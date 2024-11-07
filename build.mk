@@ -54,6 +54,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\water_demo.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\image_demo.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\ui.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\samples
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\compiler.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\language-server.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)\playgroundShader.js
@@ -103,6 +104,10 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)\ui.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\ui.
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\styles\styles.css
 	if not exist $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles $(MKDIR) $(TRY_SLANG_TARGET_DIRECTORY_PATH)\styles
+	$(COPY) "$^" "$@"
+
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)\samples: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\samples\gsplat2d.slang
+	if not exist $(TRY_SLANG_TARGET_DIRECTORY_PATH)\samples $(MKDIR) $(TRY_SLANG_TARGET_DIRECTORY_PATH)\samples
 	$(COPY) "$^" "$@"
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)\language-server.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)\language-server.js

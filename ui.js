@@ -143,6 +143,16 @@ function handleDemoDropdown() {
 
   selectInput.addEventListener("change", function () {
     const selectedDemo = this.value;
+    if (selectedDemo.endsWith(".slang")) {
+      fetch("samples/" + selectedDemo)
+        .then((response) => response.text())
+        .then((data) => {
+          monacoEditor.setValue(data);
+          onRun();
+        });
+      return;
+    }
+    
     switch (selectedDemo) {
       case "Circle":
         monacoEditor.setValue(defaultShaderCode);
@@ -150,8 +160,15 @@ function handleDemoDropdown() {
       case "Ocean":
         monacoEditor.setValue(oceanDemoCode);
         break;
-      case "Image":
+      case "Load From URL":
         monacoEditor.setValue(imageDemoCode);
+        break;
+      case "2D Splatting":
+        fetch("samples/gsplat2d.slang")
+          .then((response) => response.text())
+          .then((data) => {
+            monacoEditor.setValue(data);
+          });
         break;
       case "Simple Image Shader":
         monacoEditor.setValue(emptyImageShader);

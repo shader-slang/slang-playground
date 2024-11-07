@@ -561,15 +561,16 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
 
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('rand_float.slang')).text();
-                const ret = compileShader(randFloatShaderCode, "randFloatMain", "WGSL", false);
-                if (!ret.succ)
+                const compiledResult = compiler.compile(randFloatShaderCode, "randFloatMain", "WGSL", SlangCompiler.SLANG_STAGE_COMPUTE, false);
+                if (!compiledResult)
                 {
                     throw new Error("[Internal] Failed to compile randFloat shader");
                 }
-
-                const module = pipeline.device.createShaderModule({code:ret.code});
                 
-                randomPipeline.createPipelineLayout(ret.layout);
+                let [code, layout, hashedStrings] = compiledResult;
+                const module = pipeline.device.createShaderModule({code:code});
+                
+                randomPipeline.createPipelineLayout(layout);
 
                 // Create the pipeline (without resource bindings for now)
                 randomPipeline.createPipeline(module, null);
@@ -686,10 +687,6 @@ var onRun = () => {
     const ret = compileShader(userSource, entryPointName, "WGSL");
 
     if (!ret.succ)
-    {
-        return;
-    }
-    else
     {
         toggleDisplayMode(HIDDEN_MODE);
         return;
