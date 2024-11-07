@@ -39,11 +39,9 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
     float dist = distance(pos, center) + time;
     float strip = dist / stripSize % 2.0;
 
-    uint color = 0;
     if (strip < 1.0f)
         return float4(1.0f, 0.0f, 0.0f, 1.0f);
     else
-        color = 0x00FFFFFF;
         return float4(0.0f, 1.0f, 1.0f, 1.0f);
 }
 `;
@@ -330,6 +328,20 @@ var onRun = () => {
     }
 }
 
+function compileOrRun()
+{
+    const userSource = monacoEditor.getValue();
+    const shaderType = checkShaderType(userSource);
+    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER)
+    {
+        onCompile();
+    }
+    else
+    {
+        onRun();
+    }
+}
+
 function compileShader(userSource, entryPoint, compileTarget)
 {
     var compiledCode = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE);
@@ -496,7 +508,7 @@ function runIfFullyInitialized()
 
         if (device)
         {
-            onRun();
+            compileOrRun();
         }
     }
 }

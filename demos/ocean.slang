@@ -1,15 +1,12 @@
-const oceanDemoCode =
-`
 // afl_ext 2017-2024
 // MIT License
 import playground;
 
-#define DRAG_MULT 0.38 // changes how much waves pull on the water
-#define WATER_DEPTH 1.0 // how deep is the water
-#define CAMERA_HEIGHT 1.5 // how high the camera should be
-#define ITERATIONS_RAYMARCH 12 // waves iterations of raymarching
-#define ITERATIONS_NORMAL 37 // waves iterations when calculating normals
-
+static const float DRAG_MULT = 0.38; // changes how much waves pull on the water
+static const float WATER_DEPTH = 1.0; // how deep is the water
+static const float CAMERA_HEIGHT = 1.5; // how high the camera should be
+static const int ITERATIONS_RAYMARCH = 12; // waves iterations of raymarching
+static const int ITERATIONS_NORMAL = 37; // waves iterations when calculating normals
 
 // Calculates wave value and its derivative, 
 // for the wave direction, position in space, wave frequency and time
@@ -53,11 +50,6 @@ float getwaves(float2 position, int iterations) {
   }
   // calculate and return
   return sumOfValues / sumOfWeights;
-}
-
-float3 interpolation(float3 x, float3 y, float factor)
-{
-  return x + (y - x) * factor;
 }
 
 // Raymarches the ray from top water layer boundary to low water layer boundary
@@ -214,7 +206,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   // smooth the normal with distance to avoid disturbing high frequency noise
   float interpFactor = 0.8 * min(1.0, sqrt(dist*0.01) * 1.1);
   // N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
-  N = interpolation(N, float3(0.0, 1.0, 0.0), interpFactor);
+  N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
 
   // calculate fresnel coefficient
   float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-N, ray)), 5.0)));
@@ -232,4 +224,3 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   float4 color = float4(aces_tonemap(C * 2.0), 1.0);
   return color;
 }
-`;
