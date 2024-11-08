@@ -1,12 +1,12 @@
 // The ocean shader from ShaderToys by afl_ext.
 // https://www.shadertoy.com/view/MdXyzX
+// afl_ext 2017-2024
+// MIT License
 
 // This shader is modified to use Slang's automatic differentiation feature
 // to compute the normal of the wave by differentiating the `getwaves` function
 // with regard to `position`. See `normal` function for how autodiff is used.
 
-// afl_ext 2017-2024
-// MIT License
 import playground;
 
 static const float DRAG_MULT = 0.38; // changes how much waves pull on the water
