@@ -20,10 +20,10 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint height = 0;
     outputTexture.GetDimensions(width, height);
 
+    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
+
     if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
-
-    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
 
     outputTexture.Store(dispatchThreadID.xy, color);
 }
@@ -183,20 +183,24 @@ class SlangCompiler
     findDefinedEntryPoints(shaderSource)
     {
         var result = [];
+        if (shaderSource.match("imageMain"))
+        {
+            return ["imageMain"];
+        }
+        if (shaderSource.match("printMain"))
+        {
+            return ["printMain"];
+        }
+
         try {
             var slangSession = this.globalSlangSession.createSession(
                 this.compileTargetMap.findCompileTarget("SPIRV"));
             if(!slangSession) {
                 return [];
             }
+            var module = null;
 
-            if (shaderSource.match("imageMain"))
-                result.push("imageMain")
-
-            if (shaderSource.match("printMain"))
-                result.push("printMain")
-
-            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
+            module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if(!module) {
                 return result;
             }
@@ -278,11 +282,17 @@ class SlangCompiler
         var count = userModule.getDefinedEntryPointCount();
         for (var i = 0; i < count; i++)
         {
-            var entryPointName = userModule.getDefinedEntryPoint(i).getName();
-            if (entryPointName == "imageMain" || entryPointName == "printMain")
-            {
-                this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
-                return false;
+            var entrypoint = userModule.getDefinedEntryPoint(i);
+            try {
+                var name = userModule.getDefinedEntryPoint(i).getName();
+                if (name == "imageMain" || name == "printMain")
+                {
+                    this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
+                    return false;
+                }
+            }
+            finally {
+                entrypoint.delete();
             }
         }
 
@@ -325,6 +335,7 @@ class SlangCompiler
                     var mainProgram = this.getPrecompiledProgram(slangSession, results[i]);
                     componentList.push_back(mainProgram.module);
                     componentList.push_back(mainProgram.entryPoint);
+                    return true;
                 }
                 else
                 {
@@ -336,6 +347,7 @@ class SlangCompiler
                 }
             }
         }
+        return true;
     }
 
     getBindingDescriptor(index, programReflection, parameter)
@@ -412,9 +424,15 @@ class SlangCompiler
         return true;
     }
 
-    compile(shaderSource, entryPointName, compileTargetStr, stage, includePlaygroundModule = true)
+    compile(shaderSource, entryPointName, compileTargetStr)
     {
         this.diagnosticsMsg = "";
+        if (this.hashedString)
+        {
+            this.hashedString.delete();
+            this.hashedString = null;
+        }
+        let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
 
         const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
@@ -435,27 +453,22 @@ class SlangCompiler
 
             var components = new this.slangWasmModule.ComponentTypeList();
 
-            if (includePlaygroundModule)
+            var userModuleIndex = 0;
+            if (shouldLinkPlaygroundModule)
             {
                 if (!this.loadModule(slangSession, "playground", playgroundSource, components))
                     return null;
+                userModuleIndex++;
             }
-
             if (!this.loadModule(slangSession, "user", shaderSource, components))
                 return null;
-
-            var userComponent = components.get(1);
-            if (!includePlaygroundModule)
-                userComponent = components.get(0);
-
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, userComponent, components) == false)
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(userModuleIndex), components) == false)
                 return null;
-
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
             var hashedStrings = linkedProgram.loadStrings();
 
-            var outCode;
+            var outCode = null;
             if (compileTargetStr == "SPIRV")
             {
                 const spirvCode = linkedProgram.getTargetCodeBlob(

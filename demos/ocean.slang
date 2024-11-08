@@ -1,12 +1,12 @@
 // The ocean shader from ShaderToys by afl_ext.
 // https://www.shadertoy.com/view/MdXyzX
+// afl_ext 2017-2024
+// MIT License
 
 // This shader is modified to use Slang's automatic differentiation feature
 // to compute the normal of the wave by differentiating the `getwaves` function
 // with regard to `position`. See `normal` function for how autodiff is used.
 
-// afl_ext 2017-2024
-// MIT License
 import playground;
 
 static const float DRAG_MULT = 0.38; // changes how much waves pull on the water
@@ -174,10 +174,10 @@ float3 aces_tonemap(float3 color) {
     -0.07367, -0.00605,  1.07602
   );
 
-  float3 v = mul(m1, color);
+  float3 v = mul(color, m1);
   float3 a = v * (v + 0.0245786) - 0.000090537;
   float3 b = v * (0.983729 * v + 0.4329510) + 0.238081;
-  return pow(clamp(mul(m2, (a / b)), 0.0, 1.0), float3(1.0 / 2.2));
+  return pow(clamp(mul((a / b), m2), 0.0, 1.0), float3(1.0 / 2.2));
 }
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
@@ -216,7 +216,6 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 
   // smooth the normal with distance to avoid disturbing high frequency noise
   float interpFactor = 0.8 * min(1.0, sqrt(dist*0.01) * 1.1);
-  // N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
   N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
 
   // calculate fresnel coefficient

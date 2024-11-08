@@ -1,5 +1,6 @@
 // A simple shader ported from https://www.shadertoy.com/view/XdlSDs.
 // Author: dynamite
+// License: CC BY-NC-SA 3.0 https://creativecommons.org/licenses/by-nc-sa/3.0/deed.en
 
 import playground;
 
@@ -9,7 +10,7 @@ typealias vec4 = float4;
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
-    vec2 p = (dispatchThreadID.xy * 2 - screenSize.xy) / (float)screenSize.y;
+    vec2 p = (dispatchThreadID.xy * 2.0f - screenSize.xy) / (float)screenSize.y;
     float tau = float.getPi() * 2.0;
     float a = atan2(p.x,p.y);
     float r = length(p)*0.75;
