@@ -36,6 +36,71 @@ function reinterpretUint32AsFloat(uint32)
     return float32View[0];
 }
 
+
+function parseCommand(command)
+{
+    const match = command.match(/(\w+)\((.*)\)/);
+    if (match)
+    {
+        const funcName = match[1];
+
+        // TODO: This isn't a very robust parser.. any commas in the url will break it.
+        const args = match[2].split(',').map(arg => arg.trim());
+
+        if (funcName === "ZEROS")
+        {
+            return { type: "ZEROS", size: args.map(Number) };
+        }
+        else if (funcName === "URL")
+        {
+            // remove the quotes
+            const validURLMatch = args[0].match(/"(.*)"/)
+            if (!validURLMatch)
+            {
+                throw new Error(`Invalid URL: ${url}`);
+            }
+            
+            return { type: "URL", url: validURLMatch[1] };
+        }
+        else if (funcName === "RAND")
+        {
+            return { type: "RAND", size: args.map(Number) };
+        };
+
+    }
+    else
+    {
+        throw new Error(`Invalid command: ${command}`);
+    }
+}
+
+function parseResourceCommands(userSource)
+{
+    // Now we'll handle some special comments that the user can provide to initialize their resources.
+    //
+    // Here are some patterns we support:
+    // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
+    // 2. //! @myBuffer: URL("https://example.com/image.png")   ==> Initialize "myBuffer" with image from URL.
+    // 3. //! @noiseBuffer: RAND(1000)   ==> Initialize "myBuffer" with uniform random floats between 0 and 1.
+    //
+
+    const resourceCommands = [];
+    const lines = userSource.split('\n');
+    for (let line of lines)
+    {
+        const match = line.match(/\/\/!\s+@(\w+):\s*(.*)/);
+        if (match)
+        {
+            const resourceName = match[1];
+            const command = match[2];
+            const parsedCommand = parseCommand(command);
+            resourceCommands.push({ resourceName, parsedCommand });
+        }
+    }
+
+    return resourceCommands;
+}
+
 function parsePrintfFormat(formatString)
 {
     const formatSpecifiers = [];
@@ -181,3 +246,86 @@ function formatSpecifier(value, { flags, width, precision, specifierType })
 // const data = [42, -42, 255, 3.14159, 0.00001234, 65, "Hello, world"];
 // const output = formatPrintfString(parsedTokens, data);
 // console.log(output);
+
+
+
+// This is the definition of the printf buffer.
+// struct FormatedStruct
+// {
+//     uint32_t type = 0xFFFFFFFF;
+//     uint32_t low = 0;
+//     uint32_t high = 0;
+// };
+//
+function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize)
+{
+
+    // Read the printf buffer
+    const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
+
+    var elementIndex = 0;
+    var numberElements = printfBufferArray.byteLength / bufferElementSize;
+
+    // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
+    // so 32-bit array should be able to contain everything we need.
+    var dataArray = [];
+    const elementSizeInWords = bufferElementSize / 4;
+    var outStrArry = [];
+    var formatString = "";
+    for (elementIndex = 0; elementIndex < numberElements; elementIndex++)
+    {
+        var offset = elementIndex * elementSizeInWords;
+        const type = printfBufferArray[offset];
+        switch (type)
+        {
+            case 1: // format string
+                formatString = hashedString.getString(printfBufferArray[offset + 1]);    // low field
+                break;
+            case 2: // normal string
+                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
+                break;
+            case 3: // integer
+                dataArray.push(printfBufferArray[offset + 1]);  // low field
+                break;
+            case 4: // float
+                const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
+                dataArray.push(floatData);                      // low field
+                break;
+            case 5: // TODO: We can't handle 64-bit data type yet.
+                dataArray.push(0);                              // low field
+                break;
+            case 0xFFFFFFFF:
+            {
+                const parsedTokens = parsePrintfFormat(formatString);
+                const output = formatPrintfString(parsedTokens, dataArray);
+                outStrArry.push(output);
+                formatString = "";
+                dataArray = [];
+                if (elementIndex < numberElements - 1)
+                {
+                    const nextOffset = offset + elementSizeInWords;
+                    // advance to the next element to see if it's a format string, if it's not we just early return
+                    // the results, otherwise just continue processing.
+                    if (printfBufferArray[nextOffset] != 1)          // type field
+                    {
+                        return outStrArry;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    if (formatString != "")
+    {
+        // If we are here, it means that the printf buffer is used up, and we are in the middle of processing
+        // one printf string, so we are still going to format it, even though there could be some data missing, which
+        // will be shown as 'undef'.
+        const parsedTokens = parsePrintfFormat(formatString);
+        const output = formatPrintfString(parsedTokens, dataArray);
+        outStrArry.push(output);
+        outStrArry.push("Print buffer is out of boundary, some data is missing!!!");
+    }
+
+    return outStrArry;
+}

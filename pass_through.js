@@ -67,7 +67,7 @@ class GraphicsPipeline
     {
         // Passthrough shader will need an input texture to be displayed on the screen
         const bindGroupLayoutDescriptor = {
-            lable: 'pass through pipeline bind group layout',
+            label: 'pass through pipeline bind group layout',
             entries: [
                 {binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {}},
                 {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {sampleType: 'float'}},

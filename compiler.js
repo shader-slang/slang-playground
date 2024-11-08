@@ -20,10 +20,10 @@ void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint height = 0;
     outputTexture.GetDimensions(width, height);
 
+    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
+
     if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
         return;
-
-    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
 
     outputTexture.Store(dispatchThreadID.xy, color);
 }
@@ -69,9 +69,6 @@ class SlangCompiler
     spirvToolsModule = null;
 
     mainModules = new Map();
-
-    // store the string hash if appears in the shader code
-    hashedString = null;
 
     constructor(module)
     {
@@ -353,6 +350,67 @@ class SlangCompiler
         return true;
     }
 
+    getBindingDescriptor(index, programReflection, parameter)
+    {
+        const globalLayout = programReflection.getGlobalParamsTypeLayout();
+
+        const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
+
+        // Special case.. TODO: Remove this as soon as the reflection API properly reports write-only textures.
+        if (parameter.getName() == "outputTexture")
+        {
+            return { storageTexture: {access: "write-only", format: "rgba8unorm"} };
+        }
+
+        if (bindingType == this.slangWasmModule.BindingType.Texture)
+        {
+            return { texture: {} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableTexture)
+        {
+            return { storageTexture: {access: "read-write", format: "r32float"} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.ConstantBuffer)
+        {
+            return { buffer: {type: 'uniform'} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableTypedBuffer)
+        {
+            return { buffer: {type: 'storage'} };
+        }
+        else if (bindingType == this.slangWasmModule.BindingType.MutableRawBuffer)
+        {
+            return { buffer: {type: 'storage'} };
+        }
+    }
+
+    getResourceBindings(linkedProgram)
+    {
+        const reflection = linkedProgram.getLayout(0); // assume target-index = 0
+
+        const count = reflection.getParameterCount();
+
+        var resourceDescriptors = new Map();
+        for (let i = 0; i < count; i++)
+        {
+            const parameter = reflection.getParameterByIndex(i);
+            const name = parameter.getName();
+            var binding = {
+                binding: parameter.getBindingIndex(),
+                visibility: GPUShaderStage.COMPUTE,
+            };
+            
+            const resourceInfo = this.getBindingDescriptor(parameter.getBindingIndex(), reflection, parameter);
+
+            // extend binding with resourceInfo
+            Object.assign(binding, resourceInfo);
+
+            resourceDescriptors.set(name, binding);
+        }
+        
+        return resourceDescriptors;
+    }
+    
     loadModule(slangSession, moduleName, source, componentTypeList)
     {
         var module = slangSession.loadModuleFromSource(source, moduleName, "/"+ moduleName + ".slang");
@@ -366,7 +424,7 @@ class SlangCompiler
         return true;
     }
 
-    compile(shaderSource, entryPointName, compileTargetStr, stage)
+    compile(shaderSource, entryPointName, compileTargetStr)
     {
         this.diagnosticsMsg = "";
         if (this.hashedString)
@@ -408,7 +466,7 @@ class SlangCompiler
                 return null;
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
-            this.hashedString = linkedProgram.loadStrings();
+            var hashedStrings = linkedProgram.loadStrings();
 
             var outCode = null;
             if (compileTargetStr == "SPIRV")
@@ -427,7 +485,9 @@ class SlangCompiler
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
-            if (outCode == "")
+            var bindings = this.getResourceBindings(linkedProgram);
+
+            if (outCode == "") 
             {
                 var error = this.slangWasmModule.getLastError();
                 console.error(error.type + " error: " + error.message);
@@ -458,7 +518,11 @@ class SlangCompiler
             if (slangSession) {
                 slangSession.delete();
             }
-            return outCode;
+
+            if (!outCode || outCode == "")
+                return null;
+
+            return [outCode, bindings, hashedStrings];
         }
     }
 };
