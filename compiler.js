@@ -285,11 +285,17 @@ class SlangCompiler
         var count = userModule.getDefinedEntryPointCount();
         for (var i = 0; i < count; i++)
         {
-            var name = userModule.getDefinedEntryPoint(i).getName();
-            if (name == "imageMain" || name == "printMain")
-            {
-                this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
-                return false;
+            var entrypoint = userModule.getDefinedEntryPoint(i);
+            try {
+                var name = userModule.getDefinedEntryPoint(i).getName();
+                if (name == "imageMain" || name == "printMain")
+                {
+                    this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
+                    return false;
+                }
+            }
+            finally {
+                entrypoint.delete();
             }
         }
 
