@@ -102,6 +102,17 @@ class SlangCompiler
         }
     }
 
+    findCompileTarget(compileTargetStr)
+    {
+        for (var i = 0; i < this.compileTargetMap.length; i++)
+        {
+            var target = this.compileTargetMap[i];
+            if (target.name == compileTargetStr)
+                return target.value;
+        }
+        return 0;
+    }
+
     // In our playground, we only allow to run shaders with two entry points: renderMain and printMain
     findRunnableEntryPoint(module)
     {
@@ -194,7 +205,7 @@ class SlangCompiler
 
         try {
             var slangSession = this.globalSlangSession.createSession(
-                this.compileTargetMap.findCompileTarget("SPIRV"));
+                this.findCompileTarget("SPIRV"));
             if(!slangSession) {
                 return [];
             }
@@ -209,21 +220,14 @@ class SlangCompiler
             for (var i = 0; i < count; i++)
             {
                 var entryPoint = module.getDefinedEntryPoint(i);
-                const entryPointName = entryPoint.getName();
-
                 result.push(entryPoint.getName());
-                entryPoint.delete();
             }
         } catch (e) {
             return [];
         }
-        finally {
-            if(module) {
-                module.delete();
-            }
-            if (slangSession) {
+        finally{
+            if (slangSession)
                 slangSession.delete();
-            }
         }
         return result;
     }
@@ -283,16 +287,11 @@ class SlangCompiler
         for (var i = 0; i < count; i++)
         {
             var entrypoint = userModule.getDefinedEntryPoint(i);
-            try {
-                var name = userModule.getDefinedEntryPoint(i).getName();
-                if (name == "imageMain" || name == "printMain")
-                {
-                    this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
-                    return false;
-                }
-            }
-            finally {
-                entrypoint.delete();
+            var name = userModule.getDefinedEntryPoint(i).getName();
+            if (name == "imageMain" || name == "printMain")
+            {
+                this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
+                return false;
             }
         }
 
@@ -310,8 +309,8 @@ class SlangCompiler
                 this.shaderType = entryPointName == "imageMain" ?
                     SlangCompiler.RENDER_SHADER : SlangCompiler.PRINT_SHADER;
 
-                componentList.push_back(mainProgram.module);
-                componentList.push_back(mainProgram.entryPoint);
+                componentList.push(mainProgram.module);
+                componentList.push(mainProgram.entryPoint);
             }
             else
             {
@@ -320,7 +319,7 @@ class SlangCompiler
                 if (!entryPoint)
                     return false;
 
-                componentList.push_back(entryPoint);
+                componentList.push(entryPoint);
             }
         }
         // otherwise, it's a whole program compilation, we will find all active entry points in the user code
@@ -333,8 +332,8 @@ class SlangCompiler
                 if (results[i] == "imageMain" || results[i] == "printMain")
                 {
                     var mainProgram = this.getPrecompiledProgram(slangSession, results[i]);
-                    componentList.push_back(mainProgram.module);
-                    componentList.push_back(mainProgram.entryPoint);
+                    componentList.push(mainProgram.module);
+                    componentList.push(mainProgram.entryPoint);
                     return true;
                 }
                 else
@@ -343,7 +342,7 @@ class SlangCompiler
                     if (!entryPoint)
                         return false;
 
-                    componentList.push_back(entryPoint);
+                    componentList.push(entryPoint);
                 }
             }
         }
@@ -420,21 +419,17 @@ class SlangCompiler
             this.diagnosticsMsg+=(error.type + " error: " + error.message);
             return false;
         }
-        componentTypeList.push_back(module);
+        componentTypeList.push(module);
         return true;
     }
 
     compile(shaderSource, entryPointName, compileTargetStr)
     {
         this.diagnosticsMsg = "";
-        if (this.hashedString)
-        {
-            this.hashedString.delete();
-            this.hashedString = null;
-        }
+
         let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
 
-        const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
+        const compileTarget = this.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
 
         if(!compileTarget) {
@@ -451,7 +446,7 @@ class SlangCompiler
                 return null;
             }
 
-            var components = new this.slangWasmModule.ComponentTypeList();
+            var components = [];
 
             var userModuleIndex = 0;
             if (shouldLinkPlaygroundModule)
@@ -462,7 +457,7 @@ class SlangCompiler
             }
             if (!this.loadModule(slangSession, "user", shaderSource, components))
                 return null;
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(userModuleIndex), components) == false)
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components[userModuleIndex], components) == false)
                 return null;
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
@@ -499,26 +494,8 @@ class SlangCompiler
             return null;
         }
         finally {
-            if(linkedProgram) {
-                linkedProgram.delete();
-            }
-            if(program) {
-                program.delete();
-            }
-
-            if (components)
-            {
-                for (let i = 0; i < components.size(); i++)
-                {
-                    components.get(i).delete();
-                }
-                components.delete();
-            }
-
-            if (slangSession) {
+            if (slangSession)
                 slangSession.delete();
-            }
-
             if (!outCode || outCode == "")
                 return null;
 
