@@ -221,91 +221,6 @@ async function render(timeMS)
         requestAnimationFrame(render);
 }
 
-
-
-// This is the definition of the printf buffer.
-// struct FormatedStruct
-// {
-//     uint32_t type = 0xFFFFFFFF;
-//     uint32_t low = 0;
-//     uint32_t high = 0;
-// };
-//
-function parsePrintfBuffer()
-{
-    const hashedString = globalThis.hashedStrings;
-    const printfValueResource = globalThis.allocatedResources.get("printfBufferRead");
-
-    // Read the printf buffer
-    const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
-
-    var elementIndex = 0;
-    var numberElements = printfBufferArray.byteLength / globalThis.printfBufferElementSize;
-
-    // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
-    // so 32-bit array should be able to contain everything we need.
-    var dataArray = [];
-    const elementSizeInWords = globalThis.printfBufferElementSize / 4;
-    var outStrArry = [];
-    var formatString = "";
-    for (elementIndex = 0; elementIndex < numberElements; elementIndex++)
-    {
-        var offset = elementIndex * elementSizeInWords;
-        const type = printfBufferArray[offset];
-        switch (type)
-        {
-            case 1: // format string
-                formatString = hashedString.getString(printfBufferArray[offset + 1]);    // low field
-                break;
-            case 2: // normal string
-                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
-                break;
-            case 3: // integer
-                dataArray.push(printfBufferArray[offset + 1]);  // low field
-                break;
-            case 4: // float
-                const floatData = reinterpretUint32AsFloat(printfBufferArray[offset + 1]);
-                dataArray.push(floatData);                      // low field
-                break;
-            case 5: // TODO: We can't handle 64-bit data type yet.
-                dataArray.push(0);                              // low field
-                break;
-            case 0xFFFFFFFF:
-            {
-                const parsedTokens = parsePrintfFormat(formatString);
-                const output = formatPrintfString(parsedTokens, dataArray);
-                outStrArry.push(output);
-                formatString = "";
-                dataArray = [];
-                if (elementIndex < numberElements - 1)
-                {
-                    const nextOffset = offset + elementSizeInWords;
-                    // advance to the next element to see if it's a format string, if it's not we just early return
-                    // the results, otherwise just continue processing.
-                    if (printfBufferArray[nextOffset] != 1)          // type field
-                    {
-                        return outStrArry;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    if (formatString != "")
-    {
-        // If we are here, it means that the printf buffer is used up, and we are in the middle of processing
-        // one printf string, so we are still going to format it, even though there could be some data missing, which
-        // will be shown as 'undef'.
-        const parsedTokens = parsePrintfFormat(formatString);
-        const output = formatPrintfString(parsedTokens, dataArray);
-        outStrArry.push(output);
-        outStrArry.push("Print buffer is out of boundary, some data is missing!!!");
-    }
-
-    return outStrArry;
-}
-
 async function printResult()
 {
     // Encode commands to do the computation
@@ -335,7 +250,11 @@ async function printResult()
     await allocatedResources.get("printfBufferRead").mapAsync(GPUMapMode.READ);
 
     var textResult = "";
-    const formatPrint = parsePrintfBuffer();
+    const formatPrint = parsePrintfBuffer(
+        globalThis.hashedStrings, 
+        allocatedResources.get("printfBufferRead"),
+        globalThis.printfBufferElementSize);
+
     if (formatPrint.length != 0)
         textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
@@ -469,7 +388,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
 
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('rand_float.slang')).text();
-                const compiledResult = compiler.compile(randFloatShaderCode, "randFloatMain", "WGSL", SlangCompiler.SLANG_STAGE_COMPUTE, false);
+                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL", SlangCompiler.SLANG_STAGE_COMPUTE, false);
                 if (!compiledResult)
                 {
                     throw new Error("[Internal] Failed to compile randFloat shader");
