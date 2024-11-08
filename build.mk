@@ -16,7 +16,7 @@ endif
 
 COPY:=
 ifeq ($(OS_NAME),Windows)
-	COPY = cp -rf
+	COPY = copy /b /y
 else
 	COPY = cp -rf
 endif
