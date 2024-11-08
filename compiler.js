@@ -47,25 +47,6 @@ void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 `;
 
-const emptyImageShader = `
-import playground;
-
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
-{
-    return float4(0.3, 0.7, 0.55, 1.0);
-}
-`;
-
-const emptyPrintShader = `
-import playground;
-
-void printMain()
-{
-    print("%d, %3.2d, 0x%x, %8.3f, %s, %e\\n", 2, 3456, 2134, 40.1234, "hello world", 12.547);
-}
-`;
-
-
 class SlangCompiler
 {
     static SLANG_STAGE_VERTEX = 1;

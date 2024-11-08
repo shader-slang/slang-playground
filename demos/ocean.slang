@@ -1,18 +1,24 @@
-const oceanDemoCode =
-`
+// The ocean shader from ShaderToys by afl_ext.
+// https://www.shadertoy.com/view/MdXyzX
+
+// This shader is modified to use Slang's automatic differentiation feature
+// to compute the normal of the wave by differentiating the `getwaves` function
+// with regard to `position`. See `normal` function for how autodiff is used.
+
 // afl_ext 2017-2024
 // MIT License
 import playground;
 
-#define DRAG_MULT 0.38 // changes how much waves pull on the water
-#define WATER_DEPTH 1.0 // how deep is the water
-#define CAMERA_HEIGHT 1.5 // how high the camera should be
-#define ITERATIONS_RAYMARCH 12 // waves iterations of raymarching
-#define ITERATIONS_NORMAL 37 // waves iterations when calculating normals
-
+static const float DRAG_MULT = 0.38; // changes how much waves pull on the water
+static const float WATER_DEPTH = 1.0; // how deep is the water
+static const float CAMERA_HEIGHT = 1.5; // how high the camera should be
+static const int ITERATIONS_RAYMARCH = 12; // waves iterations of raymarching
+static const int ITERATIONS_NORMAL = 37; // waves iterations when calculating normals
 
 // Calculates wave value and its derivative, 
 // for the wave direction, position in space, wave frequency and time
+[Differentiable]
+[PreferCheckpoint]
 float2 wavedx(float2 position, float2 direction, float frequency, float timeshift) {
   float x = dot(direction, position) * frequency + timeshift;
   float wave = exp(sin(x) - 1.0);
@@ -20,8 +26,10 @@ float2 wavedx(float2 position, float2 direction, float frequency, float timeshif
   return float2(wave, -dx);
 }
 
-// Calculates waves by summing octaves of various waves with various parameters
-float getwaves(float2 position, int iterations) {
+// Calculates waves by summing octaves of various waves with various parameters.
+// This function is a generic function that can be specialized by different number of iterations.
+[Differentiable]
+float getwaves<int iterations>(float2 position) {
   float wavePhaseShift = length(position) * 0.1; // this is to avoid every octave having exactly the same phase everywhere
   float iter = 0.0; // this will help generating well distributed wave directions
   float frequency = 1.0; // frequency of the wave, this will change every iteration
@@ -29,12 +37,17 @@ float getwaves(float2 position, int iterations) {
   float weight = 1.0;// weight in final sum for the wave, this will change every iteration
   float sumOfValues = 0.0; // will store final sum of values
   float sumOfWeights = 0.0; // will store final sum of weights
+  [ForceUnroll]
   for(int i=0; i < iterations; i++) {
     // generate some wave direction that looks kind of random
     float2 p = float2(sin(iter), cos(iter));
     
     // calculate wave data
-    float2 res = wavedx(position, p, frequency, getTime() * timeMultiplier + wavePhaseShift);
+
+    // Since we don't need to propagate gradient through time and `getTime()` is a non-differentiable
+    // function, we need to use `no_diff` here to express our intention that we don't need gradients
+    // to propagate through the call.
+    float2 res = wavedx(position, p, frequency, no_diff getTime() * timeMultiplier + wavePhaseShift);
 
     // shift position around according to wave drag and derivative of the wave
     position += p * res.y * weight * DRAG_MULT;
@@ -55,18 +68,13 @@ float getwaves(float2 position, int iterations) {
   return sumOfValues / sumOfWeights;
 }
 
-float3 interpolation(float3 x, float3 y, float factor)
-{
-  return x + (y - x) * factor;
-}
-
 // Raymarches the ray from top water layer boundary to low water layer boundary
 float raymarchwater(float3 camera, float3 start, float3 end, float depth) {
   float3 pos = start;
   float3 dir = normalize(end - start);
   for(int i=0; i < 64; i++) {
     // the height is from 0 to -depth
-    float height = getwaves(pos.xz, ITERATIONS_RAYMARCH) * depth - depth;
+    float height = getwaves<ITERATIONS_RAYMARCH>(pos.xz) * depth - depth;
     // if the waves height almost nearly matches the ray height, assume its a hit and return the hit distance
     if(height + 0.01 > pos.y) {
       return distance(pos, camera);
@@ -79,17 +87,12 @@ float raymarchwater(float3 camera, float3 start, float3 end, float depth) {
   return distance(start, camera);
 }
 
-// Calculate normal at point by calculating the height at the pos and 2 additional points very close to pos
+// Calculate normal at point by using autodiff to get the derivative of `getwave` function
+// with regard to `position`.
 float3 normal(float2 pos, float e, float depth) {
-  float2 ex = float2(e, 0);
-  float H = getwaves(pos.xy, ITERATIONS_NORMAL) * depth;
-  float3 a = float3(pos.x, H, pos.y);
-  return normalize(
-    cross(
-      a - float3(pos.x - e, getwaves(pos.xy - ex.xy, ITERATIONS_NORMAL) * depth, pos.y),
-      a - float3(pos.x, getwaves(pos.xy + ex.yx, ITERATIONS_NORMAL) * depth, pos.y + e)
-    )
-  );
+   DifferentialPair<float2> diffPos = diffPair(pos);
+   bwd_diff(getwaves<ITERATIONS_NORMAL>)(diffPos, 1.0);
+   return normalize(float3(-diffPos.d.x, 1.0, -diffPos.d.y));
 }
 
 // Helper function generating a rotation matrix around the axis by the angle
@@ -214,7 +217,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   // smooth the normal with distance to avoid disturbing high frequency noise
   float interpFactor = 0.8 * min(1.0, sqrt(dist*0.01) * 1.1);
   // N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
-  N = interpolation(N, float3(0.0, 1.0, 0.0), interpFactor);
+  N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
 
   // calculate fresnel coefficient
   float fresnel = (0.04 + (1.0-0.04)*(pow(1.0 - max(0.0, dot(-N, ray)), 5.0)));
@@ -232,4 +235,3 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   float4 color = float4(aces_tonemap(C * 2.0), 1.0);
   return color;
 }
-`;

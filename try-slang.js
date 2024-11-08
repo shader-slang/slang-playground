@@ -26,40 +26,12 @@ var currentWindowSize = [300, 150];
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
 const PRINT_MODE = SlangCompiler.PRINT_SHADER;
 const HIDDEN_MODE = SlangCompiler.NON_RUNNABLE_SHADER;
+const defaultShaderURL = "circle.slang";
 
 var currentMode = RENDER_MODE;
 
 var randFloatPipeline;
 var randFloatResources;
-
-// TODO: Question?
-// When we generate the shader code to wgsl, the uniform variable (float time) will have 16 bytes alignment, which is not shown in the slang
-// code. So how the user can know the correct alignment of the uniform variable without using the slang reflection API or
-// looking at the generated shader code?
-const defaultShaderCode = `
-import playground;
-
-float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
-{
-    float2 size = float2(screenSize.x, screenSize.y);
-    float2 center = size / 2.0;
-
-    float2 pos = float2(dispatchThreadID.xy);
-
-    float stripSize = screenSize.x / 40;
-
-    const float time = getTime(); // from playgournd
-    float dist = distance(pos, center) + time;
-    float strip = dist / stripSize % 2.0;
-
-    uint color = 0;
-    if (strip < 1.0f)
-        return float4(1.0f, 0.0f, 0.0f, 1.0f);
-    else
-        color = 0x00FFFFFF;
-        return float4(0.0f, 1.0f, 1.0f, 1.0f);
-}
-`;
 
 async function webgpuInit()
 {
@@ -673,6 +645,20 @@ var onRun = () => {
     });
 }
 
+function compileOrRun()
+{
+    const userSource = monacoEditor.getValue();
+    const shaderType = checkShaderType(userSource);
+    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER)
+    {
+        onCompile();
+    }
+    else
+    {
+        onRun();
+    }
+}
+
 function compileShader(userSource, entryPoint, compileTarget, includePlaygroundModule = true)
 {
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE, includePlaygroundModule);
@@ -841,7 +827,14 @@ function runIfFullyInitialized()
 
         if (device)
         {
-            onRun();
+            if (monacoEditor.getValue() == "")
+            {
+                loadDemo(defaultShaderURL);
+            }
+            else
+            {
+                compileOrRun();
+            }
         }
     }
 }

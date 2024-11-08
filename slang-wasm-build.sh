@@ -25,7 +25,7 @@ cmake --workflow --preset generators --fresh
 mkdir generators
 cmake --install build --prefix generators --component generators
 
-emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -G "Ninja"
+emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
 cmake --build --preset emscripten --target slang-wasm
 
 cmakeRet=$?

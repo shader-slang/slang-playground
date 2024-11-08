@@ -137,47 +137,36 @@ function initializeModal() {
   };
 }
 
+function loadDemo(selectedDemoURL) {
+  if (selectedDemoURL != "")
+  {
+    // Is `selectedDemoURL` a relative path?
+    var finalURL;
+    if (!selectedDemoURL.startsWith("http"))
+    {
+      // If so, append the current origin to it.
+      // Combine the url to point to demos/${selectedDemoURL}.
+      finalURL = new URL("demos/" + selectedDemoURL, window.location.href);
+    }
+    else
+    {
+      finalURL = new URL(selectedDemoURL);
+    }
+    // Retrieve text from selectedDemoURL.
+    fetch(finalURL)
+      .then((response) => response.text())
+      .then((data) => {
+        monacoEditor.setValue(data);
+        compileOrRun();
+      });
+  }
+}
+
 function handleDemoDropdown() {
-  const demoDropdown = document.getElementById("demo-dropdown");
-  const selectInput = demoDropdown.querySelector(".dropdown-select");
+  const selectInput = document.getElementById("demo-select");
 
   selectInput.addEventListener("change", function () {
-    const selectedDemo = this.value;
-    if (selectedDemo.endsWith(".slang")) {
-      fetch("samples/" + selectedDemo)
-        .then((response) => response.text())
-        .then((data) => {
-          monacoEditor.setValue(data);
-          onRun();
-        });
-      return;
-    }
-    
-    switch (selectedDemo) {
-      case "Circle":
-        monacoEditor.setValue(defaultShaderCode);
-        break;
-      case "Ocean":
-        monacoEditor.setValue(oceanDemoCode);
-        break;
-      case "Load From URL":
-        monacoEditor.setValue(imageDemoCode);
-        break;
-      case "2D Splatting":
-        fetch("samples/gsplat2d.slang")
-          .then((response) => response.text())
-          .then((data) => {
-            monacoEditor.setValue(data);
-          });
-        break;
-      case "Simple Image Shader":
-        monacoEditor.setValue(emptyImageShader);
-        break;
-      case "Simple Print Shader":
-        monacoEditor.setValue(emptyPrintShader);
-        break;
-    }
-    onRun();
+    loadDemo(this.value);
   });
 }
 
@@ -193,8 +182,33 @@ function restoreSelectedTargetFromURL()
   }  
 }
 
+function loadDemoList()
+{
+  // Fill in demo-select dropdown using demoList.
+  let demoDropdown = document.getElementById("demo-select");
+  let firstOption = document.createElement("option");
+  firstOption.value = "";
+  firstOption.textContent = "Load Demo";
+  firstOption.disabled = true;
+  firstOption.selected = true;
+  demoDropdown.appendChild(firstOption);
+
+  // Create an option for each demo in the list.
+  demoList.forEach((demo) => {
+    let option = document.createElement("option");
+    option.value = demo.url;
+    option.textContent = demo.name;
+    if (demo.name == "-")
+    {
+      option.disabled = true;
+      option.textContent = "──────────";
+    }
+    demoDropdown.appendChild(option);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function () {
-  var initShaderCode = defaultShaderCode;
+  var initShaderCode = "";
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   if (code) {
@@ -204,7 +218,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
   else {
-    loadEditor(false, "codeEditor", defaultShaderCode);
+    loadEditor(false, "codeEditor", initShaderCode);
   }
   loadEditor(true, "diagnostics", "Diagnostic Output");
   loadEditor(true, "codeGen", "Generated Target Code");
@@ -229,6 +243,8 @@ document.addEventListener("DOMContentLoaded", function () {
     onDragStart: ()=>prepareForResize(),
     onDragEnd: ()=>finishResizing(),
   });
+
+  loadDemoList();
   handleDemoDropdown();
 
   // Target -> Profile handling
@@ -313,3 +329,17 @@ btnShareLink.onclick = async function () {
     showTooltip(btnShareLink, "Failed to copy link to clipboard.");
   }
 };
+
+document.addEventListener('keydown', function(event) {
+  if (event.key === 'F5')
+  {
+      event.preventDefault();
+      compileOrRun();
+  }
+  else if (event.ctrlKey && event.key === 'b')
+  {
+      event.preventDefault();
+      // Your custom code here
+      onCompile();
+  }
+});

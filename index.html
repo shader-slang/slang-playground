@@ -46,8 +46,7 @@
     </script>
     <script src="util.js"></script>
     <script src="playgroundShader.js"></script>
-    <script src="water_demo.js"></script>
-    <script src="image_demo.js"></script>
+    <script src="demos/demo-list.js"></script>
     <script src="pass_through.js"></script>
     <script src="compute.js"></script>
     <script src="compiler.js"></script>
@@ -88,18 +87,6 @@
                   name="demo"
                   aria-label="Load Demo"
                 >
-                  <option value="" disabled selected>Load Demo</option>
-                  <option value="Simple Image Shader">
-                    Simple Image Shader
-                  </option>
-                  <option value="Simple Print Shader">
-                    Simple Print Shader
-                  </option>
-                  <option disabled>──────────</option>
-                  <option value="Circle">Circle</option>
-                  <option value="Ocean">Ocean</option>
-                  <option value="Load From URL">Load From URL</option>
-                  <option value="gsplat2d.slang">2D Splatting</option>
                 </select>
               </div>
             </div>
@@ -107,7 +94,7 @@
 
           <!-- Run section -->
           <div class="navbar-run navbar-item">
-            <button id="run-btn" onclick="onRun()" disabled title="Compile and run the shader. (Requires shader to define either a 'imageMain' or a 'printMain' function.)">&#9658; Run</button>
+            <button id="run-btn" onclick="onRun()" disabled title="(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.)">&#9658; Run</button>
           </div>
 
           <!-- Entry/Compile section -->
@@ -149,7 +136,7 @@
               </select>
             </div>
             
-            <button id="compile-btn" onclick="onCompile()" disabled title='Compile the shader to the selected target. Requires the shader to provide a `[shader("stage")]` attribute on the entrypoint function.'>
+            <button id="compile-btn" onclick="onCompile()" disabled title='(Ctrl+B) Compile the shader to the selected target. Entrypoints needs to be marked with the `[shader("stage")]` attribute.'>
               Compile
             </button>
           </div>
