@@ -277,12 +277,15 @@ class SlangCompiler
             return false;
         }
 
+        if (isWholeProgram)
+            return false;
+
         // For now, we just don't allow user to define imageMain or printMain as entry point name for simplicity
         var count = userModule.getDefinedEntryPointCount();
         for (var i = 0; i < count; i++)
         {
-            var entryPointName = userModule.getDefinedEntryPoint(i).getName();
-            if (entryPointName == "imageMain" || entryPointName == "printMain")
+            var name = userModule.getDefinedEntryPoint(i).getName();
+            if (name == "imageMain" || name == "printMain")
             {
                 this.diagnosticsMsg+=("error: Entry point name 'imageMain' or 'printMain' is reserved");
                 return false;
@@ -314,29 +317,6 @@ class SlangCompiler
                     return false;
 
                 componentList.push_back(entryPoint);
-            }
-        }
-        // otherwise, it's a whole program compilation, we will find all active entry points in the user code
-        // and pre-built modules.
-        else
-        {
-            const results = this.findDefinedEntryPoints(shaderSource);
-            for (let i = 0; i < results.length; i++)
-            {
-                if (results[i] == "imageMain" || results[i] == "printMain")
-                {
-                    var mainProgram = this.getPrecompiledProgram(slangSession, results[i]);
-                    componentList.push_back(mainProgram.module);
-                    componentList.push_back(mainProgram.entryPoint);
-                }
-                else
-                {
-                    var entryPoint = this.findEntryPoint(userModule, results[i], SlangCompiler.SLANG_STAGE_COMPUTE);
-                    if (!entryPoint)
-                        return false;
-
-                    componentList.push_back(entryPoint);
-                }
             }
         }
     }
@@ -382,15 +362,21 @@ class SlangCompiler
 
             var components = new this.slangWasmModule.ComponentTypeList();
 
-            if (!this.loadModule(slangSession, "playground", playgroundSource, components))
-                return null;
-
+            let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
+            var userModuleIndex = 0;
+            if (shouldLinkPlaygroundModule)
+            {
+                if (!this.loadModule(slangSession, "playground", playgroundSource, components))
+                    return null;
+                userModuleIndex++;
+            }
             if (!this.loadModule(slangSession, "user", shaderSource, components))
                 return null;
-
-            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(1), components) == false)
-                return null;
-
+            if (!isWholeProgram)
+            {
+                if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(userModuleIndex), components) == false)
+                    return null;
+            }
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
             this.hashedString = linkedProgram.loadStrings();

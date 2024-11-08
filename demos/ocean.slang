@@ -216,7 +216,6 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 
   // smooth the normal with distance to avoid disturbing high frequency noise
   float interpFactor = 0.8 * min(1.0, sqrt(dist*0.01) * 1.1);
-  // N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
   N = lerp(N, float3(0.0, 1.0, 0.0), interpFactor);
 
   // calculate fresnel coefficient
