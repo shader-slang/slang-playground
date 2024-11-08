@@ -1,6 +1,7 @@
 var demoList = [
   { name: "Simple Print", url: "simple-print.slang" },
   { name: "Simple Image", url: "simple-image.slang" },
+  { name: "Load From URL", url: "load-from-url.slang" },
   { name: "-", url: "" },
   { name: "ShaderToy: Circle", url: "circle.slang" },
   { name: "ShaderToy: Ocean", url: "ocean.slang" },
