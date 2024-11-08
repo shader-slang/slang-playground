@@ -73,11 +73,33 @@ struct SymmetricGaussian2D
     }
 };
 
+struct Maybe<T>
+{
+    bool valid;
+    T value;
+};
+
+float4 preMult(float4 pixel)
+{
+    return float4(pixel.rgb * pixel.a, pixel.a);
+}
+
 float4 alphaBlend(float4 pixel, float4 gval)
 {
+    gval = preMult(gval);
     return float4(
         pixel.rgb + gval.rgb * pixel.a,
         pixel.a * (1 - gval.a));
+}
+
+Maybe<float4> transformPixelState(float4 pixel, float4 gval)
+{
+    var newState = alphaBlend(pixel, gval);
+
+    if (pixel.a < 0.01)
+        return Maybe<float4>(false, pixel);
+
+    return Maybe<float4>(true, newState);
 }
 
 void bitonicSort(uint localIdx)
@@ -132,11 +154,12 @@ float4 fineRasterize(float2 uv)
     {
         gaussian = SymmetricGaussian2D.load(blobs[i]);
         var gval = gaussian.eval(uv);
-        var gval_premult = float4(gval.rgb * gval.a, gval.a);
-        color = alphaBlend(color, gval_premult);
+        var newColor = transformPixelState(color, gval);
 
-        if (color.a < 0.01)
-            break;
+        if (!newColor.valid)
+            return color;
+
+        color = newColor.value;
     }
 
     return color;
