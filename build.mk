@@ -43,7 +43,7 @@ website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/try-slang.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/demos
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/styles
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compiler.js
@@ -80,7 +80,7 @@ $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js: $(TRY_SLANG_SOURCE_DIRECTORY
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/compute.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js
 	$(COPY) $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/compute.js $@
 
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)/water_demo.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/water_demo.js
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/demos: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/demos
 	$(COPY) $^ $@
 
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/ui.js: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/ui.js
