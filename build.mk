@@ -21,13 +21,6 @@ else
 	COPY = cp -rf
 endif
 
-MKDIR:=
-ifeq ($(OS_NAME),Windows)
-	MKDIR = mkdir
-else
-	MKDIR = mkdir -p
-endif
-
 # Helper to ensure a directory exists
 ensure_dir = if not exist $(dir $1) mkdir $(dir $1)
 
