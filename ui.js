@@ -137,34 +137,36 @@ function initializeModal() {
   };
 }
 
+function loadDemo(selectedDemoURL) {
+  if (selectedDemoURL != "")
+  {
+    // Is `selectedDemoURL` a relative path?
+    var finalURL;
+    if (!selectedDemoURL.startsWith("http"))
+    {
+      // If so, append the current origin to it.
+      // Combine the url to point to demos/${selectedDemoURL}.
+      finalURL = new URL("demos/" + selectedDemoURL, window.location.href);
+    }
+    else
+    {
+      finalURL = new URL(selectedDemoURL);
+    }
+    // Retrieve text from selectedDemoURL.
+    fetch(finalURL)
+      .then((response) => response.text())
+      .then((data) => {
+        monacoEditor.setValue(data);
+        compileOrRun();
+      });
+  }
+}
+
 function handleDemoDropdown() {
-  const demoDropdown = document.getElementById("demo-dropdown");
-  const selectInput = demoDropdown.querySelector(".dropdown-select");
+  const selectInput = document.getElementById("demo-select");
 
   selectInput.addEventListener("change", function () {
-    var selectedDemoURL = this.value;
-    if (selectedDemoURL != "")
-    {
-      // Is `selectedDemoURL` a relative path?
-      var finalURL;
-      if (!selectedDemoURL.startsWith("http"))
-      {
-        // If so, append the current origin to it.
-        // Combine the url to point to demos/${selectedDemoURL}.
-        finalURL = new URL("demos/" + selectedDemoURL, window.location.href);
-      }
-      else
-      {
-        finalURL = new URL(selectedDemoURL);
-      }
-      // Retrieve text from selectedDemoURL.
-      fetch(finalURL)
-        .then((response) => response.text())
-        .then((data) => {
-          monacoEditor.setValue(data);
-          compileOrRun();
-        });
-    }
+    loadDemo(this.value);
   });
 }
 
@@ -206,7 +208,7 @@ function loadDemoList()
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  var initShaderCode = defaultShaderCode;
+  var initShaderCode = "";
   const urlParams = new URLSearchParams(window.location.search);
   const code = urlParams.get('code');
   if (code) {
@@ -216,7 +218,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
   else {
-    loadEditor(false, "codeEditor", defaultShaderCode);
+    loadEditor(false, "codeEditor", initShaderCode);
   }
   loadEditor(true, "diagnostics", "Diagnostic Output");
   loadEditor(true, "codeGen", "Generated Target Code");
