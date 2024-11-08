@@ -186,20 +186,24 @@ class SlangCompiler
     findDefinedEntryPoints(shaderSource)
     {
         var result = [];
+        if (shaderSource.match("imageMain"))
+        {
+            return ["imageMain"];
+        }
+        if (shaderSource.match("printMain"))
+        {
+            return ["printMain"];
+        }
+
         try {
             var slangSession = this.globalSlangSession.createSession(
                 this.compileTargetMap.findCompileTarget("SPIRV"));
             if(!slangSession) {
                 return [];
             }
+            var module = null;
 
-            if (shaderSource.match("imageMain"))
-                result.push("imageMain")
-
-            if (shaderSource.match("printMain"))
-                result.push("printMain")
-
-            var module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
+            module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if(!module) {
                 return result;
             }
@@ -277,9 +281,6 @@ class SlangCompiler
             return false;
         }
 
-        if (isWholeProgram)
-            return false;
-
         // For now, we just don't allow user to define imageMain or printMain as entry point name for simplicity
         var count = userModule.getDefinedEntryPointCount();
         for (var i = 0; i < count; i++)
@@ -319,6 +320,31 @@ class SlangCompiler
                 componentList.push_back(entryPoint);
             }
         }
+        // otherwise, it's a whole program compilation, we will find all active entry points in the user code
+        // and pre-built modules.
+        else
+        {
+            const results = this.findDefinedEntryPoints(shaderSource);
+            for (let i = 0; i < results.length; i++)
+            {
+                if (results[i] == "imageMain" || results[i] == "printMain")
+                {
+                    var mainProgram = this.getPrecompiledProgram(slangSession, results[i]);
+                    componentList.push_back(mainProgram.module);
+                    componentList.push_back(mainProgram.entryPoint);
+                    return true;
+                }
+                else
+                {
+                    var entryPoint = this.findEntryPoint(userModule, results[i], SlangCompiler.SLANG_STAGE_COMPUTE);
+                    if (!entryPoint)
+                        return false;
+
+                    componentList.push_back(entryPoint);
+                }
+            }
+        }
+        return true;
     }
 
     loadModule(slangSession, moduleName, source, componentTypeList)
@@ -342,6 +368,7 @@ class SlangCompiler
             this.hashedString.delete();
             this.hashedString = null;
         }
+        let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
 
         const compileTarget = this.compileTargetMap.findCompileTarget(compileTargetStr);
         let isWholeProgram = isWholeProgramTarget(compileTargetStr);
@@ -362,7 +389,6 @@ class SlangCompiler
 
             var components = new this.slangWasmModule.ComponentTypeList();
 
-            let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
             var userModuleIndex = 0;
             if (shouldLinkPlaygroundModule)
             {
@@ -372,16 +398,13 @@ class SlangCompiler
             }
             if (!this.loadModule(slangSession, "user", shaderSource, components))
                 return null;
-            if (!isWholeProgram)
-            {
-                if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(userModuleIndex), components) == false)
-                    return null;
-            }
+            if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components.get(userModuleIndex), components) == false)
+                return null;
             var program = slangSession.createCompositeComponentType(components);
             var linkedProgram = program.link();
             this.hashedString = linkedProgram.loadStrings();
 
-            var outCode;
+            var outCode = null;
             if (compileTargetStr == "SPIRV")
             {
                 const spirvCode = linkedProgram.getTargetCodeBlob(
