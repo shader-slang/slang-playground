@@ -1,3 +1,8 @@
+// "Very fast procedural ocean" by afl_ext, https://www.shadertoy.com/view/MdXyzX, ported to Slang.
+// Copyright (C) 2017-2024 afl_ext
+// Copyright (C) 2024 NVIDIA Corporation
+// SPDX-License-Identifier: MIT
+
 // afl_ext 2017-2024
 // MIT License
 import playground;
