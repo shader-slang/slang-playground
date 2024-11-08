@@ -387,8 +387,8 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                 var randomPipeline = new ComputePipeline(pipeline.device);
 
                 // Load randFloat shader code from the file.
-                const randFloatShaderCode = await (await fetch('rand_float.slang')).text();
-                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL", SlangCompiler.SLANG_STAGE_COMPUTE, false);
+                const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
+                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL");
                 if (!compiledResult)
                 {
                     throw new Error("[Internal] Failed to compile randFloat shader");
@@ -580,7 +580,7 @@ function compileOrRun()
 
 function compileShader(userSource, entryPoint, compileTarget, includePlaygroundModule = true)
 {
-    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, SlangCompiler.SLANG_STAGE_COMPUTE, includePlaygroundModule);
+    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
     // If compile is failed, we just clear the codeGenArea
