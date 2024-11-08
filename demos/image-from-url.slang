@@ -1,4 +1,4 @@
-// This example demonstrates a slang-playground feature that poopulates a texture from a URL.
+// This example demonstrates a slang-playground feature that populates a texture by loading the image from a URL.
 
 import playground;
 
