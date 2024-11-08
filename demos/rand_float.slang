@@ -1,3 +1,8 @@
+// Hybrid Tausworthe PRNG
+//
+// Code adapted from: https://indico.cern.ch/event/93877/papers/2118070/files/4416-acat3.pdf (See document for license)
+//
+
 uniform float seed;
 RWStructuredBuffer<float> outputBuffer;
 
