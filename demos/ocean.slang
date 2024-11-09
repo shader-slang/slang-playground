@@ -33,7 +33,7 @@ float getwaves<int iterations>(float2 position) {
   float wavePhaseShift = length(position) * 0.1; // this is to avoid every octave having exactly the same phase everywhere
   float iter = 0.0; // this will help generating well distributed wave directions
   float frequency = 1.0; // frequency of the wave, this will change every iteration
-  float timeMultiplier = 0.5; // time multiplier for the wave, this will change every iteration
+  float timeMultiplier = 5.0; // time multiplier for the wave, this will change every iteration
   float weight = 1.0;// weight in final sum for the wave, this will change every iteration
   float sumOfValues = 0.0; // will store final sum of values
   float sumOfWeights = 0.0; // will store final sum of weights
@@ -145,18 +145,16 @@ float3 extra_cheap_atmosphere(float3 raydir, float3 sundir) {
 // Calculate where the sun should be, it will be moving around the sky
 float3 getSunDirection() {
   float time = getTime();
-  return normalize(float3(sin(time * 0.1), 1.0, cos(time * 0.1)));
+  return normalize(float3(sin(time), 1.0, cos(time)));
 }
 
 // Get atmosphere color for given direction
 float3 getAtmosphere(float3 dir) {
-  float time = getTime();
   return extra_cheap_atmosphere(dir, getSunDirection()) * 0.5;
 }
 
 // Get sun color for given direction
 float getSun(float3 dir) {
-  float time = getTime();
   return pow(max(0.0, dot(dir, getSunDirection())), 720.0) * 210.0;
 }
 
@@ -199,7 +197,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   float3 waterPlaneLow = float3(0.0, -WATER_DEPTH, 0.0);
 
   // define ray origin, moving around
-  float3 origin = float3(getTime() * 0.2, CAMERA_HEIGHT, 1);
+  float3 origin = float3(getTime() * 2.0, CAMERA_HEIGHT, 1);
 
   // calculate intersections and reconstruct positions
   float highPlaneHit = intersectPlane(origin, ray, waterPlaneHigh, float3(0.0, 1.0, 0.0));

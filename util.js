@@ -257,6 +257,16 @@ function formatSpecifier(value, { flags, width, precision, specifierType })
 //     uint32_t high = 0;
 // };
 //
+function hashToString(hashedStrings, hash)
+{
+    for (var i = 0; i < hashedStrings.length; i++)
+    {
+        if (hashedStrings[i].hash == hash)
+        {
+            return hashedStrings[i].string;
+        }
+    }
+}
 function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize)
 {
 
@@ -279,10 +289,10 @@ function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize)
         switch (type)
         {
             case 1: // format string
-                formatString = hashedString.getString(printfBufferArray[offset + 1]);    // low field
+                formatString = hashToString(hashedString, printfBufferArray[offset + 1]);    // low field
                 break;
             case 2: // normal string
-                dataArray.push(hashedString.getString(printfBufferArray[offset + 1]));  // low field
+                dataArray.push(hashToString(hashedString, printfBufferArray[offset + 1]));  // low field
                 break;
             case 3: // integer
                 dataArray.push(printfBufferArray[offset + 1]);  // low field
