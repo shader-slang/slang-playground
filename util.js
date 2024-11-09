@@ -289,10 +289,10 @@ function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize)
         switch (type)
         {
             case 1: // format string
-                formatString = hashToString(hashedString, printfBufferArray[offset + 1]);    // low field
+                formatString = hashToString(hashedString, (printfBufferArray[offset + 1]<<0));  // low field
                 break;
             case 2: // normal string
-                dataArray.push(hashToString(hashedString, printfBufferArray[offset + 1]));  // low field
+                dataArray.push(hashToString(hashedString, (printfBufferArray[offset + 1]<<0)));  // low field
                 break;
             case 3: // integer
                 dataArray.push(printfBufferArray[offset + 1]);  // low field
