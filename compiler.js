@@ -487,6 +487,10 @@ class SlangCompiler
 
             var bindings = this.getResourceBindings(linkedProgram);
 
+            // Also read the shader work-group size.
+            const entryPointReflection = linkedProgram.getLayout(0).findEntryPointByName(entryPointName);
+            var threadGroupSize = entryPointReflection.getComputeThreadGroupSize();
+
             if (outCode == "") 
             {
                 var error = this.slangWasmModule.getLastError();
@@ -522,7 +526,7 @@ class SlangCompiler
             if (!outCode || outCode == "")
                 return null;
 
-            return [outCode, bindings, hashedStrings];
+            return [outCode, bindings, hashedStrings, threadGroupSize];
         }
     }
 };

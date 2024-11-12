@@ -13,12 +13,20 @@ class ComputePipeline
     device;
     bindGroup;
 
+    // thread group size (array of 3 integers)
+    threadGroupSize;
+
     // resource name (string) -> binding descriptor 
     resourceBindings;
 
     constructor(device)
     {
         this.device = device;
+    }
+
+    setThreadGroupSize(size)
+    {
+        this.threadGroupSize = size;
     }
 
     createPipelineLayout(resourceDescriptors)
