@@ -70,21 +70,20 @@ function resizeCanvas(entries)
 {
     const canvas = entries[0].target;
 
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
     if (canvas.style.display == "none")
     {
         var parentDiv = document.getElementById("output");
-        currentWindowSize = [parentDiv.clientWidth, parentDiv.clientHeight];
-        return true;
+        width = parentDiv.clientWidth;
+        height = parentDiv.clientHeight;
     }
-
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
 
     if (width != currentWindowSize[0] || height != currentWindowSize[1])
     {
         // ensure the size won't be 0 nor exceed the limit, otherwise WebGPU will throw an errors
-        canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
-        canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
+        canvas.width = Math.max(2, Math.min(width, device.limits.maxTextureDimension2D));
+        canvas.height = Math.max(2, Math.min(height, device.limits.maxTextureDimension2D));
 
         currentWindowSize = [canvas.width, canvas.height];
         return true;
@@ -674,6 +673,24 @@ function compileOrRun()
     }
 }
 
+var reflectionJson = {};
+function getReflectionJson()
+{
+    return {
+        controlPanel:{enabled:false},
+        sideMenu:{enabled:false},
+        footer:{enabled:false},
+        lineNumbers:{enabled:false},
+        inspectionLevels: 8,
+        title:{
+            text:null,
+            showCloseOpenAllButtons: false,
+            showCopyButton: false,
+            enableFullScreenToggling: false
+        },
+        data: reflectionJson
+    };
+}
 function compileShader(userSource, entryPoint, compileTarget, includePlaygroundModule = true)
 {
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
@@ -686,7 +703,8 @@ function compileShader(userSource, entryPoint, compileTarget, includePlaygroundM
         return {succ: false};
     }
 
-    let [compiledCode, layout, hashedStrings, threadGroupSize] = compiledResult;
+    let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSize] = compiledResult;
+    reflectionJson = reflectionJsonObj;
 
     codeGenArea.setValue(compiledCode);
     if (compileTarget == "WGSL")
@@ -695,7 +713,12 @@ function compileShader(userSource, entryPoint, compileTarget, includePlaygroundM
         codeGenArea.getModel().setLanguage("spirv");
     else
         codeGenArea.getModel().setLanguage("generic-shader");
-    return {succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, threadGroupSize: threadGroupSize};
+
+    // Update reflection info.
+    $jsontree.setJson("reflectionDiv", reflectionJson);
+    $jsontree.refreshAll();
+
+    return {succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize};
 }
 
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.

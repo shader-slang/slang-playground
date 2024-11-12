@@ -81,8 +81,10 @@ void printMain()
     // all vector<float ,N> types conform to IMyHashable and thus valid to use in the call.
     printHash(v);
 
-    // The following line will result in a compile error because `int` does not
-    // conform to `IMyHashable`.
-    // printHash(1);
+    // The following lines will result in a compile error because `NonHashable` does not
+    // conform to `IMyHashable`:
+    //
+    // struct NonHashable{int data;}
+    // NonHashable obj = {0};
+    // printHash(obj);
 }
-

@@ -16,7 +16,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
     float r = length(p)*0.75;
     vec2 uv = vec2(a/tau,r);
 	
-    float time = getTime() * 0.2;
+    float time = getTime();
 
 	//get the color
 	float xCol = (uv.x - time/3) * 3.0;

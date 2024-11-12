@@ -83,6 +83,8 @@ function prepareForResize() {
   var codeEditors = document.getElementsByClassName("editorContainer");
 
   for (var i = 0; i < codeEditors.length; i++) {
+    if (codeEditors[i].style.display == "none")
+      continue;
     if (codeEditors[i].parentNode.clientWidth < 30)
       codeEditors[i].style.display = "none";
     else
@@ -98,12 +100,15 @@ function finishResizing() {
     document.getElementById("workSpaceDiv").style.overflow = "visible";
     document.getElementById("leftContainerDiv").style.overflow = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
+      if (codeEditors[i].style.display == "none")
+        continue;
       codeEditors[i].style.overflow = "visible";
       if (codeEditors[i].parentNode.clientWidth < 30)
         codeEditors[i].style.display = "none";
       else
         codeEditors[i].style.display = "inherit";
     }
+    document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
 }
 
 var finishResizingTimeout = null;
@@ -329,6 +334,30 @@ btnShareLink.onclick = async function () {
     showTooltip(btnShareLink, "Failed to copy link to clipboard.");
   }
 };
+
+function openTab(tabId)
+{
+  var buttons = [document.getElementById("btnTargetCode"), document.getElementById("btnReflection")];
+  if (tabId == 0)
+  {
+    document.getElementById("codeGen").style = "";
+    document.getElementById("reflectionTab").style.display = "none";
+    
+  }
+  else
+  {
+    document.getElementById("codeGen").style.display = "none";
+    document.getElementById("reflectionTab").style.display = "block";
+    finishResizing();
+  }
+  for (var i = 0; i < buttons.length; i++)
+  {
+    if (i == tabId)
+      buttons[i].classList.add("tabButtonActive");
+    else
+      buttons[i].classList.remove("tabButtonActive");
+  }
+}
 
 document.addEventListener('keydown', function(event) {
   if (event.key === 'F5')

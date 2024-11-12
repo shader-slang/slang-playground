@@ -17,8 +17,10 @@
   --button-face: #505050;
   --panel-background: #101010;
   --gutter: #101010;
-  --gutter-hover:#252525;
+  --gutter-hover: #252525;
   --font-size: 14px;
+  --inactive-tab-title: #C0C0C0;
+  --code-editor-background: #1E1E1E;
 }
 
 * {
@@ -86,7 +88,7 @@ h2 {
 }
 
 .workSpace {
-  
+
   display: grid;
   grid-template-rows: 80% 14px 1fr;
   overflow: visible;
@@ -101,13 +103,54 @@ h2 {
 
 .codingSpace,
 .diagnosticSpace,
-.outputSpace,
-.codeGenSpace {
+.outputSpace {
   background-color: var(--panel-background);
 }
 
+.codeGenSpace {
+  background-color: var(--panel-background);
+  display: flex;
+  flex-direction: column;
+}
+
+div.json-tree-js div.title-bar {
+  display: none !important;
+}
+
+.targetCodeEditor {
+  background-color: var(--panel-background);
+  flex: 1 1 0;
+  display: block;
+}
+
+.reflectionView {
+  background-color: var(--code-editor-background);
+  flex: 1 1 0;
+  display: block;
+  overflow: auto;
+}
+
+.codeGenHeader {
+  display: flex;
+  flex-direction: row;
+}
+
+.tabButton {
+  border-radius: 0px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+  border: none;
+  background: none;
+  color: var(--inactive-tab-title)
+}
+
+.tabButtonActive {
+  background: var(--code-editor-background);
+  color: white;
+}
+
 /*Hide vscode focus border*/
-.monaco-editor{
+.monaco-editor {
   --vscode-focusBorder: #00000000 !important;
 }
 
@@ -118,15 +161,16 @@ h2 {
 }
 
 .printSpace {
-  background-color: #1E1E1E;
-  margin-top:10px;
-  border:none;
-  color:white;
+  background-color: var(--code-editor-background);
+  margin-top: 10px;
+  border: none;
+  color: white;
   width: 100%;
   height: 100%;
 }
+
 .printSpace:focus {
-  outline:none;
+  outline: none;
 }
 
 .gutter {
@@ -170,6 +214,7 @@ button:disabled {
 button:hover {
   background-color: var(--orange);
 }
+
 button:disabled:hover {
   opacity: 0.5;
   cursor: not-allowed;
@@ -203,15 +248,16 @@ button:disabled:hover {
   align-items: center;
   transition: color 0.2s ease-in-out;
 }
-.svg-btn:hover{
+
+.svg-btn:hover {
   color: var(--orange);
-  background:none;
+  background: none;
 }
 
 .navbar-logo {
   flex-basis: 10%;
   min-width: 150px;
-  margin-right:20px;
+  margin-right: 20px;
 }
 
 .navbar-actions {
@@ -279,7 +325,7 @@ label {
   font-size: 14px;
   cursor: pointer;
   border-radius: 4px;
-  min-width:max-content;
+  min-width: max-content;
   box-sizing: border-box;
   transition: background-color 0.2s ease-in-out;
 }
@@ -306,7 +352,7 @@ label {
 
 #entrypoint-dropdown {
   width: auto;
-  min-width:max-content;
+  min-width: max-content;
 }
 
 .navbar-group {
@@ -316,7 +362,7 @@ label {
 
 .navbar-item {
   background-color: var(--light-grey);
-  flex: 1 1 0; 
+  flex: 1 1 0;
   color: var(--white);
   padding: 8px 16px;
   text-align: center;
@@ -329,9 +375,10 @@ label {
   margin-left: 10px;
   max-width: fit-content;
   height: 50px;
-  margin-top:5px;
+  margin-top: 5px;
   margin-bottom: 5px;
 }
+
 .navbar-standalone-button-item {
   background-color: var(--light-grey);
   color: var(--white);
@@ -347,14 +394,15 @@ label {
   margin-left: 10px;
   max-width: fit-content;
   height: 50px;
-  margin-top:5px;
+  margin-top: 5px;
   margin-bottom: 5px;
 }
 
 .modal {
   display: none;
   position: fixed;
-  z-index: 999; /* Sit on top of code editor*/
+  z-index: 999;
+  /* Sit on top of code editor*/
   left: 0;
   top: 0;
   width: 100%;
@@ -393,7 +441,8 @@ label {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #303030; /* Change color as needed */
+  background-color: #303030;
+  /* Change color as needed */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -401,10 +450,13 @@ label {
   z-index: 9999;
   font-size: 20px;
   color: #F0F0F0;
-  opacity: 1;                /* Start fully opaque */
-  transition: opacity 0.5s ease; /* Fade-out transition */
+  opacity: 1;
+  /* Start fully opaque */
+  transition: opacity 0.5s ease;
+  /* Fade-out transition */
 }
-#loading-status-line{
+
+#loading-status-line {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -425,8 +477,13 @@ label {
   margin-left: 10px;
   color: #f0f0f0;
 }
+
 @keyframes spin {
-  to { transform: rotate(360deg); }      /* Full 360-degree rotation */
+  to {
+    transform: rotate(360deg);
+  }
+
+  /* Full 360-degree rotation */
 }
 
 /* Tooltip styling */
@@ -446,6 +503,7 @@ label {
   transition: opacity 0.3s ease, visibility 0.3s ease;
   z-index: 999;
 }
+
 /* Visible tooltip styling */
 .tooltip.show {
   opacity: 1;
@@ -453,10 +511,11 @@ label {
 
 /* Narrow screen */
 @media screen and (max-width: 450px) {
-  .dropdown-select{
+  .dropdown-select {
     min-width: 100px;
   }
-  #demo-select{
+
+  #demo-select {
     width: 150px;
   }
 }
