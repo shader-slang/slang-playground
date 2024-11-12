@@ -489,6 +489,8 @@ class SlangCompiler
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
+
+            var reflectionJson = linkedProgram.getLayout(0).toJsonObject();
         } catch (e) {
             console.log(e);
             return null;
@@ -499,7 +501,7 @@ class SlangCompiler
             if (!outCode || outCode == "")
                 return null;
 
-            return [outCode, bindings, hashedStrings];
+            return [outCode, bindings, hashedStrings, reflectionJson];
         }
     }
 };
