@@ -586,6 +586,7 @@ function getReflectionJson()
         footer:{enabled:false},
         lineNumbers:{enabled:false},
         inspectionLevels: 8,
+        shortcutKeysEnabled: false,
         title:{
             text:null,
             showCloseOpenAllButtons: false,
