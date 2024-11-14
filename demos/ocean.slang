@@ -116,9 +116,9 @@ float3 getRay(float2 fragCoord, float2 resolution) {
   if(resolution.x < 600.0) {
     return proj;
   }
-  float3x3 mat = mul(createRotationMatrixAxisAngle(float3(0.0, -1.0, 0.0), 0.0),
-                     createRotationMatrixAxisAngle(float3(1.0, 0.0, 0.0), 0.0)
-                    );
+  var NormalizedMouse = getMousePosition().xy/float2(resolution);
+  float3x3 mat = mul(createRotationMatrixAxisAngle(float3(0.0, -1.0, 0.0), 3.0 * ((1.0-NormalizedMouse.x + 0.5) * 2.0 - 1.0)) ,
+                     createRotationMatrixAxisAngle(float3(1.0, 0.0, 0.0), 0.5 + 1.5 * (((NormalizedMouse.y == 0.0 ? 0.35 : NormalizedMouse.y) * 1.0) * 2.0 - 1.0)));
   return mul(mat, proj);
 }
 

@@ -41,11 +41,7 @@ async function webgpuInit()
         console.log('need a browser that supports WebGPU');
         return;
     }
-
-    // This feature is not necessary if we can support write-only texture in slang.
     const requiredFeatures = [];
-    requiredFeatures.push('bgra8unorm-storage');
-    requiredFeatures.push('float32-filterable');
 
     device = await adapter?.requestDevice({requiredFeatures});
     if (!device)
@@ -97,8 +93,6 @@ function startRendering() {
     renderDelayTimer = setTimeout(() => {
         if (computePipeline && passThroughPipeline &&
             currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
-            //computePipeline.createOutput(true, currentWindowSize);
-            //computePipeline.createBindGroup();
 
             processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
                 computePipeline.createBindGroup(allocatedResources);
@@ -140,14 +134,14 @@ function toggleDisplayMode(displayMode)
     {
         var printResult = document.getElementById("printResult")
         printResult.style.display = "none";
-        canvas.style.display="grid";
+        renderOutput.style.display="grid";
         canvas.style.width = "100%";
         canvas.style.height = "100%";
         currentMode = RENDER_MODE;
     }
     else if (displayMode == PRINT_MODE)
     {
-        canvas.style.display="none";
+        renderOutput.style.display="none";
         var printResult = document.getElementById("printResult")
         printResult.style.display = "grid";
 
@@ -155,7 +149,7 @@ function toggleDisplayMode(displayMode)
     }
     else if (displayMode == HIDDEN_MODE)
     {
-        canvas.style.display="none";
+        renderOutput.style.display="none";
         document.getElementById("printResult").style.display = "none";
         document.getElementById("resultSplitContainer").style.gridTemplateRows="0px 14px 1fr";
         currentMode = HIDDEN_MODE;
@@ -166,6 +160,9 @@ function toggleDisplayMode(displayMode)
     }
 }
 
+var timeAggregate = 0;
+var frameCount = 0;
+
 async function render(timeMS)
 {
     if (currentMode == HIDDEN_MODE)
@@ -173,9 +170,19 @@ async function render(timeMS)
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
         return;
 
-    var timeArray = new Float32Array(4);
-    timeArray[0] = timeMS * 0.001;
-    computePipeline.device.queue.writeBuffer(allocatedResources.get("time"), 0, timeArray);
+    const startTime = performance.now();
+
+    var timeArray = new Float32Array(8);
+    timeArray[0] = canvasCurrentMousePos.x;
+    timeArray[1] = canvasCurrentMousePos.y;
+    timeArray[2] = canvasLastMouseDownPos.x;
+    timeArray[3] = canvasLastMouseDownPos.y;
+    if (canvasIsMouseDown)
+        timeArray[2] = -timeArray[2];
+    if (canvasMouseClicked)
+        timeArray[3] = -timeArray[3];
+    timeArray[4] = timeMS * 0.001;
+    computePipeline.device.queue.writeBuffer(allocatedResources.get("uniformInput"), 0, timeArray);
 
     // computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
@@ -214,6 +221,21 @@ async function render(timeMS)
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
     device.queue.submit([commandBuffer]);
+
+    await device.queue.onSubmittedWorkDone();
+
+    const timeElapsed = performance.now() - startTime;
+
+    // Update performance info.
+    timeAggregate += timeElapsed;
+    frameCount++;
+    if (frameCount == 20)
+    {
+        var avgTime = (timeAggregate / frameCount);
+        document.getElementById("performanceInfo").innerText = avgTime.toFixed(1) + " ms ";
+        timeAggregate = 0;
+        frameCount = 0;
+    }
 
     // Only request the next frame if we are in the render mode
     if (currentMode == RENDER_MODE)
@@ -470,8 +492,8 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
 
-    var length = new Float32Array(4).byteLength;
-    safeSet(allocatedResources, "time", pipeline.device.createBuffer({size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
+    var length = new Float32Array(8).byteLength;
+    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST}));
 
     return allocatedResources;
 }
@@ -491,6 +513,8 @@ var onRun = () => {
         return;
     if (!compiler)
         return;
+
+    resetMouse();
     if (!computePipeline)
     {
         computePipeline = new ComputePipeline(device);

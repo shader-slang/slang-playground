@@ -1,12 +1,26 @@
 
 const playgroundSource = `
-internal uniform float time;
+internal struct UniformInput
+{
+    float4 mousePosition;
+    float time;
+}
+
+internal uniform UniformInput uniformInput;
 
 // Return the current time in milliseconds
 public float getTime()
 {
-    return time;
+    return uniformInput.time;
 }
+
+// Returns mouse position info.
+// xy: mouse position during last button down.
+// abs(zw): mouse position during last button click.
+// sign(mouze.z)  = button is down
+// sign(mouze.w)  = button is clicked
+
+public float4 getMousePosition() { return uniformInput.mousePosition; }
 
 // type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double, 
 struct FormatedStruct
