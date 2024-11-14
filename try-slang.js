@@ -5,6 +5,7 @@ var slangd = null;
 var device;
 var context;
 var computePipeline;
+var extraComputePipelines = [];
 var passThroughPipeline;
 
 var monacoEditor;
@@ -13,8 +14,11 @@ var codeGenArea;
 
 var resourceBindings;
 var resourceCommands;
+var callCommands;
 var allocatedResources;
 var hashedStrings;
+
+var stopRendering = false;
 
 var printfBufferElementSize = 12;
 var printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
@@ -90,16 +94,21 @@ function startRendering() {
     if (renderDelayTimer)
         clearTimeout(renderDelayTimer);
 
+    stopRendering = false;
+
     renderDelayTimer = setTimeout(() => {
         if (computePipeline && passThroughPipeline &&
             currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
 
             processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
-                computePipeline.createBindGroup(allocatedResources);
                 globalThis.allocatedResources = allocatedResources;
+                computePipeline.createBindGroup(allocatedResources);
     
                 passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
                 passThroughPipeline.createBindGroup();
+
+                for (const pipeline of extraComputePipelines)
+                    pipeline.createBindGroup(allocatedResources);
 
                 if (canvas.style.display != "none") 
                 {
@@ -169,6 +178,8 @@ async function render(timeMS)
         return;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
         return;
+    if (stopRendering)
+        return;
 
     const startTime = performance.now();
 
@@ -184,9 +195,57 @@ async function render(timeMS)
     timeArray[4] = timeMS * 0.001;
     computePipeline.device.queue.writeBuffer(allocatedResources.get("uniformInput"), 0, timeArray);
 
-    // computePipeline.updateUniformBuffer(timeMS * 0.01);
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+
+    // The extra passes always go first.
+    // zip the extraComputePipelines and callCommands together
+    for (const [pipeline, command] of callCommands.map((x, i) => [extraComputePipelines[i], x]))
+    {
+        const pass = encoder.beginComputePass({ label: 'extra passes' });
+        pass.setBindGroup(0, pipeline.bindGroup);
+        pass.setPipeline(pipeline.pipeline);
+        // Determine the workgroup size based on the size of the buffer or texture.
+        if (command.type == "RESOURCE_BASED")
+        {
+            if (!globalThis.allocatedResources.has(command.resourceName))
+            {
+                diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
+                return;
+            }
+
+            var resource = globalThis.allocatedResources.get(command.resourceName)
+            if (resource instanceof GPUBuffer)
+            {
+                var size = resource.size / 4;
+                const blockSizeX = pipeline.threadGroupSize.x;
+                const blockSizeY = pipeline.threadGroupSize.y;
+
+                const workGroupSizeX = Math.floor((size + blockSizeX - 1) / blockSizeX);
+                const workGroupSizeY = Math.floor((1 + blockSizeY - 1) / blockSizeY);
+                
+                pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
+            }
+            else if (resource instanceof GPUTexture)
+            {
+                var size = [0, 0];
+                size[0] = resource.width;
+                size[1] = resource.height;
+                const blockSizeX = pipeline.threadGroupSize.x;
+                const blockSizeY = pipeline.threadGroupSize.y;
+
+                const workGroupSizeX = Math.floor((size[0] + blockSizeX - 1) / blockSizeX);
+                const workGroupSizeY = Math.floor((size[1] + blockSizeY - 1) / blockSizeY);
+
+                pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
+            }
+            else
+            {
+                throw new Error("Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
+            }
+        }
+        pass.end();
+    }
 
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
@@ -309,7 +368,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
     {
         if (parsedCommand.type === "ZEROS")
         {
-            const size = command.size.reduce((a, b) => a * b);
+            const size = parsedCommand.size.reduce((a, b) => a * b);
             const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo)
@@ -520,6 +579,9 @@ var onRun = () => {
         computePipeline = new ComputePipeline(device);
     }
 
+    // Stop any ongoing render tasks.
+    stopRendering = true;
+
     // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
     // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
     const userSource = monacoEditor.getValue();
@@ -551,9 +613,40 @@ var onRun = () => {
         return;
     }
 
+    try {
+        callCommands = parseCallCommands(userSource);
+    }
+    catch (error) {
+        diagnosticsArea.setValue("Error while parsing '//! CALL' commands: " + error.message);
+        return;
+    }
+
     resourceBindings = ret.layout;
     // create a pipeline resource 'signature' based on the bindings found in the program.
-    computePipeline.createPipelineLayout(resourceBindings); 
+    computePipeline.createPipelineLayout(resourceBindings);
+
+    if (extraComputePipelines.length > 0)
+        extraComputePipelines = []; // This should release the resources of the extra pipelines.
+
+    if (callCommands && (callCommands.length > 0))
+    {
+        for (const command of callCommands)
+        {
+            const compiledResult = compileShader(userSource, command.fnName, "WGSL");
+            if (!compiledResult.succ)
+            {
+                diagnosticsArea.setValue("Failed to compile shader for requested entry-point: " + command.fnName);
+                return;
+            }
+
+            const module = device.createShaderModule({code:compiledResult.code});
+            const pipeline = new ComputePipeline(device);
+            pipeline.createPipelineLayout(compiledResult.layout);
+            pipeline.createPipeline(module, null);
+            pipeline.setThreadGroupSize(compiledResult.threadGroupSize);
+            extraComputePipelines.push(pipeline);
+        }
+    }
 
     processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
         globalThis.allocatedResources = allocatedResources;
@@ -571,6 +664,11 @@ var onRun = () => {
             const module = device.createShaderModule({code:ret.code});
             computePipeline.createPipeline(module, allocatedResources);
         }
+
+        // Create bind groups for the extra pipelines
+        for (const pipeline of globalThis.extraComputePipelines)
+            pipeline.createBindGroup(allocatedResources);
+
 
         toggleDisplayMode(compiler.shaderType);
         if (compiler.shaderType == SlangCompiler.PRINT_SHADER)
@@ -632,7 +730,7 @@ function compileShader(userSource, entryPoint, compileTarget, includePlaygroundM
         return {succ: false};
     }
 
-    let [compiledCode, layout, hashedStrings, reflectionJsonObj] = compiledResult;
+    let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSize] = compiledResult;
     reflectionJson = reflectionJsonObj;
 
     codeGenArea.setValue(compiledCode);
@@ -647,7 +745,7 @@ function compileShader(userSource, entryPoint, compileTarget, includePlaygroundM
     $jsontree.setJson("reflectionDiv", reflectionJson);
     $jsontree.refreshAll();
 
-    return {succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson};
+    return {succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize};
 }
 
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.

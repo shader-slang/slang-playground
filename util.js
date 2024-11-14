@@ -37,7 +37,7 @@ function reinterpretUint32AsFloat(uint32)
 }
 
 
-function parseCommand(command)
+function parseResourceCommand(command)
 {
     const match = command.match(/(\w+)\((.*)\)/);
     if (match)
@@ -93,12 +93,47 @@ function parseResourceCommands(userSource)
         {
             const resourceName = match[1];
             const command = match[2];
-            const parsedCommand = parseCommand(command);
+            const parsedCommand = parseResourceCommand(command);
             resourceCommands.push({ resourceName, parsedCommand });
         }
     }
 
     return resourceCommands;
+}
+
+function parseCallCommands(userSource)
+{
+    // Look for commands of the form:
+    //
+    // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
+    //                                                    function name and using the resource size
+    //                                                    to determine the work-group size.
+    // 2. //! CALL(fn-name, 512, 512) ==> Dispatch a compute pass with the given function name and
+    //                                    the provided work-group size.
+    //
+
+    const callCommands = [];
+    const lines = userSource.split('\n');
+    for (let line of lines)
+    {
+        const match = line.match(/\/\/!\s+CALL\((\w+),\s*(.*)\)/);
+        if (match)
+        {
+            const fnName = match[1];
+            const args = match[2].split(',').map(arg => arg.trim());
+
+            if (args[0].startsWith("SIZE_OF"))
+            {
+                callCommands.push({type: "RESOURCE_BASED", fnName, resourceName: args[0].slice(8, -1)});
+            }
+            else
+            {
+                callCommands.push({type: "FIXED_SIZE", fnName, size: args.map(Number)});
+            }
+        }
+    }
+
+    return callCommands;
 }
 
 function parsePrintfFormat(formatString)
