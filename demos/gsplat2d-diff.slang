@@ -51,27 +51,6 @@ struct FilledShortList { int _dummy = 0; };
 struct PaddedShortList { int _dummy = 0; };
 struct SortedShortList { int _dummy = 0; };
 
-/*// Axis-aligned bounding box.
-struct AABB
-{
-    float2 minVal;
-    float2 maxVal;
-
-    __init(float2 minVal, float2 maxVal)
-    {
-        this.minVal = minVal;
-        this.maxVal = maxVal;
-    }
-
-    bool intersects(AABB other)
-    {
-        return !(other.minVal.x > this.maxVal.x
-            || other.maxVal.x < this.minVal.x
-            || other.maxVal.y < this.minVal.y
-            || other.minVal.y > this.maxVal.y);
-    }
-};*/
-
 // Oriented bounding box.
 struct OBB
 {
