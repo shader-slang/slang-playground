@@ -134,7 +134,7 @@ function toggleDisplayMode(displayMode)
     {
         var printResult = document.getElementById("printResult")
         printResult.style.display = "none";
-        renderOutput.style.display="grid";
+        renderOutput.style.display="block";
         canvas.style.width = "100%";
         canvas.style.height = "100%";
         currentMode = RENDER_MODE;
