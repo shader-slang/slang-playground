@@ -93,12 +93,14 @@ function prepareForResize() {
   }
   document.getElementById("workSpaceDiv").style.overflow = "hidden";
   document.getElementById("leftContainerDiv").style.overflow = "hidden";
+  targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
 function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
     document.getElementById("workSpaceDiv").style.overflow = "visible";
     document.getElementById("leftContainerDiv").style.overflow = "visible";
+    targetResultContainer.style.overflow = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
       if (codeEditors[i].style.display == "none")
         continue;
@@ -109,6 +111,13 @@ function finishResizing() {
         codeEditors[i].style.display = "inherit";
     }
     document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
+    
+    var canvasRect = document.getElementById("canvas").getBoundingClientRect();
+    
+    renderOverlay.style.top = 5 + "px";
+    renderOverlay.style.left = (canvasRect.left + 5) + "px";
+    renderOverlay.style.display = canvasRect.height> 30?"block":"none";
+    resetMouse();
 }
 
 var finishResizingTimeout = null;
@@ -246,7 +255,11 @@ document.addEventListener("DOMContentLoaded", function () {
       },
     ],
     onDragStart: ()=>prepareForResize(),
-    onDragEnd: ()=>finishResizing(),
+    onDragEnd: ()=>{
+        finishResizingTimeout = setTimeout(() => {
+        finishResizing();
+        finishResizingTimeout = null;
+      }, 50);},
   });
 
   loadDemoList();
@@ -372,3 +385,35 @@ document.addEventListener('keydown', function(event) {
       onCompile();
   }
 });
+
+var canvasLastMouseDownPos = {x:0, y:0};
+var canvasCurrentMousePos = {x:0, y:0};
+var canvasIsMouseDown = false;
+var canvasMouseClicked = false;
+canvas.addEventListener("mousedown", function(event) {
+  canvasLastMouseDownPos.x = event.offsetX;
+  canvasLastMouseDownPos.y = event.offsetY;
+  canvasCurrentMousePos.x = event.offsetX;
+  canvasCurrentMousePos.y = event.offsetY;
+  canvasMouseClicked = true;
+  canvasIsMouseDown = true;
+});
+
+canvas.addEventListener("mousemove", function(event) {
+  if (canvasIsMouseDown) {
+    canvasCurrentMousePos.x = event.offsetX;
+    canvasCurrentMousePos.y = event.offsetY;
+  }
+});
+canvas.addEventListener("mouseup", function(event) {
+  canvasIsMouseDown = false;
+});
+function resetMouse()
+{
+  canvasIsMouseDown = false;
+  canvasLastMouseDownPos.x = 0;
+  canvasLastMouseDownPos.y = 0;
+  canvasCurrentMousePos.x = 0;
+  canvasCurrentMousePos.y = 0;
+  canvasMouseClicked = false;
+}

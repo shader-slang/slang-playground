@@ -154,11 +154,16 @@
     <div class="rightContainer" id="rightContainerDiv">
       <div class="resultSpace" id="resultSplitContainer">
         <div class="outputSpace" id="output">
-          <canvas class="renderCanvas" id="canvas"></canvas>
-          <textarea readonly class="printSpace editorContainer" id="printResult" style="display: none"></textarea>
+          <div id="renderOutput">
+            <div id="renderOverlay">
+              <div id="performanceInfo"></div>
+            </div>
+            <canvas class="renderCanvas" id="canvas"></canvas>
+          </div>
+          <textarea readonly class="printSpace" id="printResult" style="display: none"></textarea>
         </div>
         <div class="gutter gutter-vertical"></div>
-        <div class="codeGenSpace">
+        <div class="codeGenSpace" id="targetResultContainer">
           <div class="codeGenHeader">
             <button class="tabButton tabButtonActive" onclick="openTab(0)" id="btnTargetCode">Target Code</button>
             <button class="tabButton" onclick="openTab(1)" id="btnReflection">Reflection</button>
@@ -199,7 +204,6 @@
             </ul>
       </div>
     </div>
-
     <script src="ui.js"></script>
 </body>
 
