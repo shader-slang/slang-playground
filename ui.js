@@ -85,10 +85,6 @@ function prepareForResize() {
   for (var i = 0; i < codeEditors.length; i++) {
     if (codeEditors[i].style.display == "none")
       continue;
-    if (codeEditors[i].parentNode.clientWidth < 30)
-      codeEditors[i].style.display = "none";
-    else
-      codeEditors[i].style.display = "inherit";
     codeEditors[i].style.overflow = "hidden";
   }
   document.getElementById("workSpaceDiv").style.overflow = "hidden";
@@ -100,15 +96,19 @@ function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
     document.getElementById("workSpaceDiv").style.overflow = "visible";
     document.getElementById("leftContainerDiv").style.overflow = "visible";
-    targetResultContainer.style.overflow = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
       if (codeEditors[i].style.display == "none")
         continue;
-      codeEditors[i].style.overflow = "visible";
       if (codeEditors[i].parentNode.clientWidth < 30)
-        codeEditors[i].style.display = "none";
+      {
+        codeEditors[i].style["z-index"] = -1;
+        codeEditors[i].style.overflow = "hidden";
+      }
       else
-        codeEditors[i].style.display = "inherit";
+      {
+        codeEditors[i].style["z-index"] = 0;
+        codeEditors[i].style.overflow = "visible";
+      }
     }
     document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
     
