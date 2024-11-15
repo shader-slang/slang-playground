@@ -196,6 +196,21 @@ function restoreSelectedTargetFromURL()
   }  
 }
 
+function restoreDemoSelectionFromURL()
+{
+  const urlParams = new URLSearchParams(window.location.search);
+  var demo = urlParams.get('demo');
+  if (demo) {
+    if (!demo.endsWith(".slang"))
+      demo += ".slang";
+    const demoSelect = document.getElementById("demo-select");
+    demoSelect.value = demo;
+    loadDemo(demo);
+    return true;
+  }
+  return false;
+}
+
 function loadDemoList()
 {
   // Fill in demo-select dropdown using demoList.
