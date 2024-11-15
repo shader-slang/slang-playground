@@ -39,6 +39,7 @@ fi
 
 cp slang-repo/slang/build.em/Release/bin/* ./
 cp slang-repo/slang/build.em/Release/bin/* ./
+gzip -c slang-wasm.wasm > slang-wasm.wasm.gz
 
 rm key.txt
 echo "$(git -C ./slang-repo/slang rev-parse HEAD)" >> key.txt

@@ -4,7 +4,8 @@ name: Deploy Jekyll with GitHub Pages dependencies preinstalled
 on:
   # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
+    branches:
+      - main
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -52,7 +53,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            ./slang-wasm.wasm
+            ./slang-wasm.wasm.gz
             ./slang-wasm.js
           key: ${{hashFiles('key.txt')}}
 
@@ -75,7 +76,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-            ./slang-wasm.wasm
+            ./slang-wasm.wasm.gz
             ./slang-wasm.js
           key: ${{hashFiles('key.txt')}}
 
