@@ -487,6 +487,19 @@ label {
   justify-content: center;
 }
 
+#progress-bar-container {
+  width: 300px;
+  height: 10px;
+  display: block;
+  background: var(--button-face);
+}
+
+#progress-bar {
+  width: 0%;
+  height: 100%;
+  background: rgb(2, 133, 82);
+}
+
 /* Optional: Spinner animation */
 .spinner {
   width: 25px;

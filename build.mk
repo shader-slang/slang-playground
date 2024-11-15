@@ -38,7 +38,7 @@ $(eval $(foreach var,$(required_variables),\
 .PHONY: website_runtime
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/index.html
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.js
-website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm
+website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm.gz
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/try-slang.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/util.js
 website_runtime: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/pass_through.js
@@ -59,9 +59,9 @@ $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $(TR
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.js: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js
 	$(COPY) $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.js $@
 
-.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm
-$(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm
-	$(COPY) $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm $@
+.PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm.gz
+$(TRY_SLANG_TARGET_DIRECTORY_PATH)/slang-wasm.wasm.gz: $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm
+	gzip -c $(TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH)/build.em/Release/bin/slang-wasm.wasm > $@
 
 .PHONY: $(TRY_SLANG_TARGET_DIRECTORY_PATH)/index.html
 $(TRY_SLANG_TARGET_DIRECTORY_PATH)/index.html: $(TRY_SLANG_SOURCE_DIRECTORY_PATH)/index.html
