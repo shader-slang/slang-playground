@@ -113,12 +113,12 @@ float3 getRay(float2 fragCoord, float2 resolution) {
   // for fisheye, uncomment following line and comment the next one
   //float3 proj = normalize(float3(uv.x, uv.y, 1.0) + float3(uv.x, uv.y, -1.0) * pow(length(uv), 2.0) * 0.05);
   float3 proj = normalize(float3(uv.x, uv.y, 1.5));
-  if(resolution.x < 600.0) {
+  if (resolution.x < 40.0 || resolution.y < 40.0) {
     return proj;
   }
-  var NormalizedMouse = getMousePosition().xy/float2(resolution);
-  float3x3 mat = mul(createRotationMatrixAxisAngle(float3(0.0, -1.0, 0.0), 3.0 * ((1.0-NormalizedMouse.x + 0.5) * 2.0 - 1.0)) ,
-                     createRotationMatrixAxisAngle(float3(1.0, 0.0, 0.0), 0.5 + 1.5 * (((NormalizedMouse.y == 0.0 ? 0.35 : NormalizedMouse.y) * 1.0) * 2.0 - 1.0)));
+  var normalizedMouse = getMousePosition().xy / float2(resolution);
+  float3x3 mat = mul(createRotationMatrixAxisAngle(float3(0.0, -1.0, 0.0), 3.0 * ((1.0-normalizedMouse.x + 0.5) * 2.0 - 1.0)) ,
+                     createRotationMatrixAxisAngle(float3(1.0, 0.0, 0.0), 0.5 + 1.5 * (((normalizedMouse.y == 0.0 ? 0.35 : normalizedMouse.y) * 1.0) * 2.0 - 1.0)));
   return mul(mat, proj);
 }
 
