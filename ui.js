@@ -88,27 +88,24 @@ function prepareForResize() {
     codeEditors[i].style.overflow = "hidden";
   }
   document.getElementById("workSpaceDiv").style.overflow = "hidden";
-  document.getElementById("leftContainerDiv").style.overflow = "hidden";
+  document.getElementById("leftContainerDiv").style["overflow-x"] = "hidden";
   targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
 function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
     document.getElementById("workSpaceDiv").style.overflow = "visible";
-    document.getElementById("leftContainerDiv").style.overflow = "visible";
+    var leftContainer = document.getElementById("leftContainerDiv");
+    if (leftContainer.clientWidth < 30)
+      leftContainer.style["overflow-x"] = "hidden";
+    else
+      leftContainer.style["overflow-x"] = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
       if (codeEditors[i].style.display == "none")
         continue;
-      if (codeEditors[i].parentNode.clientWidth < 30)
-      {
-        codeEditors[i].style["z-index"] = -1;
-        codeEditors[i].style.overflow = "hidden";
-      }
-      else
-      {
-        codeEditors[i].style["z-index"] = 0;
-        codeEditors[i].style.overflow = "visible";
-      }
+      if (codeEditors[i].clientHeight < 30)
+        codeEditors[i].parentNode.style.overflow = "hidden";
+      codeEditors[i].style.overflow = "visible";
     }
     document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
     
