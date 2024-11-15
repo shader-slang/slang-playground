@@ -889,10 +889,12 @@ function runIfFullyInitialized()
         document.getElementById('contentDiv').style="";
 
         restoreSelectedTargetFromURL();
-
+        
         if (device)
         {
-            if (monacoEditor.getValue() == "")
+            if (restoreDemoSelectionFromURL())
+            {}
+            else if (monacoEditor.getValue() == "")
             {
                 loadDemo(defaultShaderURL);
             }
