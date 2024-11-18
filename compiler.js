@@ -484,7 +484,8 @@ class SlangCompiler
 
             // Also read the shader work-group size.
             const entryPointReflection = linkedProgram.getLayout(0).findEntryPointByName(entryPointName);
-            var threadGroupSize = entryPointReflection.getComputeThreadGroupSize();
+            var threadGroupSize = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
+                { x: 1, y: 1, z: 1 };
 
             if (outCode == "") 
             {
