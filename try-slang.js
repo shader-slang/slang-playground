@@ -631,14 +631,31 @@ var onRun = () => {
     });
 }
 
+function appendOutput(editor, textLine) {
+    editor.setValue(editor.getValue() + textLine + "\n");
+}
+
 function compileOrRun() {
     const userSource = monacoEditor.getValue();
     const shaderType = checkShaderType(userSource);
+
     if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
         onCompile();
     }
     else {
-        onRun();
+        if (device == null) {
+            onCompile().then(() => {
+                if (diagnosticsArea.getValue() == "")
+                    appendOutput(diagnosticsArea, `The shader compiled successfully,` +
+                        `but it cannot run because your browser does not support WebGPU.\n` +
+                        `WebGPU is supported in Chrome, Edge, Firefox Nightly or Safari Technology Preview. ` +
+                        `On iOS, WebGPU support requires Safari 16.4 or later and must be enabled in settings. ` +
+                        `Please check your browser version and enable WebGPU if possible.`);
+            });
+        }
+        else {
+            onRun();
+        }
     }
 }
 
@@ -730,6 +747,7 @@ function loadEditor(readOnlyMode = false, containerId, preloadCode) {
             readOnly: readOnlyMode,
             lineNumbers: readOnlyMode ? "off" : "on",
             automaticLayout: true,
+            wordWrap: containerId == "diagnostics" ? "on" : "off",
             "semanticHighlighting.enabled": true,
             renderValidationDecorations: "on",
             minimap: {
@@ -771,7 +789,7 @@ var Module = {
         const progressBar = document.getElementById('progress-bar');
         const compressedData = await fetchWithProgress('slang-wasm.wasm.gz', (loaded, total) => {
             const progress = (loaded / total) * 100;
-            progressBar.style.width = `${progress}%`;
+            progressBar.style.width = `${progress} % `;
         });
 
         // Step 2: Decompress the gzip data
@@ -842,14 +860,12 @@ function runIfFullyInitialized() {
 
         restoreSelectedTargetFromURL();
 
-        if (device) {
-            if (restoreDemoSelectionFromURL()) { }
-            else if (monacoEditor.getValue() == "") {
-                loadDemo(defaultShaderURL);
-            }
-            else {
-                compileOrRun();
-            }
+        if (restoreDemoSelectionFromURL()) { }
+        else if (monacoEditor.getValue() == "") {
+            loadDemo(defaultShaderURL);
+        }
+        else {
+            compileOrRun();
         }
     }
 }
