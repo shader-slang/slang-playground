@@ -648,7 +648,7 @@ function compileOrRun() {
                 if (diagnosticsArea.getValue() == "")
                     appendOutput(diagnosticsArea, `The shader compiled successfully,` +
                         `but it cannot run because your browser does not support WebGPU.\n` +
-                        `WebGPU is supported in Chrome, Edge, Firefox Nightly or Safari Technology Preview. ` +
+                        `WebGPU is supported in Chrome, Edge, Firefox Nightly and Safari Technology Preview. ` +
                         `On iOS, WebGPU support requires Safari 16.4 or later and must be enabled in settings. ` +
                         `Please check your browser version and enable WebGPU if possible.`);
             });
@@ -786,10 +786,11 @@ var Module = {
     },
     instantiateWasm: async function (imports, receiveInstance) {
         // Step 1: Fetch the compressed .wasm.gz file
-        const progressBar = document.getElementById('progress-bar');
+        var progressBar = document.getElementById('progress-bar');
         const compressedData = await fetchWithProgress('slang-wasm.wasm.gz', (loaded, total) => {
             const progress = (loaded / total) * 100;
-            progressBar.style.width = `${progress} % `;
+            if (progressBar == null) progressBar = document.getElementById('progress-bar');
+            if (progressBar) progressBar.style.width = `${progress}%`;
         });
 
         // Step 2: Decompress the gzip data
@@ -819,19 +820,9 @@ var Module = {
     }
 };
 
-function loadSlangWasm() {
-    var label = document.getElementById("loadingStatusLabel");
-    if (label)
-        label.innerText = "Loading Slang Compiler...";
-    const script = document.createElement("script");
-    script.src = "slang-wasm.js";
-    document.head.appendChild(script);
-}
-
 var pageLoaded = false;
 // event when loading the page
 window.onload = async function () {
-    loadSlangWasm();
     pageLoaded = true;
 
     await webgpuInit();
