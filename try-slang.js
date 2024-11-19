@@ -38,20 +38,23 @@ var randFloatPipeline;
 var randFloatResources;
 
 async function webgpuInit() {
-    const adapter = await navigator.gpu?.requestAdapter();
-    if (!adapter) {
-        console.log('need a browser that supports WebGPU');
-        return;
-    }
-    const requiredFeatures = [];
+    try {
+        const adapter = await navigator.gpu?.requestAdapter();
+        if (!adapter) {
+            console.log('need a browser that supports WebGPU');
+            return;
+        }
+        const requiredFeatures = [];
 
-    device = await adapter?.requestDevice({ requiredFeatures });
-    if (!device) {
-        console.log('need a browser that supports WebGPU');
-        return;
+        device = await adapter?.requestDevice({ requiredFeatures });
+        if (!device) {
+            console.log('need a browser that supports WebGPU');
+            return;
+        }
+        context = configContext(device, canvas);
     }
-    context = configContext(device, canvas);
-
+    catch {
+    }
     // The default resolution of a canvas element is 300x150, which is too small compared to the container size of the canvas,
     // therefore, we have to set the resolution same as the container size.
 
@@ -60,6 +63,9 @@ async function webgpuInit() {
 }
 
 function resizeCanvas(entries) {
+    if (device == null)
+        return;
+
     const canvas = entries[0].target;
 
     const width = canvas.clientWidth;
