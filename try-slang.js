@@ -18,7 +18,10 @@ var callCommands;
 var allocatedResources;
 var hashedStrings;
 
-var stopRendering = false;
+var renderThread = null;
+var releaseRenderLock = null;
+var abortRender = false;
+var onRenderAborted = null;
 
 var printfBufferElementSize = 12;
 var printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
@@ -88,36 +91,108 @@ function resizeCanvas(entries) {
     return false;
 }
 
-var renderDelayTimer = null;
+function abortRendererIfActive()
+{
+    return new Promise((resolve) => {
+        if (renderThread)
+        {
+            abortRender = true;
+            onRenderAborted = resolve;
+        }
+        else
+        {
+            resolve();
+        }
+    });
+}
 
-function startRendering() {
-    if (renderDelayTimer)
-        clearTimeout(renderDelayTimer);
+function withRenderLock(setupFn, renderFn) 
+{
+    // Overwrite the onRenderAborted function to the new one.
+    // This also makes sure that a single function is called when the render thread is aborted.
+    //
+    onRenderAborted = () => {
+        // On callback, reset the onRenderAborted function to null to clear it for any future
+        // resets.
+        //
+        onRenderAborted = null;
 
-    stopRendering = false;
+        // Clear state for the new render thread.
+        abortRender = false;
 
-    renderDelayTimer = setTimeout(() => {
-        if (computePipeline && passThroughPipeline &&
-            currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
-
-            processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
-                globalThis.allocatedResources = allocatedResources;
-                computePipeline.createBindGroup(allocatedResources);
-
-                passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
-                passThroughPipeline.createBindGroup();
-
-                for (const pipeline of extraComputePipelines)
-                    pipeline.createBindGroup(allocatedResources);
-
-                if (canvas.style.display != "none") {
-                    requestAnimationFrame(render);
+        // New render loop with the provided function.
+        renderThread = new Promise((resolve) => { 
+            releaseRenderLock = resolve;
+            
+            // Set up render loop function
+            const newRenderLoop = async (timeMS) => {
+                var nextFrame = false;
+                try {
+                    const keepRendering = await renderFn(timeMS);
+                    nextFrame = keepRendering && !abortRender;
+                    if (nextFrame)
+                        requestAnimationFrame(newRenderLoop);
+                } catch (error) {
+                    diagnosticsArea.setValue("Error when rendering: " + error.message);
                 }
+                finally {
+                    if (!nextFrame)
+                        releaseRenderLock();
+                }
+            }
+            
+            // Setup renderer and start the render loop.
+            setupFn().then(() => {
+                requestAnimationFrame(newRenderLoop);
             }).catch((error) => {
                 diagnosticsArea.setValue(error.message);
+                releaseRenderLock();
             });
-        }
-    }, 100);
+        });
+        
+        // Queue any follow-up actions upon abort.
+        renderThread.then(() => {
+            renderThread = null; // Clear the render thread.
+            if (onRenderAborted)
+                onRenderAborted();
+        })
+    };
+
+    // Is there any renderer active?
+    if (!renderThread)
+    {
+        // Nothing to wait for. Call immediately.
+        onRenderAborted();
+    }
+    else
+    {
+        // Otherwise, signal the render thread to abort.
+        abortRender = true;
+    }
+}
+
+function startRendering() {
+    // This is a lighter-weight setup function that doesn't need to re-compile the shader code.
+    const setupRenderer = async () => {
+        if (!computePipeline || !passThroughPipeline)
+            throw new Error("pipeline not ready");
+        
+        if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
+            throw new Error("window not ready");
+        
+        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+
+        globalThis.allocatedResources = allocatedResources;
+        computePipeline.createBindGroup(allocatedResources);
+
+        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+        passThroughPipeline.createBindGroup();
+
+        for (const pipeline of extraComputePipelines)
+            pipeline.createBindGroup(allocatedResources);
+    };
+    
+    withRenderLock(setupRenderer, execFrame);
 }
 
 // We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
@@ -164,13 +239,11 @@ function toggleDisplayMode(displayMode) {
 var timeAggregate = 0;
 var frameCount = 0;
 
-async function render(timeMS) {
+async function execFrame(timeMS) {
     if (currentMode == HIDDEN_MODE)
-        return;
+        return false;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
-        return;
-    if (stopRendering)
-        return;
+        return false;
 
     const startTime = performance.now();
 
@@ -199,7 +272,8 @@ async function render(timeMS) {
         if (command.type == "RESOURCE_BASED") {
             if (!globalThis.allocatedResources.has(command.resourceName)) {
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
-                return;
+                pass.end();
+                return false;
             }
 
             var resource = globalThis.allocatedResources.get(command.resourceName)
@@ -226,9 +300,12 @@ async function render(timeMS) {
                 pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
             }
             else {
-                throw new Error("Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
+                pass.end();
+                diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
+                return false;
             }
         }
+
         pass.end();
     }
 
@@ -281,7 +358,9 @@ async function render(timeMS) {
 
     // Only request the next frame if we are in the render mode
     if (currentMode == RENDER_MODE)
-        requestAnimationFrame(render);
+        return true;
+    else
+        return false;
 }
 
 async function printResult() {
@@ -429,7 +508,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
 
             // Place a call to a shader that fills the buffer with random numbers.
             if (!globalThis.randFloatPipeline) {
-                var randomPipeline = new ComputePipeline(pipeline.device);
+                const randomPipeline = new ComputePipeline(pipeline.device);
 
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
@@ -451,7 +530,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
 
             // Dispatch a random number generation shader.
             {
-                var randomPipeline = globalThis.randFloatPipeline;
+                const randomPipeline = globalThis.randFloatPipeline;
 
                 // Alloc resources for the shader.
                 if (!globalThis.randFloatResources)
@@ -472,8 +551,8 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                 pipeline.device.queue.writeBuffer(seedBuffer, 0, seedValue);
 
                 // Encode commands to do the computation
-                var encoder = pipeline.device.createCommandEncoder({ label: 'compute builtin encoder' });
-                var pass = encoder.beginComputePass({ label: 'compute builtin pass' });
+                const encoder = pipeline.device.createCommandEncoder({ label: 'compute builtin encoder' });
+                const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
                 pass.setBindGroup(0, randomPipeline.bindGroup);
                 pass.setPipeline(randomPipeline.pipeline);
@@ -483,8 +562,9 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                 pass.end();
 
                 // Finish encoding and submit the commands
-                var commandBuffer = encoder.finish();
+                const commandBuffer = encoder.finish();
                 pipeline.device.queue.submit([commandBuffer]);
+                await pipeline.device.queue.onSubmittedWorkDone();
             }
         }
     }
@@ -540,71 +620,63 @@ var onRun = () => {
         computePipeline = new ComputePipeline(device);
     }
 
-    // Stop any ongoing render tasks.
-    stopRendering = true;
-
-    // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
-    // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
-    const userSource = monacoEditor.getValue();
-    const shaderType = checkShaderType(userSource);
-    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
-        diagnosticsArea.setValue("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
-        // clear content in render area and code-gen area
-        toggleDisplayMode(HIDDEN_MODE);
-        codeGenArea.setValue("");
-        return;
-    }
-
-    const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
-    const ret = compileShader(userSource, entryPointName, "WGSL");
-
-    if (!ret.succ) {
-        toggleDisplayMode(HIDDEN_MODE);
-        return;
-    }
-
-    globalThis.hashedStrings = ret.hashedStrings;
-
-    try {
-        resourceCommands = parseResourceCommands(userSource);
-    } catch (error) {
-        diagnosticsArea.setValue(error.message);
-        return;
-    }
-
-    try {
-        callCommands = parseCallCommands(userSource);
-    }
-    catch (error) {
-        diagnosticsArea.setValue("Error while parsing '//! CALL' commands: " + error.message);
-        return;
-    }
-
-    resourceBindings = ret.layout;
-    // create a pipeline resource 'signature' based on the bindings found in the program.
-    computePipeline.createPipelineLayout(resourceBindings);
-
-    if (extraComputePipelines.length > 0)
-        extraComputePipelines = []; // This should release the resources of the extra pipelines.
-
-    if (callCommands && (callCommands.length > 0)) {
-        for (const command of callCommands) {
-            const compiledResult = compileShader(userSource, command.fnName, "WGSL");
-            if (!compiledResult.succ) {
-                diagnosticsArea.setValue("Failed to compile shader for requested entry-point: " + command.fnName);
-                return;
-            }
-
-            const module = device.createShaderModule({ code: compiledResult.code });
-            const pipeline = new ComputePipeline(device);
-            pipeline.createPipelineLayout(compiledResult.layout);
-            pipeline.createPipeline(module, null);
-            pipeline.setThreadGroupSize(compiledResult.threadGroupSize);
-            extraComputePipelines.push(pipeline);
+    withRenderLock(
+    // setupFn
+    async () => {
+        // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
+        // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
+        const userSource = monacoEditor.getValue();
+        const shaderType = checkShaderType(userSource);
+        if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
+            toggleDisplayMode(HIDDEN_MODE);
+            codeGenArea.setValue("");
+            throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
         }
-    }
 
-    processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
+        const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
+        const ret = compileShader(userSource, entryPointName, "WGSL");
+
+        if (!ret.succ) {
+            toggleDisplayMode(HIDDEN_MODE);
+            throw new Error("");
+        }
+
+        globalThis.hashedStrings = ret.hashedStrings;
+
+        resourceCommands = parseResourceCommands(userSource);
+
+        try {
+            callCommands = parseCallCommands(userSource);
+        }
+        catch (error) {
+            throw new Error("Error while parsing '//! CALL' commands: " + error.message);
+        }
+
+        resourceBindings = ret.layout;
+        // create a pipeline resource 'signature' based on the bindings found in the program.
+        computePipeline.createPipelineLayout(resourceBindings);
+
+        if (extraComputePipelines.length > 0)
+            extraComputePipelines = []; // This should release the resources of the extra pipelines.
+
+        if (callCommands && (callCommands.length > 0)) {
+            for (const command of callCommands) {
+                const compiledResult = compileShader(userSource, command.fnName, "WGSL");
+                if (!compiledResult.succ) {
+                    throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
+                }
+
+                const module = device.createShaderModule({ code: compiledResult.code });
+                const pipeline = new ComputePipeline(device);
+                pipeline.createPipelineLayout(compiledResult.layout);
+                pipeline.createPipeline(module, null);
+                pipeline.setThreadGroupSize(compiledResult.threadGroupSize);
+                extraComputePipelines.push(pipeline);
+            }
+        }
+
+        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+        
         globalThis.allocatedResources = allocatedResources;
 
         if (!passThroughPipeline) {
@@ -614,26 +686,29 @@ var onRun = () => {
             passThroughPipeline.createPipeline(shaderModule, inputTexture);
         }
 
-        if (ret.succ) {
-            const module = device.createShaderModule({ code: ret.code });
-            computePipeline.createPipeline(module, allocatedResources);
-        }
+        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+        passThroughPipeline.createBindGroup();
+
+        const module = device.createShaderModule({ code: ret.code });
+        computePipeline.createPipeline(module, allocatedResources);
 
         // Create bind groups for the extra pipelines
         for (const pipeline of globalThis.extraComputePipelines)
             pipeline.createBindGroup(allocatedResources);
 
-
         toggleDisplayMode(compiler.shaderType);
+    },
+    // renderFn
+    async (timeMS) => 
+    {
         if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
-            printResult();
+            await printResult();
+            return false; // Stop after one frame.
         }
         else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
-            startRendering();
+            return await execFrame(timeMS);
         }
-
-    }).catch((error) => {
-        diagnosticsArea.setValue(error.message);
+        return false;
     });
 }
 
