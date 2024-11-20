@@ -444,8 +444,8 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
             safeSet(allocatedResources, resourceName, buffer);
 
             // Initialize the buffer with zeros.
-            //const zeros = new Float32Array(size);
-            //pipeline.device.queue.writeBuffer(buffer, 0, zeros);
+            const zeros = new Float32Array(size);
+            pipeline.device.queue.writeBuffer(buffer, 0, zeros);
         }
         else if (parsedCommand.type === "URL") {
             // Load image from URL and wait for it to be ready.
