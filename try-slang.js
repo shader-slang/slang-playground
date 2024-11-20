@@ -106,7 +106,7 @@ function abortRendererIfActive()
     });
 }
 
-function withRenderLock(fn) 
+function withRenderLock(setupFn, renderFn) 
 {
     // Overwrite the onRenderAborted function to the new one.
     // This also makes sure that a single function is called when the render thread is aborted.
@@ -123,7 +123,31 @@ function withRenderLock(fn)
         // New render loop with the provided function.
         renderThread = new Promise((resolve) => { 
             releaseRenderLock = resolve;
-            fn();
+            
+            // Set up render loop function
+            const newRenderLoop = async (timeMS) => {
+                var nextFrame = false;
+                try {
+                    const keepRendering = await renderFn(timeMS);
+                    nextFrame = keepRendering && !abortRender;
+                    if (nextFrame)
+                        requestAnimationFrame(newRenderLoop);
+                } catch (error) {
+                    diagnosticsArea.setValue("Error when rendering: " + error.message);
+                }
+                finally {
+                    if (!nextFrame)
+                        releaseRenderLock();
+                }
+            }
+            
+            // Setup renderer and start the render loop.
+            setupFn().then(() => {
+                requestAnimationFrame(newRenderLoop);
+            }).catch((error) => {
+                diagnosticsArea.setValue(error.message);
+                releaseRenderLock();
+            });
         });
         
         // Queue any follow-up actions upon abort.
@@ -147,35 +171,28 @@ function withRenderLock(fn)
     }
 }
 
-async function startRendering() {
-    withRenderLock(() => {
-        if (computePipeline && passThroughPipeline &&
-            currentWindowSize[0] > 1 && currentWindowSize[1] > 1) {
+function startRendering() {
+    // This is a lighter-weight setup function that doesn't need to re-compile the shader code.
+    const setupRenderer = async () => {
+        if (!computePipeline || !passThroughPipeline)
+            throw new Error("pipeline not ready");
+        
+        if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
+            throw new Error("window not ready");
+        
+        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
 
-            processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
-                globalThis.allocatedResources = allocatedResources;
-                computePipeline.createBindGroup(allocatedResources);
+        globalThis.allocatedResources = allocatedResources;
+        computePipeline.createBindGroup(allocatedResources);
 
-                passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
-                passThroughPipeline.createBindGroup();
+        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+        passThroughPipeline.createBindGroup();
 
-                for (const pipeline of extraComputePipelines)
-                    pipeline.createBindGroup(allocatedResources);
-
-                if (canvas.style.display != "none")
-                    requestAnimationFrame(render);
-                else
-                    releaseRenderLock();
-
-            }).catch((error) => {
-                diagnosticsArea.setValue(error.message);
-                releaseRenderLock();
-            });
-        }
-        else {
-            releaseRenderLock();
-        }
-    });
+        for (const pipeline of extraComputePipelines)
+            pipeline.createBindGroup(allocatedResources);
+    };
+    
+    withRenderLock(setupRenderer, execFrame);
 }
 
 // We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
@@ -221,23 +238,6 @@ function toggleDisplayMode(displayMode) {
 
 var timeAggregate = 0;
 var frameCount = 0;
-
-async function render(timeMS)
-{
-    try
-    {
-        const keepRendering = execFrame(timeMS);
-        if (keepRendering && !abortRender)
-            requestAnimationFrame(render);
-        else
-            releaseRenderLock();
-    }
-    catch (error)
-    {
-        diagnosticsArea.setValue("Error when rendering: " + error.message);
-        releaseRenderLock();
-    }
-}
 
 async function execFrame(timeMS) {
     if (currentMode == HIDDEN_MODE)
@@ -620,17 +620,17 @@ var onRun = () => {
         computePipeline = new ComputePipeline(device);
     }
 
-    abortRendererIfActive().then(() => {
+    withRenderLock(
+    // setupFn
+    async () => {
         // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
         // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
         const userSource = monacoEditor.getValue();
         const shaderType = checkShaderType(userSource);
         if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
-            diagnosticsArea.setValue("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
-            // clear content in render area and code-gen area
             toggleDisplayMode(HIDDEN_MODE);
             codeGenArea.setValue("");
-            return;
+            throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
         }
 
         const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
@@ -638,24 +638,18 @@ var onRun = () => {
 
         if (!ret.succ) {
             toggleDisplayMode(HIDDEN_MODE);
-            return;
+            throw new Error("");
         }
 
         globalThis.hashedStrings = ret.hashedStrings;
 
-        try {
-            resourceCommands = parseResourceCommands(userSource);
-        } catch (error) {
-            diagnosticsArea.setValue(error.message);
-            return;
-        }
+        resourceCommands = parseResourceCommands(userSource);
 
         try {
             callCommands = parseCallCommands(userSource);
         }
         catch (error) {
-            diagnosticsArea.setValue("Error while parsing '//! CALL' commands: " + error.message);
-            return;
+            throw new Error("Error while parsing '//! CALL' commands: " + error.message);
         }
 
         resourceBindings = ret.layout;
@@ -669,8 +663,7 @@ var onRun = () => {
             for (const command of callCommands) {
                 const compiledResult = compileShader(userSource, command.fnName, "WGSL");
                 if (!compiledResult.succ) {
-                    diagnosticsArea.setValue("Failed to compile shader for requested entry-point: " + command.fnName);
-                    return;
+                    throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
                 }
 
                 const module = device.createShaderModule({ code: compiledResult.code });
@@ -682,37 +675,40 @@ var onRun = () => {
             }
         }
 
-        processResourceCommands(computePipeline, resourceBindings, resourceCommands).then((allocatedResources) => {
-            globalThis.allocatedResources = allocatedResources;
+        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+        
+        globalThis.allocatedResources = allocatedResources;
 
-            if (!passThroughPipeline) {
-                passThroughPipeline = new GraphicsPipeline(device);
-                const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
-                const inputTexture = allocatedResources.get("outputTexture");
-                passThroughPipeline.createPipeline(shaderModule, inputTexture);
-            }
+        if (!passThroughPipeline) {
+            passThroughPipeline = new GraphicsPipeline(device);
+            const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
+            const inputTexture = allocatedResources.get("outputTexture");
+            passThroughPipeline.createPipeline(shaderModule, inputTexture);
+        }
 
-            if (ret.succ) {
-                const module = device.createShaderModule({ code: ret.code });
-                computePipeline.createPipeline(module, allocatedResources);
-            }
+        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+        passThroughPipeline.createBindGroup();
 
-            // Create bind groups for the extra pipelines
-            for (const pipeline of globalThis.extraComputePipelines)
-                pipeline.createBindGroup(allocatedResources);
+        const module = device.createShaderModule({ code: ret.code });
+        computePipeline.createPipeline(module, allocatedResources);
 
+        // Create bind groups for the extra pipelines
+        for (const pipeline of globalThis.extraComputePipelines)
+            pipeline.createBindGroup(allocatedResources);
 
-            toggleDisplayMode(compiler.shaderType);
-            if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
-                printResult();
-            }
-            else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
-                startRendering();
-            }
-
-        }).catch((error) => {
-            diagnosticsArea.setValue(error.message);
-        });
+        toggleDisplayMode(compiler.shaderType);
+    },
+    // renderFn
+    async (timeMS) => 
+    {
+        if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
+            await printResult();
+            return false; // Stop after one frame.
+        }
+        else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
+            return await execFrame(timeMS);
+        }
+        return false;
     });
 }
 
