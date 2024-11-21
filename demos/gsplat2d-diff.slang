@@ -10,7 +10,8 @@
  * are presented in order of depth (higher index = farther away). Further, this implementation does 
  * not perform adaptive density control to add or remove blobs.
  * 
- * See the `computeDerivativesMain()` kernel * the `splatBlobs()` function for the bulk of the code. 
+ * See the `computeDerivativesMain()` kernel and the `splatBlobs()` function for the bulk of the key
+ * pieces of the code. 
  *
  * Key Slang features used in this example include the autodiff operator `bwd_diff(fn)`, the 
  * `[Differentiable]` attribute, and custom derivatives for a few specific components via 
@@ -25,17 +26,17 @@ import playground;
 
 // ----- Constants and definitions --------
 
-#define BLOB_BUFFER_SIZE 184320
-#define NUM_FIELDS 9
+static const int BLOB_BUFFER_SIZE = 184320;
+static const int NUM_FIELDS = 9;
 
-#define GAUSSIANS_PER_BLOCK 256
-#define WG_X 16
-#define WG_Y 16
+static const int GAUSSIANS_PER_BLOCK = 256;
+static const int WG_X = 16;
+static const int WG_Y = 16;
 
-#define ADAM_ETA 0.002
-#define ADAM_BETA_1 0.9
-#define ADAM_BETA_2 0.999
-#define ADAM_EPSILON 1e-8
+static const float ADAM_ETA = 0.002;
+static const float ADAM_BETA_1 = 0.9;
+static const float ADAM_BETA_2 = 0.999;
+static const float ADAM_EPSILON = 1e-8;
 
 // ------ Global buffers and textures --------
 
@@ -61,7 +62,7 @@ RWStructuredBuffer<float> adamSecondMoment;
 //! @targetTexture: URL("static/jeep.jpg")
 Texture2D<float4> targetTexture;
 
-// ----- shared memory declarationa --------
+// ----- Shared memory declarations --------
 
 // Note: In Slang, the 'groupshared' identifier is used to define
 // workgroup-level shared memory. This is equivalent to '__shared__' in CUDA
@@ -69,7 +70,7 @@ Texture2D<float4> targetTexture;
 // blobCountAT is used when storing blob IDs into the blobs buffer. It needs to be atomic 
 // since multiple threads will be in contention to increment it.
 //
-// For WebGPU, atomic operations only apply to Atomic<T> types. Slang supports basic 
+// Atomic<T> is the most portable way to express atomic operations. Slang supports basic 
 // operations like +, -, ++, etc.. on Atomic<T> types.
 // 
 groupshared Atomic<uint> blobCountAT;
@@ -112,7 +113,7 @@ struct SortedShortList { int _dummy = 0; };
 *
 * Can be used to represent the bounds of an anisotropic Gaussian blob.
 * The bounding box can be extracted by taking a canonical box 
-* formed by (-1,-1), (1,-1), (1,1), (-1,1) and translating, rotating, and scaling it.
+* formed by (-1,-1), (1,-1), (1,1), (-1,1), then translating, rotating, and scaling it.
 */
 struct OBB
 {
@@ -126,8 +127,8 @@ struct OBB
     * The implementation is based on the separating axis theorem (see 
     * https://dyn4j.org/2010/01/sat/#sat-algo for a detailed explanation). 
     * At a high level, the SAT algorithm checks if the projections of the 
-    * points of the two OBBs are disjoint along all the normals of the faces of the OBBs.
-    *
+    * points of the two OBBs are disjoint along the normals of all of the 
+    * faces of each OBB.
     */
     bool intersects(OBB other)
     {
