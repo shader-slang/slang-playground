@@ -367,7 +367,7 @@ class SlangCompiler
         }
         else if (bindingType == this.slangWasmModule.BindingType.MutableTexture)
         {
-            return { storageTexture: {access: "read-write", format: "r32float"} };
+            return { storageTexture: {access: "read-write", format: "r32uint"} };
         }
         else if (bindingType == this.slangWasmModule.BindingType.ConstantBuffer)
         {
