@@ -454,7 +454,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                     }
                     const texture = pipeline.device.createTexture({
                         size: parsedCommand.size,
-                        format: bindingInfo.storageTexture?'r32uint':'rgba8unorm',
+                        format: bindingInfo.storageTexture?'r32float':'rgba8unorm',
                         usage: usage,
                     });
 
