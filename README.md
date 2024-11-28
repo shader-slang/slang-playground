@@ -9,7 +9,7 @@ On Windows, set up the environment as follows:
     set TRY_SLANG_SOURCE_DIRECTORY_PATH=%userprofile%\source\try-slang
     set TRY_SLANG_TARGET_DIRECTORY_PATH=%userprofile%\target\try-slang
 
-In the following, it is also assumed that GNU Make and Python are in PATH.
+In the following, it is also assumed that GNU Make, Python and gzip are in PATH.
 Follow the setup instructions in `docs/building.md` for building `slang-wasm` in the Slang repository.
 (E.g. setup shell for CMake and Emscripten, and setup the `build.em` output directory.)
 
