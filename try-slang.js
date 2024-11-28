@@ -432,20 +432,44 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
 
-            if (!bindingInfo.buffer) {
-                throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
+            if (bindingInfo.buffer) {
+                const buffer = pipeline.device.createBuffer({
+                    size: size * elementSize,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+
+                safeSet(allocatedResources, resourceName, buffer);
+
+                // Initialize the buffer with zeros.
+                const zeros = new Float32Array(size);
+                pipeline.device.queue.writeBuffer(buffer, 0, zeros);
+            } else if (bindingInfo.texture || bindingInfo.storageTexture) {
+                if (parsedCommand.size.length !== 2) {
+                    throw new Error(`Invalid parameter count ${parsedCommand.size.length} for ZEROS on texture ${resourceName}, should be 2.`);
+                }
+                try {
+                    let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
+                    if (bindingInfo.storageTexture) {
+                        usage |= GPUTextureUsage.STORAGE_BINDING;
+                    }
+                    const texture = pipeline.device.createTexture({
+                        size: parsedCommand.size,
+                        format: bindingInfo.storageTexture?'r32float':'rgba8unorm',
+                        usage: usage,
+                    });
+
+                    safeSet(allocatedResources, resourceName, texture);
+
+                    // Initialize the texture with zeros.
+                    let zeros = new Uint8Array(Array(size*elementSize).fill(0));
+                    pipeline.device.queue.writeTexture({ texture }, zeros, {bytesPerRow: parsedCommand.size[0] * elementSize}, { width: parsedCommand.size[0], height: parsedCommand.size[1] });
+                }
+                catch (error) {
+                    throw new Error(`Failed to create texture: ${error}`);
+                }
+            } else {
+                throw new Error(`Resource ${resourceName} is an invalid type for ZEROS`);
             }
-
-            const buffer = pipeline.device.createBuffer({
-                size: size * elementSize,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-            });
-
-            safeSet(allocatedResources, resourceName, buffer);
-
-            // Initialize the buffer with zeros.
-            const zeros = new Float32Array(size);
-            pipeline.device.queue.writeBuffer(buffer, 0, zeros);
         }
         else if (parsedCommand.type === "URL") {
             // Load image from URL and wait for it to be ready.
