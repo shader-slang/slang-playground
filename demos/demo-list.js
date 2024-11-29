@@ -15,4 +15,5 @@ var demoList = [
   { name: "Variadic Generics", url: "variadic.slang" },
   { name: "Automatic Differentiation", url: "autodiff.slang" },
   { name: "Graphics Entrypoints", url: "entrypoint.slang" },
+  { name: "Atomics", url: "atomics.slang" },
 ];
