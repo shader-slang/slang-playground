@@ -47,6 +47,7 @@ $(eval $(foreach var,$(required_variables),\
 website_source_files :=
 website_source_files += compiler.js
 website_source_files += compute.js
+website_source_files += demos/atomics.slang
 website_source_files += demos/autodiff.slang
 website_source_files += demos/circle.slang
 website_source_files += demos/demo-list.js
