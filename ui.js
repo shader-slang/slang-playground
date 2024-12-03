@@ -35,7 +35,12 @@ function updateProfileOptions(targetSelect, profileSelect) {
     document.getElementById("entrypoint-dropdown").style.display = "none";
     document.getElementById("entrypoint-select").value = "";
   } else {
+    prepareForResize();
     document.getElementById("entrypoint-dropdown").style = "";
+    finishResizingTimeout = setTimeout(() => {
+      finishResizing();
+      finishResizingTimeout = null;
+    }, 50);
     updateEntryPointOptions();
   }
 }
@@ -67,10 +72,10 @@ function updateEntryPointOptions()
       prevValueExists = true;
     }
   });
-  if (prevValue == "" && entryPoints.length > 0)
-    entrypointSelect.value = entryPoints[0];
-  else if (prevValueExists)
+  if (prevValueExists)
     entrypointSelect.value = prevValue;
+  else if (entryPoints.length > 0)
+    entrypointSelect.value = entryPoints[0];
   else
   {
     entrypointSelect.value = "";
@@ -168,6 +173,7 @@ function loadDemo(selectedDemoURL) {
       .then((response) => response.text())
       .then((data) => {
         monacoEditor.setValue(data);
+        updateEntryPointOptions();
         compileOrRun();
       });
   }
