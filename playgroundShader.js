@@ -23,7 +23,7 @@ public float getTime()
 public float4 getMousePosition() { return uniformInput.mousePosition; }
 
 // type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double, 
-struct FormatedStruct
+struct FormattedStruct
 {
     uint32_t type = 0xFFFFFFFF;
     uint32_t low = 0;
@@ -33,7 +33,7 @@ struct FormatedStruct
 // This is global variable, intead of shader parameter.
 internal static int g_printBufferIndex = 0;
 
-internal RWStructuredBuffer<FormatedStruct> g_printedBuffer;
+internal RWStructuredBuffer<FormattedStruct> g_printedBuffer;
 
 interface IPrintf
 {
