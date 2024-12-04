@@ -4,10 +4,10 @@ const targetProfileMap = {
   //"SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
 
-var entrypointSelect: HTMLInputElement | null = null;
+var entrypointSelect = null;
 
 // Function to update the profile dropdown based on the selected target
-function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HTMLSelectElement) {
+function updateProfileOptions(targetSelect, profileSelect) {
   const selectedTarget = targetSelect.value;
   // Clear the existing options in profile dropdown
   profileSelect.innerHTML = "";
@@ -148,7 +148,7 @@ function initializeModal() {
   };
 }
 
-function loadDemo(selectedDemoURL: string) {
+function loadDemo(selectedDemoURL) {
   if (selectedDemoURL != "")
   {
     // Is `selectedDemoURL` a relative path?
@@ -300,7 +300,7 @@ var pako = null;
 // Lazy load function that loads pako on the first call
 function loadPako() {
   if (pako == null)
-    pako = require("https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js");
+    pako = BrowserCJS.require("https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js");
   return pako;
 }
 

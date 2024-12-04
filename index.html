@@ -13,6 +13,10 @@
   <script src="https://unpkg.com/split-grid/dist/split-grid.js"></script>
   <script src="https://unpkg.com/browser-cjs/require.min.js"></script>
   <script src="json-tree/jsontree.min.js"></script>
+  <script>
+    let BrowserCJS = {};
+    BrowserCJS.require = require;
+  </script>
   <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
   <script>
     require.config({

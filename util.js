@@ -1,4 +1,4 @@
-function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) => any; }) {
+function configContext(device, canvas) {
     let context = canvas.getContext('webgpu');
 
     const canvasConfig = {
@@ -12,7 +12,7 @@ function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) =
     return context;
 }
 
-function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
+function createOutputTexture(device, width, height, format) {
     const textureDesc = {
         label: 'output storage texture',
         size: { width: width, height: height },
@@ -26,7 +26,7 @@ function createOutputTexture(device: GPUDevice, width: number, height: number, f
     return storageTexture;
 }
 
-function reinterpretUint32AsFloat(uint32: number) {
+function reinterpretUint32AsFloat(uint32) {
     const buffer = new ArrayBuffer(4);
     const uint32View = new Uint32Array(buffer);
     const float32View = new Float32Array(buffer);
@@ -36,7 +36,7 @@ function reinterpretUint32AsFloat(uint32: number) {
 }
 
 
-function parseResourceCommand(command: string): ParsedCommand {
+function parseResourceCommand(command) {
     const match = command.match(/(\w+)\((.*)\)/);
     if (match) {
         const funcName = match[1];
@@ -51,7 +51,7 @@ function parseResourceCommand(command: string): ParsedCommand {
             // remove the quotes
             const validURLMatch = args[0].match(/"(.*)"/)
             if (!validURLMatch) {
-                throw new Error(`Invalid URL: ${args[0]}`);
+                throw new Error(`Invalid URL: ${url}`);
             }
 
             return { type: "URL", url: validURLMatch[1] };
@@ -59,7 +59,6 @@ function parseResourceCommand(command: string): ParsedCommand {
         else if (funcName === "RAND") {
             return { type: "RAND", size: args.map(Number) };
         };
-        throw new Error(`Unrecognized command: ${command}`);
 
     }
     else {
@@ -67,7 +66,7 @@ function parseResourceCommand(command: string): ParsedCommand {
     }
 }
 
-function parseResourceCommands(userSource: string): {resourceName: string, parsedCommand: ParsedCommand}[] {
+function parseResourceCommands(userSource) {
     // Now we'll handle some special comments that the user can provide to initialize their resources.
     //
     // Here are some patterns we support:
@@ -91,7 +90,7 @@ function parseResourceCommands(userSource: string): {resourceName: string, parse
     return resourceCommands;
 }
 
-function parseCallCommands(userSource: string) {
+function parseCallCommands(userSource) {
     // Look for commands of the form:
     //
     // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
@@ -121,7 +120,7 @@ function parseCallCommands(userSource: string) {
     return callCommands;
 }
 
-function parsePrintfFormat(formatString: string) {
+function parsePrintfFormat(formatString) {
     const formatSpecifiers = [];
     const regex = /%([-+ #0]*)(\d*)(\.\d+)?([diufFeEgGxXosc])/g;
     let lastIndex = 0;
@@ -156,11 +155,11 @@ function parsePrintfFormat(formatString: string) {
     return formatSpecifiers;
 }
 
-function formatPrintfString(parsedTokens: any[], data: any[]) {
+function formatPrintfString(parsedTokens, data) {
     let result = '';
     let dataIndex = 0;
 
-    parsedTokens.forEach((token: { type?: any; value?: any; flags?: any; width?: any; precision?: any; specifierType?: any; }) => {
+    parsedTokens.forEach(token => {
         if (token.type === 'text') {
             result += token.value;
         }
@@ -174,7 +173,7 @@ function formatPrintfString(parsedTokens: any[], data: any[]) {
 }
 
 // Helper function to format each specifier
-function formatSpecifier(value: string, { flags, width, precision, specifierType }: any) {
+function formatSpecifier(value, { flags, width, precision, specifierType }) {
     let formattedValue;
 
     switch (specifierType) {
@@ -263,14 +262,14 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 //     uint32_t high = 0;
 // };
 //
-function hashToString(hashedStrings: string | any[], hash: number) {
+function hashToString(hashedStrings, hash) {
     for (var i = 0; i < hashedStrings.length; i++) {
         if (hashedStrings[i].hash == hash) {
             return hashedStrings[i].string;
         }
     }
 }
-function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappedRange: () => any; }, bufferElementSize: number) {
+function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize) {
 
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
@@ -338,7 +337,7 @@ function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappe
     return outStrArry;
 }
 
-async function fetchWithProgress(url: string, onProgress: { (loaded: number, total: number): void; }) {
+async function fetchWithProgress(url, onProgress) {
     const response = await fetch(url);
     const contentLength = response.headers.get('Content-Length');
 
@@ -351,10 +350,6 @@ async function fetchWithProgress(url: string, onProgress: { (loaded: number, tot
     let buffer = new Uint8Array(total); // Initial buffer
     let position = 0; // Tracks the current position in the buffer
 
-    if(!response.body) {
-        // Probably needs to be handled properly
-        throw new Error("No response body")
-    }
     const reader = response.body.getReader();
     const chunks = [];
 

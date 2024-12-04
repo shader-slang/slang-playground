@@ -51,16 +51,14 @@ var passThroughshaderCode = `
 
 class GraphicsPipeline
 {
-    vertShader: undefined;
-    fragShader: undefined;
-    device: GPUDevice;
-    pipeline: GPURenderPipeline | undefined;
-    sampler: GPUSampler | undefined;
-    pipelineLayout: GPUPipelineLayout | undefined;
-    inputTexture: GPUTexture | undefined;
-    bindGroup: GPUBindGroup | undefined;
+    vertShader;
+    fragShader;
+    device;
+    pipeline;
+    sampler;
+    pipelineLayout;
 
-    constructor(device: GPUDevice)
+    constructor(device)
     {
         this.device = device;
     }
@@ -68,7 +66,7 @@ class GraphicsPipeline
     createGraphicsPipelineLayout()
     {
         // Passthrough shader will need an input texture to be displayed on the screen
-        const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
+        const bindGroupLayoutDescriptor = {
             label: 'pass through pipeline bind group layout',
             entries: [
                 {binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {}},
@@ -81,11 +79,9 @@ class GraphicsPipeline
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, inputTexture: any)
+    createPipeline(shaderModule, inputTexture)
     {
         this.createGraphicsPipelineLayout();
-
-        if(this.pipelineLayout == undefined) throw new Error("Pipeline layout not available")
 
         const pipeline = device.createRenderPipeline({
             label: 'pass through pipeline',
@@ -109,9 +105,6 @@ class GraphicsPipeline
 
     createBindGroup()
     {
-      if(this.pipeline == undefined) throw new Error("Pipeline not created yet")
-      if(this.sampler == undefined) throw new Error("Sampler not created yet")
-      if(this.inputTexture == undefined) throw new Error("Input texture not created yet")
         const bindGroup = device.createBindGroup({
           label: 'pass through pipeline bind group',
           layout: this.pipeline.getBindGroupLayout(0),
