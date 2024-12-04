@@ -1,27 +1,27 @@
 'use strict';
 
-var compiler = null;
-var slangd = null;
-var device;
-var context;
-var computePipeline;
-var extraComputePipelines = [];
-var passThroughPipeline;
+var compiler: SlangCompiler | null = null;
+var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
+var device: GPUDevice;
+var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): any; new(): any; }; }; };
+var computePipeline: ComputePipeline;
+var extraComputePipelines: ComputePipeline[] = [];
+var passThroughPipeline: GraphicsPipeline;
 
-var monacoEditor;
-var diagnosticsArea;
-var codeGenArea;
+var monacoEditor: { getValue: () => string; setValue: (arg0: string) => void; getModel: () => any; };
+var diagnosticsArea: { setValue: (arg0: string) => void; getValue: () => string; };
+var codeGenArea: { setValue: (arg0: string) => void; getModel: () => { (): any; new(): any; setLanguage: { (arg0: string): void; new(): any; }; }; };
 
-var resourceBindings;
-var resourceCommands;
-var callCommands;
-var allocatedResources;
-var hashedStrings;
+var resourceBindings: Bindings;
+var resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[];
+var callCommands: any[];
+var allocatedResources: Map<any, any>;
+var hashedStrings: string;
 
-var renderThread = null;
-var releaseRenderLock = null;
+var renderThread: Promise<void> | null = null;
+var releaseRenderLock: (() => void) | null = null;
 var abortRender = false;
-var onRenderAborted = null;
+var onRenderAborted: (() => void) | null = null;
 
 var printfBufferElementSize = 12;
 var printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
@@ -47,7 +47,7 @@ async function webgpuInit() {
             console.log('need a browser that supports WebGPU');
             return;
         }
-        const requiredFeatures = [];
+        const requiredFeatures: never[] = [];
 
         device = await adapter?.requestDevice({ requiredFeatures });
         if (!device) {
@@ -65,18 +65,18 @@ async function webgpuInit() {
     observer.observe(canvas);
 }
 
-function resizeCanvas(entries) {
+function resizeCanvas(entries: { target: any; }[]) {
     if (device == null)
         return;
 
     const canvas = entries[0].target;
 
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    let width = canvas.clientWidth;
+    let height = canvas.clientHeight;
     if (canvas.style.display == "none") {
         var parentDiv = document.getElementById("output");
-        width = parentDiv.clientWidth;
-        height = parentDiv.clientHeight;
+        width = parentDiv?.clientWidth;
+        height = parentDiv?.clientHeight;
     }
 
     if (width != currentWindowSize[0] || height != currentWindowSize[1]) {
@@ -91,23 +91,19 @@ function resizeCanvas(entries) {
     return false;
 }
 
-function abortRendererIfActive()
-{
+function abortRendererIfActive(): Promise<void> {
     return new Promise((resolve) => {
-        if (renderThread)
-        {
+        if (renderThread) {
             abortRender = true;
             onRenderAborted = resolve;
         }
-        else
-        {
+        else {
             resolve();
         }
     });
 }
 
-function withRenderLock(setupFn, renderFn) 
-{
+function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Promise<any>; }, renderFn: { (timeMS: any): Promise<boolean>; (timeMS: any): Promise<boolean>; (arg0: any): any; }) {
     // Overwrite the onRenderAborted function to the new one.
     // This also makes sure that a single function is called when the render thread is aborted.
     //
@@ -121,18 +117,18 @@ function withRenderLock(setupFn, renderFn)
         abortRender = false;
 
         // New render loop with the provided function.
-        renderThread = new Promise((resolve) => { 
+        renderThread = new Promise((resolve) => {
             releaseRenderLock = resolve;
-            
+
             // Set up render loop function
-            const newRenderLoop = async (timeMS) => {
+            const newRenderLoop = async (timeMS: any) => {
                 var nextFrame = false;
                 try {
                     const keepRendering = await renderFn(timeMS);
                     nextFrame = keepRendering && !abortRender;
                     if (nextFrame)
                         requestAnimationFrame(newRenderLoop);
-                } catch (error) {
+                } catch (error: any) {
                     diagnosticsArea.setValue("Error when rendering: " + error.message);
                 }
                 finally {
@@ -140,16 +136,16 @@ function withRenderLock(setupFn, renderFn)
                         releaseRenderLock();
                 }
             }
-            
+
             // Setup renderer and start the render loop.
             setupFn().then(() => {
                 requestAnimationFrame(newRenderLoop);
-            }).catch((error) => {
+            }).catch((error: { message: any; }) => {
                 diagnosticsArea.setValue(error.message);
                 releaseRenderLock();
             });
         });
-        
+
         // Queue any follow-up actions upon abort.
         renderThread.then(() => {
             renderThread = null; // Clear the render thread.
@@ -159,13 +155,11 @@ function withRenderLock(setupFn, renderFn)
     };
 
     // Is there any renderer active?
-    if (!renderThread)
-    {
+    if (!renderThread) {
         // Nothing to wait for. Call immediately.
         onRenderAborted();
     }
-    else
-    {
+    else {
         // Otherwise, signal the render thread to abort.
         abortRender = true;
     }
@@ -176,35 +170,35 @@ function startRendering() {
     const setupRenderer = async () => {
         if (!computePipeline || !passThroughPipeline)
             throw new Error("pipeline not ready");
-        
+
         if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
             throw new Error("window not ready");
-        
+
         const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
 
         globalThis.allocatedResources = allocatedResources;
         computePipeline.createBindGroup(allocatedResources);
 
-        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+        passThroughPipeline.inputTexture = (allocatedResources.get("outputTexture") as GPUTexture);
         passThroughPipeline.createBindGroup();
 
         for (const pipeline of extraComputePipelines)
             pipeline.createBindGroup(allocatedResources);
     };
-    
+
     withRenderLock(setupRenderer, execFrame);
 }
 
 // We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
 // multiple useless frames.
-function resizeCanvasHandler(entries) {
+function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
     var needResize = resizeCanvas(entries);
     if (needResize) {
         startRendering();
     }
 }
 
-function toggleDisplayMode(displayMode) {
+function toggleDisplayMode(displayMode: number) {
     if (currentMode == displayMode)
         return;
     if (currentMode == HIDDEN_MODE && displayMode != HIDDEN_MODE) {
@@ -239,7 +233,7 @@ function toggleDisplayMode(displayMode) {
 var timeAggregate = 0;
 var frameCount = 0;
 
-async function execFrame(timeMS) {
+async function execFrame(timeMS: number) {
     if (currentMode == HIDDEN_MODE)
         return false;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
@@ -264,7 +258,7 @@ async function execFrame(timeMS) {
 
     // The extra passes always go first.
     // zip the extraComputePipelines and callCommands together
-    for (const [pipeline, command] of callCommands.map((x, i) => [extraComputePipelines[i], x])) {
+    for (const [pipeline, command] of callCommands.map((x: any, i: number) => [extraComputePipelines[i], x])) {
         const pass = encoder.beginComputePass({ label: 'extra passes' });
         pass.setBindGroup(0, pipeline.bindGroup);
         pass.setPipeline(pipeline.pipeline);
@@ -276,9 +270,9 @@ async function execFrame(timeMS) {
                 return false;
             }
 
-            var resource = globalThis.allocatedResources.get(command.resourceName)
+            let resource = globalThis.allocatedResources.get(command.resourceName)
             if (resource instanceof GPUBuffer) {
-                var size = resource.size / 4;
+                let size = resource.size / 4;
                 const blockSizeX = pipeline.threadGroupSize.x;
                 const blockSizeY = pipeline.threadGroupSize.y;
 
@@ -288,7 +282,7 @@ async function execFrame(timeMS) {
                 pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
             }
             else if (resource instanceof GPUTexture) {
-                var size = [0, 0];
+                let size = [0, 0];
                 size[0] = resource.width;
                 size[1] = resource.height;
                 const blockSizeX = pipeline.threadGroupSize.x;
@@ -390,7 +384,7 @@ async function printResult() {
     // Read the results once the job is done
     await allocatedResources.get("printfBufferRead").mapAsync(GPUMapMode.READ);
 
-    var textResult = "";
+    let textResult = "";
     const formatPrint = parsePrintfBuffer(
         globalThis.hashedStrings,
         allocatedResources.get("printfBufferRead"),
@@ -403,7 +397,7 @@ async function printResult() {
     document.getElementById("printResult").value = textResult;
 }
 
-function checkShaderType(userSource) {
+function checkShaderType(userSource: string) {
     // we did a pre-filter on the user input source code.
     const isImageMain = userSource.match("imageMain");
     const isPrintMain = userSource.match("printMain");
@@ -419,13 +413,29 @@ function checkShaderType(userSource) {
         return SlangCompiler.PRINT_SHADER;
 }
 
-async function processResourceCommands(pipeline, resourceBindings, resourceCommands) {
-    var allocatedResources = new Map();
-    const safeSet = (map, key, value) => { if (map.has(key)) { map.get(key).destroy(); } map.set(key, value); };
+type ParsedCommand = {
+    "type": "ZEROS" | "RAND",
+    "size": number[],
+} | {
+    "type": "URL",
+    "url": string,
+}
+
+function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: string, value: T) {
+    if (map.has(key)) {
+        let currentEntry = map.get(key);
+        if(currentEntry == undefined) throw new Error("Invalid state")
+        currentEntry.destroy()
+    }
+    map.set(key, value);
+};
+
+async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[]) {
+    var allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
-            const size = parsedCommand.size.reduce((a, b) => a * b);
+            const size = parsedCommand.size.reduce((a: number, b: number) => a * b);
             const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
@@ -454,15 +464,15 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
                     }
                     const texture = pipeline.device.createTexture({
                         size: parsedCommand.size,
-                        format: bindingInfo.storageTexture?'r32float':'rgba8unorm',
+                        format: bindingInfo.storageTexture ? 'r32float' : 'rgba8unorm',
                         usage: usage,
                     });
 
                     safeSet(allocatedResources, resourceName, texture);
 
                     // Initialize the texture with zeros.
-                    let zeros = new Uint8Array(Array(size*elementSize).fill(0));
-                    pipeline.device.queue.writeTexture({ texture }, zeros, {bytesPerRow: parsedCommand.size[0] * elementSize}, { width: parsedCommand.size[0], height: parsedCommand.size[1] });
+                    let zeros = new Uint8Array(Array(size * elementSize).fill(0));
+                    pipeline.device.queue.writeTexture({ texture }, zeros, { bytesPerRow: parsedCommand.size[0] * elementSize }, { width: parsedCommand.size[0], height: parsedCommand.size[1] });
                 }
                 catch (error) {
                     throw new Error(`Failed to create texture: ${error}`);
@@ -512,7 +522,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
             }
         }
         else if (parsedCommand.type === "RAND") {
-            const size = parsedCommand.size.reduce((a, b) => a * b);
+            const size = parsedCommand.size.reduce((a: number, b: number) => a * b);
             const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
@@ -625,7 +635,7 @@ async function processResourceCommands(pipeline, resourceBindings, resourceComma
     return allocatedResources;
 }
 
-function freeAllocatedResources(resources) {
+function freeAllocatedResources(resources: any[]) {
     for (const resource of resources.values()) {
         resource.destroy();
     }
@@ -645,98 +655,97 @@ var onRun = () => {
     }
 
     withRenderLock(
-    // setupFn
-    async () => {
-        // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
-        // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
-        const userSource = monacoEditor.getValue();
-        const shaderType = checkShaderType(userSource);
-        if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
-            toggleDisplayMode(HIDDEN_MODE);
-            codeGenArea.setValue("");
-            throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
-        }
-
-        const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
-        const ret = compileShader(userSource, entryPointName, "WGSL");
-
-        if (!ret.succ) {
-            toggleDisplayMode(HIDDEN_MODE);
-            throw new Error("");
-        }
-
-        globalThis.hashedStrings = ret.hashedStrings;
-
-        resourceCommands = parseResourceCommands(userSource);
-
-        try {
-            callCommands = parseCallCommands(userSource);
-        }
-        catch (error) {
-            throw new Error("Error while parsing '//! CALL' commands: " + error.message);
-        }
-
-        resourceBindings = ret.layout;
-        // create a pipeline resource 'signature' based on the bindings found in the program.
-        computePipeline.createPipelineLayout(resourceBindings);
-
-        if (extraComputePipelines.length > 0)
-            extraComputePipelines = []; // This should release the resources of the extra pipelines.
-
-        if (callCommands && (callCommands.length > 0)) {
-            for (const command of callCommands) {
-                const compiledResult = compileShader(userSource, command.fnName, "WGSL");
-                if (!compiledResult.succ) {
-                    throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
-                }
-
-                const module = device.createShaderModule({ code: compiledResult.code });
-                const pipeline = new ComputePipeline(device);
-                pipeline.createPipelineLayout(compiledResult.layout);
-                pipeline.createPipeline(module, null);
-                pipeline.setThreadGroupSize(compiledResult.threadGroupSize);
-                extraComputePipelines.push(pipeline);
+        // setupFn
+        async () => {
+            // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
+            // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
+            const userSource = monacoEditor.getValue();
+            const shaderType = checkShaderType(userSource);
+            if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
+                toggleDisplayMode(HIDDEN_MODE);
+                codeGenArea.setValue("");
+                throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
             }
-        }
 
-        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
-        
-        globalThis.allocatedResources = allocatedResources;
+            const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
+            const ret = compileShader(userSource, entryPointName, "WGSL");
 
-        if (!passThroughPipeline) {
-            passThroughPipeline = new GraphicsPipeline(device);
-            const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
-            const inputTexture = allocatedResources.get("outputTexture");
-            passThroughPipeline.createPipeline(shaderModule, inputTexture);
-        }
+            if (!ret.succ) {
+                toggleDisplayMode(HIDDEN_MODE);
+                throw new Error("");
+            }
 
-        passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
-        passThroughPipeline.createBindGroup();
+            globalThis.hashedStrings = ret.hashedStrings;
 
-        const module = device.createShaderModule({ code: ret.code });
-        computePipeline.createPipeline(module, allocatedResources);
+            resourceCommands = parseResourceCommands(userSource);
 
-        // Create bind groups for the extra pipelines
-        for (const pipeline of globalThis.extraComputePipelines)
-            pipeline.createBindGroup(allocatedResources);
+            try {
+                callCommands = parseCallCommands(userSource);
+            }
+            catch (error: any) {
+                throw new Error("Error while parsing '//! CALL' commands: " + error.message);
+            }
 
-        toggleDisplayMode(compiler.shaderType);
-    },
-    // renderFn
-    async (timeMS) => 
-    {
-        if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
-            await printResult();
-            return false; // Stop after one frame.
-        }
-        else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
-            return await execFrame(timeMS);
-        }
-        return false;
-    });
+            resourceBindings = ret.layout;
+            // create a pipeline resource 'signature' based on the bindings found in the program.
+            computePipeline.createPipelineLayout(resourceBindings);
+
+            if (extraComputePipelines.length > 0)
+                extraComputePipelines = []; // This should release the resources of the extra pipelines.
+
+            if (callCommands && (callCommands.length > 0)) {
+                for (const command of callCommands) {
+                    const compiledResult = compileShader(userSource, command.fnName, "WGSL");
+                    if (!compiledResult.succ) {
+                        throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
+                    }
+
+                    const module = device.createShaderModule({ code: compiledResult.code });
+                    const pipeline = new ComputePipeline(device);
+                    pipeline.createPipelineLayout(compiledResult.layout);
+                    pipeline.createPipeline(module, null);
+                    pipeline.setThreadGroupSize(compiledResult.threadGroupSize);
+                    extraComputePipelines.push(pipeline);
+                }
+            }
+
+            const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+
+            globalThis.allocatedResources = allocatedResources;
+
+            if (!passThroughPipeline) {
+                passThroughPipeline = new GraphicsPipeline(device);
+                const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
+                const inputTexture = allocatedResources.get("outputTexture");
+                passThroughPipeline.createPipeline(shaderModule, inputTexture);
+            }
+
+            passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+            passThroughPipeline.createBindGroup();
+
+            const module = device.createShaderModule({ code: ret.code });
+            computePipeline.createPipeline(module, allocatedResources);
+
+            // Create bind groups for the extra pipelines
+            for (const pipeline: { createBindGroup: (arg0: Map<any, any>) => void; } of globalThis.extraComputePipelines)
+                pipeline.createBindGroup(allocatedResources);
+
+            toggleDisplayMode(compiler.shaderType);
+        },
+        // renderFn
+        async (timeMS: any) => {
+            if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
+                await printResult();
+                return false; // Stop after one frame.
+            }
+            else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
+                return await execFrame(timeMS);
+            }
+            return false;
+        });
 }
 
-function appendOutput(editor, textLine) {
+function appendOutput(editor: { setValue: (arg0: string) => void; getValue: () => any; }, textLine: string) {
     editor.setValue(editor.getValue() + textLine + "\n");
 }
 
@@ -764,7 +773,7 @@ function compileOrRun() {
     }
 }
 
-var reflectionJson = {};
+var reflectionJson: any = {};
 function getReflectionJson() {
     return {
         controlPanel: { enabled: false },
@@ -782,7 +791,18 @@ function getReflectionJson() {
         data: reflectionJson
     };
 }
-function compileShader(userSource, entryPoint, compileTarget, includePlaygroundModule = true) {
+type Shader = {
+    succ: true,
+    code: string,
+    layout: Bindings,
+    hashedStrings: string,
+    reflection: string,
+    threadGroupSize: number
+} | {
+    succ: false
+};
+function compileShader(userSource: any, entryPoint: string, compileTarget: string, includePlaygroundModule = true): Shader {
+    if (compiler == null) throw new Error("No compiler available")
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);
 
@@ -816,13 +836,15 @@ function compileShader(userSource, entryPoint, compileTarget, includePlaygroundM
 var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
-    const compileTarget = document.getElementById("target-select").value;
+    const compileTarget = (document.getElementById("target-select") as HTMLSelectElement).value;
 
-    const entryPoint = document.getElementById("entrypoint-select").value;
+    const entryPoint = (document.getElementById("entrypoint-select") as HTMLSelectElement).value;
     if (entryPoint == "" && !isWholeProgramTarget(compileTarget)) {
         diagnosticsArea.setValue("Please select the entry point name");
         return;
     }
+
+    if (compiler == null) throw new Error("Compiler doesn't exist")
 
     if (compileTarget == "SPIRV")
         await compiler.initSpirvTools();
@@ -837,7 +859,7 @@ var onCompile = async () => {
     }
 }
 
-function loadEditor(readOnlyMode = false, containerId, preloadCode) {
+function loadEditor(readOnlyMode = false, containerId: string, preloadCode: string) {
 
     require(["vs/editor/editor.main"], function () {
         var container = document.getElementById(containerId);
@@ -883,13 +905,13 @@ var moduleLoadingMessage = "";
 
 // Define the Module object with a callback for initialization
 var Module = {
-    locateFile: function (path) {
+    locateFile: function (path: string) {
         if (path.endsWith('.wasm')) {
             return 'slang-wasm.wasm.gz'; // Use the gzip compressed file
         }
         return path;
     },
-    instantiateWasm: async function (imports, receiveInstance) {
+    instantiateWasm: async function (imports: WebAssembly.Imports | undefined, receiveInstance: (arg0: WebAssembly.Instance) => void) {
         // Step 1: Fetch the compressed .wasm.gz file
         var progressBar = document.getElementById('progress-bar');
         const compressedData = await fetchWithProgress('slang-wasm.wasm.gz', (loaded, total) => {
@@ -914,7 +936,7 @@ var Module = {
         var result = compiler.init();
         slangd = Module.createLanguageServer();
         if (result.ret) {
-            document.getElementById("compile-btn").disabled = false;
+            (document.getElementById("compile-btn") as HTMLButtonElement).disabled = false;
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";
             runIfFullyInitialized();
         }
@@ -931,12 +953,13 @@ window.onload = async function () {
     pageLoaded = true;
 
     await webgpuInit();
+    let button = (document.getElementById("run-btn") as HTMLButtonElement);
     if (device) {
-        document.getElementById("run-btn").disabled = false;
+        button.disabled = false;
     }
     else {
         diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
-        document.getElementById("run-btn").title = "Run shader feature is disabled because the current browser does not support WebGPU.";
+        button.title = "Run shader feature is disabled because the current browser does not support WebGPU.";
     }
     runIfFullyInitialized();
 }
@@ -946,13 +969,14 @@ function runIfFullyInitialized() {
         initLanguageServer();
 
         const loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen == null) throw new Error("missing loading screen element");
         // Start fade-out by setting opacity to 0
         loadingScreen.style.opacity = '0';
         // Wait for the transition to finish before hiding completely
         loadingScreen.addEventListener('transitionend', () => {
             loadingScreen.style.display = 'none';
         });
-        document.getElementById('contentDiv').style = "";
+        (document.getElementById('contentDiv') as HTMLElement).style.cssText = "";
 
         restoreSelectedTargetFromURL();
 

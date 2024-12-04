@@ -1,44 +1,44 @@
 
 class ComputePipeline
 {
-    pipeline;
-    pipelineLayout;
+    pipeline: GPUComputePipeline | undefined;
+    pipelineLayout: GPUPipelineLayout | "auto" | undefined;
 
     // TODO: We should make this field optional, and only when user select a "Debug" mode will this option be available,
     // and we will output this buffer to the output area.
 
-    outputBuffer;
-    outputBufferRead;
-    outputTexture;
+    outputBuffer: any;
+    outputBufferRead: any;
+    outputTexture: any;
     device;
-    bindGroup;
+    bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
-    threadGroupSize;
+    threadGroupSize: any;
 
     // resource name (string) -> binding descriptor 
-    resourceBindings;
+    resourceBindings: Bindings | undefined;
 
-    constructor(device)
+    constructor(device: GPUDevice)
     {
         this.device = device;
     }
 
-    setThreadGroupSize(size)
+    setThreadGroupSize(size: number)
     {
         this.threadGroupSize = size;
     }
 
-    createPipelineLayout(resourceDescriptors)
+    createPipelineLayout(resourceDescriptors: Bindings)
     {
         this.resourceBindings = resourceDescriptors;
 
-        const entries = [];
+        const entries: GPUBindGroupLayoutEntry[] = [];
         for (const [name, binding] of this.resourceBindings)
         {
             entries.push(binding);
         }
-        const bindGroupLayoutDescriptor = {
+        const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
             label: 'compute pipeline bind group layout',
             entries: entries,
         };
@@ -49,8 +49,10 @@ class ComputePipeline
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule, resources)
+    createPipeline(shaderModule: GPUShaderModule, resources: Map<any, any> | null)
     {
+        if(this.pipelineLayout == undefined)
+            throw new Error("Cannot create pipeline without layout")
         const pipeline = device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
@@ -64,8 +66,13 @@ class ComputePipeline
             this.createBindGroup(resources);
     }
 
-    createBindGroup(allocatedResources)
+    createBindGroup(allocatedResources: Map<any, any>)
     {
+        if(this.resourceBindings == undefined)
+            throw new Error("No resource bindings")
+        if(this.pipeline == undefined)
+            throw new Error("No pipeline")
+
         const entries = [];
         for (const [name, resource] of allocatedResources)
         {
@@ -91,10 +98,11 @@ class ComputePipeline
         // Check that all resources are bound
         if (entries.length != this.resourceBindings.size)
         {
+            let missingEntries = []
             // print out the names of the resources that aren't bound
             for (const [name, resource] of this.resourceBindings)
             {
-                var missingEntries = []
+                missingEntries = []
                 if (!entries.find(entry => entry.binding == resource.binding))
                 {
                     missingEntries.push(name);
