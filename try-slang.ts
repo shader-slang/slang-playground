@@ -1,14 +1,24 @@
 'use strict';
 
+import * as monaco from 'monaco-editor';
+
+declare global {
+    var hashedStrings: string;
+    var allocatedResources: Map<string, GPUBuffer | GPUTexture>;
+    var randFloatPipeline: ComputePipeline;
+    var randFloatResources: Map<string, GPUBuffer | GPUTexture>;
+    var extraComputePipelines: GraphicsPipeline[];
+}
+
 var compiler: SlangCompiler | null = null;
 var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
 var device: GPUDevice;
-var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): any; new(): any; }; }; };
+var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): GPUTextureView; new(): any; }; }; };
 var computePipeline: ComputePipeline;
 var extraComputePipelines: ComputePipeline[] = [];
 var passThroughPipeline: GraphicsPipeline;
 
-var monacoEditor: { getValue: () => string; setValue: (arg0: string) => void; getModel: () => any; };
+var monacoEditor: monaco.editor.IStandaloneCodeEditor;
 var diagnosticsArea: { setValue: (arg0: string) => void; getValue: () => string; };
 var codeGenArea: { setValue: (arg0: string) => void; getModel: () => { (): any; new(): any; setLanguage: { (arg0: string): void; new(): any; }; }; };
 
@@ -19,16 +29,17 @@ var allocatedResources: Map<any, any>;
 var hashedStrings: string;
 
 var renderThread: Promise<void> | null = null;
-var releaseRenderLock: (() => void) | null = null;
 var abortRender = false;
 var onRenderAborted: (() => void) | null = null;
 
-var printfBufferElementSize = 12;
-var printfBufferSize = this.printfBufferElementSize * 2048; // 12 bytes per printf struct
+const printfBufferElementSize = 12;
+const printfBufferSize = printfBufferElementSize * 2048; // 12 bytes per printf struct
 
 var sourceCodeChange = true;
 
 var currentWindowSize = [300, 150];
+
+var $jsontree: any; //TODO fix types
 
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
 const PRINT_MODE = SlangCompiler.PRINT_SHADER;
@@ -118,7 +129,7 @@ function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Pro
 
         // New render loop with the provided function.
         renderThread = new Promise((resolve) => {
-            releaseRenderLock = resolve;
+            let releaseRenderLock = resolve;
 
             // Set up render loop function
             const newRenderLoop = async (timeMS: any) => {
@@ -305,7 +316,9 @@ async function execFrame(timeMS: number) {
 
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
-    pass.setBindGroup(0, computePipeline.bindGroup);
+    pass.setBindGroup(0, computePipeline.bindGroup || null);
+    if(computePipeline.pipeline == undefined) 
+        throw new Error("No pipeline");
     pass.setPipeline(computePipeline.pipeline);
     const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
     const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
@@ -313,11 +326,10 @@ async function execFrame(timeMS: number) {
     pass.end();
 
     if (currentMode == RENDER_MODE) {
-        var renderPassDescriptor = passThroughPipeline.createRenderPassDesc();
-        renderPassDescriptor.colorAttachments[0].view = context.getCurrentTexture().createView();
+        var renderPassDescriptor = passThroughPipeline.createRenderPassDesc(context.getCurrentTexture().createView());
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
-        renderPass.setBindGroup(0, passThroughPipeline.bindGroup);
+        renderPass.setBindGroup(0, passThroughPipeline.bindGroup || null);
         renderPass.setPipeline(passThroughPipeline.pipeline);
         renderPass.draw(6);  // call our vertex shader 6 times.
         renderPass.end();
@@ -364,7 +376,7 @@ async function printResult() {
 
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
-    pass.setBindGroup(0, computePipeline.bindGroup);
+    pass.setBindGroup(0, computePipeline.bindGroup || null);
     pass.setPipeline(computePipeline.pipeline);
     pass.dispatchWorkgroups(1, 1);
     pass.end();
@@ -388,7 +400,7 @@ async function printResult() {
     const formatPrint = parsePrintfBuffer(
         globalThis.hashedStrings,
         allocatedResources.get("printfBufferRead"),
-        globalThis.printfBufferElementSize);
+        printfBufferElementSize);
 
     if (formatPrint.length != 0)
         textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
@@ -576,7 +588,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                     globalThis.randFloatResources.set("seed",
                         pipeline.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
-                const seedBuffer = globalThis.randFloatResources.get("seed");
+                const seedBuffer = globalThis.randFloatResources.get("seed") as GPUBuffer;
 
                 // Set bindings on the pipeline.
                 globalThis.randFloatPipeline.createBindGroup(globalThis.randFloatResources);
@@ -588,7 +600,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 const encoder = pipeline.device.createCommandEncoder({ label: 'compute builtin encoder' });
                 const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
-                pass.setBindGroup(0, randomPipeline.bindGroup);
+                pass.setBindGroup(0, randomPipeline.bindGroup || null);
                 pass.setPipeline(randomPipeline.pipeline);
 
                 const workGroupSizeX = Math.floor((size + 63) / 64);
@@ -727,7 +739,7 @@ var onRun = () => {
             computePipeline.createPipeline(module, allocatedResources);
 
             // Create bind groups for the extra pipelines
-            for (const pipeline: { createBindGroup: (arg0: Map<any, any>) => void; } of globalThis.extraComputePipelines)
+            for (const pipeline of globalThis.extraComputePipelines)
                 pipeline.createBindGroup(allocatedResources);
 
             toggleDisplayMode(compiler.shaderType);
@@ -862,12 +874,12 @@ var onCompile = async () => {
 function loadEditor(readOnlyMode = false, containerId: string, preloadCode: string) {
 
     require(["vs/editor/editor.main"], function () {
-        var container = document.getElementById(containerId);
+        let container = document.getElementById(containerId);
         initMonaco();
-        var model = readOnlyMode
+        let model = readOnlyMode
             ? monaco.editor.createModel(preloadCode)
             : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
-        var editor = monaco.editor.create(container, {
+        let editor = monaco.editor.create(container, {
             model: model,
             language: readOnlyMode ? 'csharp' : 'slang',
             theme: 'slang-dark',
@@ -889,7 +901,7 @@ function loadEditor(readOnlyMode = false, containerId: string, preloadCode: stri
         if (containerId == "codeEditor")
             monacoEditor = editor;
         else if (containerId == "diagnostics") {
-            var model = editor.getModel();
+            let model = editor.getModel();
             monaco.editor.setModelLanguage(model, "text")
             diagnosticsArea = editor;
         }

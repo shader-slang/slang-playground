@@ -67,7 +67,7 @@ function parseResourceCommand(command: string): ParsedCommand {
     }
 }
 
-function parseResourceCommands(userSource: string): {resourceName: string, parsedCommand: ParsedCommand}[] {
+function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
     // Now we'll handle some special comments that the user can provide to initialize their resources.
     //
     // Here are some patterns we support:
@@ -121,8 +121,19 @@ function parseCallCommands(userSource: string) {
     return callCommands;
 }
 
-function parsePrintfFormat(formatString: string) {
-    const formatSpecifiers = [];
+type FormatSpecifier = {
+    type: "text",
+    value: string,
+} | {
+    type: "specifier",
+    flags: string,
+    width: number | null,
+    precision: number | null,
+    specifierType: string,
+};
+
+function parsePrintfFormat(formatString: string): FormatSpecifier[] {
+    const formatSpecifiers: FormatSpecifier[] = [];
     const regex = /%([-+ #0]*)(\d*)(\.\d+)?([diufFeEgGxXosc])/g;
     let lastIndex = 0;
 
@@ -136,12 +147,17 @@ function parsePrintfFormat(formatString: string) {
             formatSpecifiers.push({ type: 'text', value: literalText });
         }
 
+        let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
+        let precision_number = precision_text?parseInt(precision):null
+
+        let width_number = width ? parseInt(width) : null
+
         // Add the format specifier as a token
         formatSpecifiers.push({
             type: 'specifier',
             flags: flags || '',
-            width: width || null,
-            precision: precision ? precision.slice(1) : null, // remove leading '.'
+            width: width_number,
+            precision: precision_number,
             specifierType: type
         });
 
@@ -156,11 +172,11 @@ function parsePrintfFormat(formatString: string) {
     return formatSpecifiers;
 }
 
-function formatPrintfString(parsedTokens: any[], data: any[]) {
+function formatPrintfString(parsedTokens: FormatSpecifier[], data: any[]) {
     let result = '';
     let dataIndex = 0;
 
-    parsedTokens.forEach((token: { type?: any; value?: any; flags?: any; width?: any; precision?: any; specifierType?: any; }) => {
+    parsedTokens.forEach((token) => {
         if (token.type === 'text') {
             result += token.value;
         }
@@ -174,9 +190,10 @@ function formatPrintfString(parsedTokens: any[], data: any[]) {
 }
 
 // Helper function to format each specifier
-function formatSpecifier(value: string, { flags, width, precision, specifierType }: any) {
+function formatSpecifier(value: string, { flags, width, precision, specifierType }: FormatSpecifier & { type: 'specifier' }) {
     let formattedValue;
-
+    if(precision == null)
+        precision = 6; //eww magic number
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
@@ -196,17 +213,17 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
             break;
         case 'f':
         case 'F': // Floating-point
-            formattedValue = parseFloat(value).toFixed(precision || 6);
+            formattedValue = parseFloat(value).toFixed(precision);
             break;
         case 'e': // Scientific notation (lowercase)
-            formattedValue = parseFloat(value).toExponential(precision || 6);
+            formattedValue = parseFloat(value).toExponential(precision);
             break;
         case 'E': // Scientific notation (uppercase)
-            formattedValue = parseFloat(value).toExponential(precision || 6).toUpperCase();
+            formattedValue = parseFloat(value).toExponential(precision).toUpperCase();
             break;
         case 'g':
         case 'G': // Shortest representation of floating-point
-            formattedValue = parseFloat(value).toPrecision(precision || 6);
+            formattedValue = parseFloat(value).toPrecision(precision);
             break;
         case 'c': // Character
             formattedValue = String.fromCharCode(parseInt(value));
@@ -351,7 +368,7 @@ async function fetchWithProgress(url: string, onProgress: { (loaded: number, tot
     let buffer = new Uint8Array(total); // Initial buffer
     let position = 0; // Tracks the current position in the buffer
 
-    if(!response.body) {
+    if (!response.body) {
         // Probably needs to be handled properly
         throw new Error("No response body")
     }

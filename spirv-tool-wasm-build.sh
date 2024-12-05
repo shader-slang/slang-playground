@@ -20,5 +20,6 @@ python3 utils/git-sync-deps
 
 cp out/web/spirv-tools.wasm ../
 cp out/web/spirv-tools.js ../
+cp out/web/spirv-tools.d.ts ../
 
 popd

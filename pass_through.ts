@@ -51,8 +51,6 @@ var passThroughshaderCode = `
 
 class GraphicsPipeline
 {
-    vertShader: undefined;
-    fragShader: undefined;
     device: GPUDevice;
     pipeline: GPURenderPipeline | undefined;
     sampler: GPUSampler | undefined;
@@ -124,17 +122,18 @@ class GraphicsPipeline
         this.bindGroup = bindGroup;
     }
 
-    createRenderPassDesc()
+    createRenderPassDesc(view: GPUTextureView): GPURenderPassDescriptor
     {
+      const attachment: GPURenderPassColorAttachment = {
+        view,
+        clearValue: [0.3, 0.3, 0.3, 1],
+        loadOp: 'clear',
+        storeOp: 'store',
+      };
         const renderPassDescriptor = {
           label: 'pass through renderPass',
           colorAttachments: [
-            {
-              // view: <- to be filled out when we render
-              clearValue: [0.3, 0.3, 0.3, 1],
-              loadOp: 'clear',
-              storeOp: 'store',
-            },
+            attachment
           ],
         };
 

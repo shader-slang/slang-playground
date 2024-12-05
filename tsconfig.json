@@ -106,6 +106,6 @@
     /* Completeness */
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true,     
-    "types": ["@webgpu/types"]                            /* Skip type checking all .d.ts files. */
+    "types": ["@webgpu/types", "jjsontree.js", "./spirv-tools"]                            /* Skip type checking all .d.ts files. */
   }
 }

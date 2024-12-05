@@ -1,5 +1,10 @@
 {
   "devDependencies": {
     "@webgpu/types": "^0.1.51"
+  },
+  "dependencies": {
+    "@types/emscripten": "^1.39.13",
+    "jjsontree.js": "^4.6.4",
+    "monaco-editor": "^0.52.0"
   }
 }

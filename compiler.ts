@@ -1,3 +1,7 @@
+import '@types/emscripten';
+
+import spirvTools, { SpirvTools } from "./spirv-tools.js";
+
 function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
 }
@@ -73,13 +77,13 @@ class SlangCompiler {
     globalSlangSession = null;
     slangSession = null;
 
-    compileTargetMap: {name: string, value: unknown} | null = null;
+    compileTargetMap: { name: string, value: unknown }[] | null = null;
 
     slangWasmModule;
     diagnosticsMsg;
     shaderType;
 
-    spirvToolsModule = null;
+    spirvToolsModule: SpirvTools | null = null;
 
     mainModules: Map<string, { source: string }> = new Map();
 
@@ -89,8 +93,8 @@ class SlangCompiler {
         this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
         this.mainModules.set('imageMain', { source: imageMainSource });
         this.mainModules.set('printMain', { source: printMainSource });
-        FS.createDataFile("/", "user.slang", "", true, true);
-        FS.createDataFile("/", "playground.slang", "", true, true);
+        FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer()), true, true, false);
+        FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer()), true, true, false);
     }
 
     init() {
@@ -112,7 +116,7 @@ class SlangCompiler {
     }
 
     findCompileTarget(compileTargetStr: string) {
-        if(this.compileTargetMap == null)
+        if (this.compileTargetMap == null)
             throw new Error("No compile targets to find")
         for (var i = 0; i < this.compileTargetMap.length; i++) {
             var target = this.compileTargetMap[i];
@@ -163,7 +167,6 @@ class SlangCompiler {
 
     async initSpirvTools() {
         if (!this.spirvToolsModule) {
-            const spirvTools = import("./spirv-tools.js");
             this.spirvToolsModule = await spirvTools();
         }
     }

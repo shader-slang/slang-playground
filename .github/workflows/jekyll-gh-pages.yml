@@ -29,11 +29,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      # - name: Setup Pages
+      #   uses: actions/configure-pages@v5
 
       - name: get slang head commit
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
           mkdir slang-repo
           pushd slang-repo
           git clone https://github.com/shader-slang/slang.git
@@ -64,11 +66,14 @@ jobs:
           path: |
             ./spirv-tools.wasm
             ./spirv-tools.js
+            ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
       - name: slang-wasm build
         if: steps.cache_slang.outputs.cache-hit != 'true'
         run: |
+          sed -i -e 's/\r$//' ./slang-wasm-build.sh
+          chmod +x ./slang-wasm-build.sh
           ./slang-wasm-build.sh
 
       - name: save slang-wasm
@@ -83,6 +88,8 @@ jobs:
       - name: spirv-tools-wasm build
         if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
         run: |
+          sed -i -e 's/\r$//' ./spirv-tool-wasm-build.sh
+          chmod +x ./spirv-tool-wasm-build.sh
           ./spirv-tool-wasm-build.sh
 
       - name: save spirv-tools-wasm
@@ -92,6 +99,7 @@ jobs:
           path: |
             ./spirv-tools.wasm
             ./spirv-tools.js
+            ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
       - name: Cleanup workspace
@@ -105,8 +113,13 @@ jobs:
         with:
           source: ./
           destination: ./_site
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: ./_site/
+          compression-level: 0
+      # - name: Upload artifact
+      #   uses: actions/upload-pages-artifact@v3
 
   # Deployment job
   deploy:
