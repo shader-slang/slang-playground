@@ -2,7 +2,7 @@ import '@types/emscripten';
 
 import spirvTools, { SpirvTools } from "./spirv-tools.js";
 
-function isWholeProgramTarget(compileTarget: string) {
+export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
 }
 
@@ -62,10 +62,10 @@ type BindingDescriptor = {
     }
 }
 
-type Bindings = Map<string, GPUBindGroupLayoutEntry>
+export type Bindings = Map<string, GPUBindGroupLayoutEntry>
 
 
-class SlangCompiler {
+export class SlangCompiler {
     static SLANG_STAGE_VERTEX = 1;
     static SLANG_STAGE_FRAGMENT = 5;
     static SLANG_STAGE_COMPUTE = 6;

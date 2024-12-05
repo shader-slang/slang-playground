@@ -1,4 +1,6 @@
-function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) => any; }) {
+import { ParsedCommand } from './try-slang.js';
+
+export function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) => any; }) {
     let context = canvas.getContext('webgpu');
 
     const canvasConfig = {
@@ -12,7 +14,7 @@ function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) =
     return context;
 }
 
-function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
+export function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
     const textureDesc = {
         label: 'output storage texture',
         size: { width: width, height: height },
@@ -67,7 +69,7 @@ function parseResourceCommand(command: string): ParsedCommand {
     }
 }
 
-function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
+export function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
     // Now we'll handle some special comments that the user can provide to initialize their resources.
     //
     // Here are some patterns we support:
@@ -91,7 +93,7 @@ function parseResourceCommands(userSource: string): { resourceName: string, pars
     return resourceCommands;
 }
 
-function parseCallCommands(userSource: string) {
+export function parseCallCommands(userSource: string) {
     // Look for commands of the form:
     //
     // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
@@ -287,7 +289,7 @@ function hashToString(hashedStrings: string | any[], hash: number) {
         }
     }
 }
-function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappedRange: () => any; }, bufferElementSize: number) {
+export function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappedRange: () => any; }, bufferElementSize: number) {
 
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
@@ -355,7 +357,7 @@ function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappe
     return outStrArry;
 }
 
-async function fetchWithProgress(url: string, onProgress: { (loaded: number, total: number): void; }) {
+export async function fetchWithProgress(url: string, onProgress: { (loaded: number, total: number): void; }) {
     const response = await fetch(url);
     const contentLength = response.headers.get('Content-Length');
 

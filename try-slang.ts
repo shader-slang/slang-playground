@@ -1,6 +1,9 @@
-'use strict';
-
 import * as monaco from 'monaco-editor';
+import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
+import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
+import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, resetMouse } from './ui.js';
+import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer } from './util.js';
+import pako from 'pako';
 
 declare global {
     var hashedStrings: string;
@@ -10,17 +13,17 @@ declare global {
     var extraComputePipelines: GraphicsPipeline[];
 }
 
-var compiler: SlangCompiler | null = null;
-var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
+export var compiler: SlangCompiler | null = null;
+export var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
 var device: GPUDevice;
 var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): GPUTextureView; new(): any; }; }; };
 var computePipeline: ComputePipeline;
 var extraComputePipelines: ComputePipeline[] = [];
 var passThroughPipeline: GraphicsPipeline;
 
-var monacoEditor: monaco.editor.IStandaloneCodeEditor;
+export var monacoEditor: monaco.editor.IStandaloneCodeEditor;
 var diagnosticsArea: { setValue: (arg0: string) => void; getValue: () => string; };
-var codeGenArea: { setValue: (arg0: string) => void; getModel: () => { (): any; new(): any; setLanguage: { (arg0: string): void; new(): any; }; }; };
+var codeGenArea: monaco.editor.IStandaloneCodeEditor;
 
 var resourceBindings: Bindings;
 var resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[];
@@ -212,11 +215,18 @@ function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
 function toggleDisplayMode(displayMode: number) {
     if (currentMode == displayMode)
         return;
+    let resultSplitContainer = document.getElementById("resultSplitContainer")
+    if (resultSplitContainer == null) {
+        throw new Error("Cannot get resultSplitContatiner element")
+    }
+    let printResult = document.getElementById("printResult")
+    if (printResult == null) {
+        throw new Error("Cannot get printResult element")
+    }
     if (currentMode == HIDDEN_MODE && displayMode != HIDDEN_MODE) {
-        document.getElementById("resultSplitContainer").style.gridTemplateRows = "50% 14px 1fr";
+        resultSplitContainer.style.gridTemplateRows = "50% 14px 1fr";
     }
     if (displayMode == RENDER_MODE) {
-        var printResult = document.getElementById("printResult")
         printResult.style.display = "none";
         renderOutput.style.display = "block";
         canvas.style.width = "100%";
@@ -225,15 +235,14 @@ function toggleDisplayMode(displayMode: number) {
     }
     else if (displayMode == PRINT_MODE) {
         renderOutput.style.display = "none";
-        var printResult = document.getElementById("printResult")
         printResult.style.display = "grid";
 
         currentMode = PRINT_MODE;
     }
     else if (displayMode == HIDDEN_MODE) {
         renderOutput.style.display = "none";
-        document.getElementById("printResult").style.display = "none";
-        document.getElementById("resultSplitContainer").style.gridTemplateRows = "0px 14px 1fr";
+        printResult.style.display = "none";
+        resultSplitContainer.style.gridTemplateRows = "0px 14px 1fr";
         currentMode = HIDDEN_MODE;
     }
     else {
@@ -377,6 +386,9 @@ async function printResult() {
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup || null);
+    if(computePipeline.pipeline == undefined) {
+        throw new Error("Pipeline is undefined")
+    }
     pass.setPipeline(computePipeline.pipeline);
     pass.dispatchWorkgroups(1, 1);
     pass.end();
@@ -425,7 +437,7 @@ function checkShaderType(userSource: string) {
         return SlangCompiler.PRINT_SHADER;
 }
 
-type ParsedCommand = {
+export type ParsedCommand = {
     "type": "ZEROS" | "RAND",
     "size": number[],
 } | {
@@ -761,7 +773,7 @@ function appendOutput(editor: { setValue: (arg0: string) => void; getValue: () =
     editor.setValue(editor.getValue() + textLine + "\n");
 }
 
-function compileOrRun() {
+export function compileOrRun() {
     const userSource = monacoEditor.getValue();
     const shaderType = checkShaderType(userSource);
 
@@ -828,12 +840,16 @@ function compileShader(userSource: any, entryPoint: string, compileTarget: strin
     reflectionJson = reflectionJsonObj;
 
     codeGenArea.setValue(compiledCode);
+    let model = codeGenArea.getModel();
+    if(model == null) {
+        throw new Error("Cannot get editor model")
+    }
     if (compileTarget == "WGSL")
-        codeGenArea.getModel().setLanguage("wgsl");
+        model.setLanguage("wgsl");
     else if (compileTarget == "SPIRV")
-        codeGenArea.getModel().setLanguage("spirv");
+        model.setLanguage("spirv");
     else
-        codeGenArea.getModel().setLanguage("generic-shader");
+        model.setLanguage("generic-shader");
 
     // Update reflection info.
     $jsontree.setJson("reflectionDiv", reflectionJson);
@@ -845,7 +861,7 @@ function compileShader(userSource: any, entryPoint: string, compileTarget: strin
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.
 // But if it doesn't define any of them, then user code has to define a entry point function name. Because our built-in shader
 // have no way to call the user defined function, and compile engine cannot compile the source code.
-var onCompile = async () => {
+export var onCompile = async () => {
 
     toggleDisplayMode(HIDDEN_MODE);
     const compileTarget = (document.getElementById("target-select") as HTMLSelectElement).value;
@@ -871,44 +887,47 @@ var onCompile = async () => {
     }
 }
 
-function loadEditor(readOnlyMode = false, containerId: string, preloadCode: string) {
-
-    require(["vs/editor/editor.main"], function () {
-        let container = document.getElementById(containerId);
-        initMonaco();
-        let model = readOnlyMode
-            ? monaco.editor.createModel(preloadCode)
-            : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
-        let editor = monaco.editor.create(container, {
-            model: model,
-            language: readOnlyMode ? 'csharp' : 'slang',
-            theme: 'slang-dark',
-            readOnly: readOnlyMode,
-            lineNumbers: readOnlyMode ? "off" : "on",
-            automaticLayout: true,
-            wordWrap: containerId == "diagnostics" ? "on" : "off",
-            "semanticHighlighting.enabled": true,
-            renderValidationDecorations: "on",
-            minimap: {
-                enabled: false
-            },
-        });
-        if (!readOnlyMode) {
-            model.onDidChangeContent(codeEditorChangeContent);
-            model.setValue(preloadCode);
-        }
-
-        if (containerId == "codeEditor")
-            monacoEditor = editor;
-        else if (containerId == "diagnostics") {
-            let model = editor.getModel();
-            monaco.editor.setModelLanguage(model, "text")
-            diagnosticsArea = editor;
-        }
-        else if (containerId == "codeGen") {
-            codeGenArea = editor;
-        }
+export function loadEditor(readOnlyMode = false, containerId: string, preloadCode: string) {
+    let container = document.getElementById(containerId);
+    if (container == null) {
+        throw new Error("Could not find container for editor")
+    }
+    initMonaco();
+    let model = readOnlyMode
+        ? monaco.editor.createModel(preloadCode)
+        : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
+    let editor = monaco.editor.create(container, {
+        model: model,
+        language: readOnlyMode ? 'csharp' : 'slang',
+        theme: 'slang-dark',
+        readOnly: readOnlyMode,
+        lineNumbers: readOnlyMode ? "off" : "on",
+        automaticLayout: true,
+        wordWrap: containerId == "diagnostics" ? "on" : "off",
+        "semanticHighlighting.enabled": true,
+        renderValidationDecorations: "on",
+        minimap: {
+            enabled: false
+        },
     });
+    if (!readOnlyMode) {
+        model.onDidChangeContent(codeEditorChangeContent);
+        model.setValue(preloadCode);
+    }
+
+    if (containerId == "codeEditor")
+        monacoEditor = editor;
+    else if (containerId == "diagnostics") {
+        let model = editor.getModel();
+        if(model == null) {
+            throw new Error("Cannot get editor model")
+        }
+        monaco.editor.setModelLanguage(model, "text")
+        diagnosticsArea = editor;
+    }
+    else if (containerId == "codeGen") {
+        codeGenArea = editor;
+    }
 }
 
 
@@ -933,7 +952,7 @@ var Module = {
         });
 
         // Step 2: Decompress the gzip data
-        const wasmBinary = loadPako().inflate(compressedData);
+        const wasmBinary = pako.inflate(compressedData);
 
         // Step 3: Instantiate the WebAssembly module from the decompressed data
         const { instance } = await WebAssembly.instantiate(wasmBinary, imports);

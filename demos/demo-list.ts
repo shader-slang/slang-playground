@@ -1,4 +1,4 @@
-var demoList = [
+export let demoList = [
   { name: "Simple Print", url: "simple-print.slang" },
   { name: "Simple Image", url: "simple-image.slang" },
   { name: "Image From URL", url: "image-from-url.slang" },

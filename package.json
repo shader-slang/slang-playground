@@ -1,10 +1,13 @@
 {
   "devDependencies": {
+    "@types/emscripten": "^1.39.13",
+    "@types/pako": "^2.0.3",
     "@webgpu/types": "^0.1.51"
   },
   "dependencies": {
-    "@types/emscripten": "^1.39.13",
     "jjsontree.js": "^4.6.4",
-    "monaco-editor": "^0.52.0"
+    "monaco-editor": "^0.52.0",
+    "pako": "^2.1.0",
+    "split-grid": "^1.0.11"
   }
 }

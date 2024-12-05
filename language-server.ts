@@ -1,7 +1,10 @@
-const userCodeURI = "file:///user.slang";
+import * as monaco from 'monaco-editor';
+import { slangd, monacoEditor, compiler } from './try-slang.js';
+
+export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";
 var languageRegistered = false;
-function initMonaco() {
+export function initMonaco() {
     if (languageRegistered)
         return;
     languageRegistered = true;
@@ -567,7 +570,7 @@ function initMonaco() {
     monaco.languages.registerSignatureHelpProvider("slang", {
         signatureHelpTriggerCharacters: ["(", ","],
         signatureHelpRetriggerCharacters: [","],
-        provideSignatureHelp: function (model, position) {
+        provideSignatureHelp: function (model, position, _a, _b): monaco.languages.ProviderResult<monaco.languages.SignatureHelpResult> {
             if (slangd == null) {
                 return null;
             }
@@ -575,10 +578,10 @@ function initMonaco() {
             if (result == null) {
                 return null;
             }
-            let sigs = [];
+            let sigs: monaco.languages.SignatureInformation[] = [];
             for (var i = 0; i < result.signatures.size(); i++) {
                 let lspSignature = result.signatures.get(i);
-                let params = [];
+                let params: monaco.languages.ParameterInformation[] = [];
                 for (var j = 0; j < lspSignature.parameters.size(); j++) {
                     let lspParameter = lspSignature.parameters.get(j);
                     params.push({
@@ -586,7 +589,7 @@ function initMonaco() {
                         documentation: lspParameter.documentation.value
                     });
                 }
-                let signature = {
+                let signature: monaco.languages.SignatureInformation = {
                     label: lspSignature.label,
                     documentation: lspSignature.documentation.value,
                     parameters: params
@@ -641,7 +644,7 @@ function initMonaco() {
     });
 }
 
-function initLanguageServer() {
+export function initLanguageServer() {
     var text = "";
     if (monacoEditor)
     {
@@ -651,9 +654,9 @@ function initLanguageServer() {
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 
-var diagnosticTimeout = null;
+var diagnosticTimeout: number | null = null;
 
-function translateSeverity(severity) {
+function translateSeverity(severity: number) {
     switch(severity)
     {
         case 1:
@@ -669,7 +672,7 @@ function translateSeverity(severity) {
     }
 }
 
-function codeEditorChangeContent(e) {
+export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
     if (slangd == null)
         return;
     let lspChanges = new compiler.slangWasmModule.TextEditList();
@@ -691,8 +694,12 @@ function codeEditorChangeContent(e) {
         }
         diagnosticTimeout = setTimeout(() => {
             let diagnostics = slangd.getDiagnostics(userCodeURI);
+            let model = monacoEditor.getModel();
+            if(model == null) {
+                throw new Error("Could not get editor model")
+            }
             if (diagnostics == null) {
-                monaco.editor.setModelMarkers(monacoEditor.getModel(), "slang", []);
+                monaco.editor.setModelMarkers(model, "slang", []);
                 return;
             }
             var markers = [];
@@ -708,7 +715,7 @@ function codeEditorChangeContent(e) {
                     code: lspDiagnostic.code
                 });
             }
-            monaco.editor.setModelMarkers(monacoEditor.getModel(), "slang", markers);
+            monaco.editor.setModelMarkers(model, "slang", markers);
             diagnosticTimeout = null;
         }, 500);
 

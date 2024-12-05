@@ -1,7 +1,14 @@
+import { monacoEditor, compiler, compileOrRun, onCompile } from './try-slang.js';
+import { demoList } from './demos/demo-list.js';
+import { isWholeProgramTarget } from './compiler.js';
+import { loadEditor } from './try-slang.js';
+import Split from 'split-grid';
+import pako from 'pako';
+
 // target -> profile mappings
-const targetProfileMap = {
+const targetProfileMap: {[target: string]: {default: string, options: string[]}} = {
   // TODO: uncomment when we support specifying profiles.
-  //"SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
+  // "SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
 
 var entrypointSelect: HTMLInputElement | null = null;
@@ -56,7 +63,7 @@ function updateEntryPointOptions()
 
   const entryPoints = compiler.findDefinedEntryPoints(monacoEditor.getValue());
   var prevValueExists = false;
-  entryPoints.forEach((entryPoint) => {
+  for(let entryPoint of entryPoints) {
     const option = document.createElement("option");
     option.value = entryPoint;
     option.textContent = entryPoint;
@@ -66,7 +73,7 @@ function updateEntryPointOptions()
       option.selected = true;
       prevValueExists = true;
     }
-  });
+  }
   if (prevValue == "" && entryPoints.length > 0)
     entrypointSelect.value = entryPoints[0];
   else if (prevValueExists)
@@ -117,7 +124,7 @@ function finishResizing() {
     resetMouse();
 }
 
-var finishResizingTimeout = null;
+var finishResizingTimeout: number | null = null;
 window.onresize = function () {
   prepareForResize();
   if (finishResizingTimeout)
@@ -148,7 +155,7 @@ function initializeModal() {
   };
 }
 
-function loadDemo(selectedDemoURL: string) {
+export function loadDemo(selectedDemoURL: string) {
   if (selectedDemoURL != "")
   {
     // Is `selectedDemoURL` a relative path?
@@ -181,7 +188,7 @@ function handleDemoDropdown() {
   });
 }
 
-function restoreSelectedTargetFromURL()
+export function restoreSelectedTargetFromURL()
 {
   const urlParams = new URLSearchParams(window.location.search);
   const target = urlParams.get('target');
@@ -193,7 +200,7 @@ function restoreSelectedTargetFromURL()
   }  
 }
 
-function restoreDemoSelectionFromURL()
+export function restoreDemoSelectionFromURL()
 {
   const urlParams = new URLSearchParams(window.location.search);
   var demo = urlParams.get('demo');
@@ -294,20 +301,8 @@ document.addEventListener("DOMContentLoaded", function () {
   initializeModal();
 });
 
-
-let pakoLoaded = false;
-var pako = null;
-// Lazy load function that loads pako on the first call
-function loadPako() {
-  if (pako == null)
-    pako = require("https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js");
-  return pako;
-}
-
 // Function to compress and decompress text, loading pako if necessary
-async function compressToBase64URL(text) {
-  const pako = loadPako(); // Ensure pako is loaded
-
+async function compressToBase64URL(text:string) {
   // Compress the text
   const compressed = pako.deflate(text, { to: 'string' });
   const base64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
@@ -315,8 +310,7 @@ async function compressToBase64URL(text) {
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function decompressFromBase64URL(base64) {
-  const pako = loadPako(); // Ensure pako is loaded
+async function decompressFromBase64URL(base64: string) {
   // Decode the base64 URL
   base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
   const compressed = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -326,7 +320,7 @@ async function decompressFromBase64URL(base64) {
   return decompressed;
 }
 
-function showTooltip(button, text) {
+function showTooltip(button: HTMLElement, text: string) {
   document.getElementById("tooltip").textContent = text;
   // Position the tooltip near the button
   const rect = button.getBoundingClientRect();
@@ -360,7 +354,7 @@ btnShareLink.onclick = async function () {
   }
 };
 
-function openTab(tabId)
+function openTab(tabId: number)
 {
   var buttons = [document.getElementById("btnTargetCode"), document.getElementById("btnReflection")];
   if (tabId == 0)
@@ -399,7 +393,7 @@ document.addEventListener('keydown', function(event) {
 });
 
 var canvasLastMouseDownPos = {x:0, y:0};
-var canvasCurrentMousePos = {x:0, y:0};
+export var canvasCurrentMousePos = {x:0, y:0};
 var canvasIsMouseDown = false;
 var canvasMouseClicked = false;
 canvas.addEventListener("mousedown", function(event) {
@@ -420,7 +414,7 @@ canvas.addEventListener("mousemove", function(event) {
 canvas.addEventListener("mouseup", function(event) {
   canvasIsMouseDown = false;
 });
-function resetMouse()
+export function resetMouse()
 {
   canvasIsMouseDown = false;
   canvasLastMouseDownPos.x = 0;

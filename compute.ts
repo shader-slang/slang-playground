@@ -1,3 +1,4 @@
+import { Bindings } from "./compiler";
 
 class ComputePipeline
 {
@@ -43,8 +44,8 @@ class ComputePipeline
             entries: entries,
         };
 
-        const bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
+        const bindGroupLayout = this.device.createBindGroupLayout(bindGroupLayoutDescriptor);
+        const layout = this.device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
 
         this.pipelineLayout = layout;
     }
@@ -53,7 +54,7 @@ class ComputePipeline
     {
         if(this.pipelineLayout == undefined)
             throw new Error("Cannot create pipeline without layout")
-        const pipeline = device.createComputePipeline({
+        const pipeline = this.device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
             compute: {module: shaderModule},
@@ -112,7 +113,7 @@ class ComputePipeline
             throw new Error("Cannot create bind-group. The following resources are not bound: " + missingEntries.join(", "));
         }
         
-        this.bindGroup = device.createBindGroup({
+        this.bindGroup = this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
             entries: entries,
         });

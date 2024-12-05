@@ -74,8 +74,8 @@ class GraphicsPipeline
             ],
         };
 
-        const bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
+        const bindGroupLayout = this.device.createBindGroupLayout(bindGroupLayoutDescriptor);
+        const layout = this.device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
         this.pipelineLayout = layout;
     }
 
@@ -85,7 +85,7 @@ class GraphicsPipeline
 
         if(this.pipelineLayout == undefined) throw new Error("Pipeline layout not available")
 
-        const pipeline = device.createRenderPipeline({
+        const pipeline = this.device.createRenderPipeline({
             label: 'pass through pipeline',
             layout: this.pipelineLayout,
             vertex:
@@ -100,7 +100,7 @@ class GraphicsPipeline
             });
         this.pipeline = pipeline;
 
-        this.sampler = device.createSampler();
+        this.sampler = this.device.createSampler();
         this.inputTexture = inputTexture;
         this.createBindGroup();
     }
@@ -110,7 +110,7 @@ class GraphicsPipeline
       if(this.pipeline == undefined) throw new Error("Pipeline not created yet")
       if(this.sampler == undefined) throw new Error("Sampler not created yet")
       if(this.inputTexture == undefined) throw new Error("Input texture not created yet")
-        const bindGroup = device.createBindGroup({
+        const bindGroup = this.device.createBindGroup({
           label: 'pass through pipeline bind group',
           layout: this.pipeline.getBindGroupLayout(0),
           entries: [
