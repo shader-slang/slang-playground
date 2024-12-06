@@ -17,11 +17,15 @@ Ensure the following tools are installed and properly configured on your system:
 - **Python 3** (Required for building and running the server)
 - **gzip** (For compressing `.wasm` files)
 
+We need to build `slang-wasm` because we need `slang-wasm.js` and `slang-wasm.wasm` files.
+The reason they're not included in this repo is that they are big binary files, and the result of building top of tree slang, so making this part of the CI build process makes the most sense.
+
 ### Building `slang-wasm`
 
 1. Clone the [Slang repository](https://github.com/shader-slang/slang) and fetch its submodules:
    ```bash
    git clone https://github.com/shader-slang/slang --recursive
+
    cd ./slang
    ```
 
