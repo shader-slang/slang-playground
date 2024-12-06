@@ -255,7 +255,7 @@ function formatSpecifier(value, { flags, width, precision, specifierType }) {
 
 
 // This is the definition of the printf buffer.
-// struct FormatedStruct
+// struct FormattedStruct
 // {
 //     uint32_t type = 0xFFFFFFFF;
 //     uint32_t low = 0;
