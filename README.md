@@ -54,7 +54,22 @@ Ensure the following tools are installed and properly configured on your system:
 
 If any issues arise, ensure the `.wasm` file is properly compressed (`slang-wasm.wasm.gz`) and located in the correct directory.
 
-## Iterating on Development
+This process of: build -> run, should work alone.
+
+## Iterating on Development Using build.mk
+
+Alternatively you can build using the `build.mk` file.
+
+Set up the environment as follows:
+
+```bash
+## The output directory where to output target (non-source) files
+export TRY_SLANG_TARGET_DIRECTORY_PATH="path-to-slang-target-directory"
+## Path to the hello-emscripten source tree
+export TRY_SLANG_SOURCE_DIRECTORY_PATH="path-to-slang-source-directory"
+## Slang source directory
+export TRY_SLANG_SLANG_SOURCE_DIRECTORY_PATH="path-to-slang-directory"
+```
 
 1. Make the necessary changes to your source code.
 2. Build the updated runtime by running:
