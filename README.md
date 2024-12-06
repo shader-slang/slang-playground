@@ -17,6 +17,12 @@ Ensure the following tools are installed and properly configured on your system:
 - **Python 3** (Required for building and running the server)
 - **gzip** (For compressing `.wasm` files)
 
+To install the above tools on linux, run:
+```bash
+sudo apt update
+sudo apt install build-essential cmake ninja-build python3 python3-pip gzip
+```
+
 We need to build `slang-wasm` because we need `slang-wasm.js` and `slang-wasm.wasm` files.
 The reason they're not included in this repo is that they are big binary files, and the result of building top of tree slang, so making this part of the CI build process makes the most sense.
 
