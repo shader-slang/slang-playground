@@ -1,32 +1,64 @@
-# Development instructions
+# Development Instructions
 
 ## Setup
 
-### Development environment shell
+Clone the [Slang Playground](https://github.com/shader-slang/slang-playground):
 
-On Windows, set up the environment as follows:
+```bash
+git clone https://github.com/shader-slang/slang-playground.git
+```
 
-    set TRY_SLANG_SOURCE_DIRECTORY_PATH=%userprofile%\source\try-slang
-    set TRY_SLANG_TARGET_DIRECTORY_PATH=%userprofile%\target\try-slang
+### Prerequisites
 
-In the following, it is also assumed that GNU Make, Python and gzip are in PATH.
-Follow the setup instructions in `docs/building.md` for building `slang-wasm` in the Slang repository.
-(E.g. setup shell for CMake and Emscripten, and setup the `build.em` output directory.)
+Ensure the following tools are installed and properly configured on your system:
+- **CMake** (Version 3.25 or greater is preferred, if you're on a lower version please see [build with older cmake](https://github.com/shader-slang/slang/blob/master/docs/building.md#building-with-an-older-cmake))
+- A **C++ compiler** with C++17 support (GCC, Clang, or MSVC)
+- A **CMake-compatible build backend** (e.g., Ninja or Visual Studio)
+- **Python 3** (Required for building and running the server)
+- **gzip** (For compressing `.wasm` files)
 
-### Server
+### Building `slang-wasm`
 
-The Wasm loader needs a running web server in the build target directory, in order to load .wasm files.
+1. Clone the [Slang repository](https://github.com/shader-slang/slang) and fetch its submodules:
+   ```bash
+   git clone https://github.com/shader-slang/slang --recursive
+   cd ./slang
+   ```
 
-**NOTE: ** You do not need a shell with the full development environment set up, you just need Python and the `TRY_SLANG_TARGET_DIRECTORY_PATH` environment variable.
+2. Follow the instructions in the [WebAssembly build section](https://github.com/shader-slang/slang/blob/master/docs/building.md#webassembly-build) of the Slang documentation to:
+   - Set up the [Emscripten SDK](https://github.com/emscripten-core/emsdk) by installing and activating it.
+   - Build the WebAssembly target (`slang-wasm.js` and `slang-wasm.wasm`) using the documented cross-compilation steps.
 
-To start the server, run something like:
+3. Once the build completes, locate `slang-wasm.js` and `slang-wasm.wasm` in the `build.em/Release/bin` directory
+   
+4. Copy `slang-wasm.js` and `slang-wasm.wasm` to the **root of the playground directory**.
 
-    $ cd $TRY_SLANG_TARGET_DIRECTORY_PATH && python -m http.server 8000
+5. Compress the `slang-wasm.wasm` file using gzip:
+   ```bash
+   gzip -k slang-wasm.wasm
+   ```
 
-## Iterate
+### Starting the Server
 
-To iterate on the website, make changes and build the `website_runtime` target, from a development environment shell:
+1. Navigate to the root of your playground directory (where `slang-wasm.js` and `slang-wasm.wasm.gz` are located).
+   ```bash
+   cd ./slang-playground
+   ```
 
-    $ make -f $TRY_SLANG_SOURCE_DIRECTORY_PATH/build.md website_runtime
+2. Start a Python web server to host the files:
+   ```bash
+   python -m http.server 8000
+   ```
 
-Now load or reload `localhost:8000` in your browser to see the results.
+3. Open `http://localhost:8000` in your browser to verify the server is running and the files are accessible. You should see the application loading the `.wasm` and `.js` files correctly.
+
+If any issues arise, ensure the `.wasm` file is properly compressed (`slang-wasm.wasm.gz`) and located in the correct directory.
+
+## Iterating on Development
+
+1. Make the necessary changes to your source code.
+2. Build the updated runtime by running:
+   ```bash
+   make -f ./build.mk website_runtime
+   ```
+3. Refresh `http://localhost:8000` in your browser to view the changes.
