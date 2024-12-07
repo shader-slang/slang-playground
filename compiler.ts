@@ -1,6 +1,8 @@
 import '@types/emscripten';
 
 import spirvTools, { SpirvTools } from "./spirv-tools.js";
+import { ModuleType } from './try-slang.js';
+import { ComponentType, EmbindString, GlobalSession, Module, Session, ThreadGroupSize } from './slang-wasm.js';
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
@@ -74,10 +76,10 @@ export class SlangCompiler {
     static PRINT_SHADER = 1;
     static NON_RUNNABLE_SHADER = 2;
 
-    globalSlangSession = null;
-    slangSession = null;
+    globalSlangSession: GlobalSession | null = null;
+    // slangSession = null;
 
-    compileTargetMap: { name: string, value: unknown }[] | null = null;
+    compileTargetMap: { name: string, value: number }[] | null = null;
 
     slangWasmModule;
     diagnosticsMsg;
@@ -85,9 +87,9 @@ export class SlangCompiler {
 
     spirvToolsModule: SpirvTools | null = null;
 
-    mainModules: Map<string, { source: string }> = new Map();
+    mainModules: Map<string, { source: EmbindString }> = new Map();
 
-    constructor(module: any) {
+    constructor(module: ModuleType) {
         this.slangWasmModule = module;
         this.diagnosticsMsg = "";
         this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
@@ -194,7 +196,7 @@ export class SlangCompiler {
     // already defined in our pre-built module. So we will add those one of those entry points to the
     // dropdown list. Then, we will find whether user code also defines other entry points, if it has
     // we will also add them to the dropdown list.
-    findDefinedEntryPoints(shaderSource: string) {
+    findDefinedEntryPoints(shaderSource: string): string[] {
         var result: any[] = [];
         if (shaderSource.match("imageMain")) {
             return ["imageMain"];
@@ -204,12 +206,12 @@ export class SlangCompiler {
         }
 
         try {
-            var slangSession = this.globalSlangSession.createSession(
+            var slangSession = this.globalSlangSession?.createSession(
                 this.findCompileTarget("SPIRV"));
             if (!slangSession) {
                 return [];
             }
-            var module = null;
+            var module: Module | null = null;
 
             module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
             if (!module) {
@@ -241,8 +243,12 @@ export class SlangCompiler {
     // Since we will not let user to change the entry point code, we can precompile the entry point module
     // and reuse it for every compilation.
 
-    compileEntryPointModule(slangSession: { loadModuleFromSource: (arg0: any, arg1: any, arg2: string) => any; }, moduleName: string) {
-        var module = slangSession.loadModuleFromSource(this.mainModules.get(moduleName)?.source, moduleName, '/' + moduleName + '.slang');
+    compileEntryPointModule(slangSession: Session, moduleName: string) {
+        let source = this.mainModules.get(moduleName)?.source;
+        if(source == undefined) {
+            throw new Error(`Could not get module ${moduleName}`)
+        }
+        var module = slangSession.loadModuleFromSource(source, moduleName, '/' + moduleName + '.slang');
 
         if (!module) {
             var error = this.slangWasmModule.getLastError();
@@ -260,7 +266,7 @@ export class SlangCompiler {
 
     }
 
-    getPrecompiledProgram(slangSession: any, moduleName: string) {
+    getPrecompiledProgram(slangSession: Session, moduleName: string) {
         if (moduleName != "printMain" && moduleName != "imageMain")
             return null;
 
@@ -270,7 +276,7 @@ export class SlangCompiler {
         return mainModule;
     }
 
-    addActiveEntryPoints(slangSession: any, shaderSource: any, entryPointName: string, isWholeProgram: boolean, userModule: { getDefinedEntryPointCount: () => any; getDefinedEntryPoint: (arg0: number) => { (): any; new(): any; getName: { (): any; new(): any; }; }; }, componentList: any[]) {
+    addActiveEntryPoints(slangSession: Session, shaderSource: any, entryPointName: string, isWholeProgram: boolean, userModule: Module, componentList: any[]) {
         if (entryPointName == "" && !isWholeProgram) {
             this.diagnosticsMsg += ("error: No entry point specified");
             return false;
@@ -389,7 +395,7 @@ export class SlangCompiler {
         return resourceDescriptors;
     }
 
-    loadModule(slangSession: { loadModuleFromSource: (arg0: any, arg1: any, arg2: string) => any; }, moduleName: string, source: string, componentTypeList: any[]) {
+    loadModule(slangSession: Session, moduleName: string, source: string, componentTypeList: any[]) {
         var module = slangSession.loadModuleFromSource(source, moduleName, "/" + moduleName + ".slang");
         if (!module) {
             var error = this.slangWasmModule.getLastError();
@@ -401,7 +407,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [any, Bindings, any, any, any] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, any, ThreadGroupSize | {x: number, y: number, z: number}] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);
@@ -415,6 +421,9 @@ export class SlangCompiler {
         }
 
         try {
+            if(this.globalSlangSession == null) {
+                throw new Error("Slang session not available. Maybe the compiler hasn't been initialized yet?")
+            }
             let slangSession = this.globalSlangSession.createSession(compileTarget);
             if (!slangSession) {
                 let error = this.slangWasmModule.getLastError();
@@ -435,11 +444,11 @@ export class SlangCompiler {
                 return null;
             if (this.addActiveEntryPoints(slangSession, shaderSource, entryPointName, isWholeProgram, components[userModuleIndex], components) == false)
                 return null;
-            let program = slangSession.createCompositeComponentType(components);
-            let linkedProgram = program.link();
+            let program: ComponentType = slangSession.createCompositeComponentType(components);
+            let linkedProgram:ComponentType = program.link();
             let hashedStrings = linkedProgram.loadStrings();
 
-            let outCode = null;
+            let outCode: string;
             if (compileTargetStr == "SPIRV") {
                 const spirvCode = linkedProgram.getTargetCodeBlob(
                     0 /* targetIndex */
@@ -457,7 +466,7 @@ export class SlangCompiler {
             let bindings = this.getResourceBindings(linkedProgram);
 
             // Also read the shader work-group size.
-            const entryPointReflection = linkedProgram.getLayout(0).findEntryPointByName(entryPointName);
+            const entryPointReflection = linkedProgram.getLayout(0)?.findEntryPointByName(entryPointName);
             let threadGroupSize = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
                 { x: 1, y: 1, z: 1 };
 
@@ -468,7 +477,7 @@ export class SlangCompiler {
                 return null;
             }
 
-            let reflectionJson = linkedProgram.getLayout(0).toJsonObject();
+            let reflectionJson = linkedProgram.getLayout(0)?.toJsonObject();
 
             if (slangSession)
                 slangSession.delete();

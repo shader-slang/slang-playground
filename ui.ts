@@ -21,11 +21,15 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
 
   // If the selected target does not have any profiles, hide the profile dropdown.
   const profiles = targetProfileMap[selectedTarget] || null;
+  let profileDropdown = document.getElementById("profile-dropdown");
+  if(!(profileDropdown instanceof HTMLDivElement)) {
+    throw new Error("profileDropdown invalid type")
+  }
   if (!profiles) {
-    document.getElementById("profile-dropdown").style.display = "none";
+    profileDropdown.style.display = "none";
   }
   else{
-    document.getElementById("profile-dropdown").style = "";
+    profileDropdown.style.cssText = "";
 
     // Populate the profile dropdown with new options
     profiles.options.forEach((profile) => {
@@ -42,7 +46,7 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
     document.getElementById("entrypoint-dropdown").style.display = "none";
     document.getElementById("entrypoint-select").value = "";
   } else {
-    document.getElementById("entrypoint-dropdown").style = "";
+    document.getElementById("entrypoint-dropdown").style.cssText = "";
     updateEntryPointOptions();
   }
 }
@@ -359,7 +363,7 @@ function openTab(tabId: number)
   var buttons = [document.getElementById("btnTargetCode"), document.getElementById("btnReflection")];
   if (tabId == 0)
   {
-    document.getElementById("codeGen").style = "";
+    document.getElementById("codeGen").style.cssText = "";
     document.getElementById("reflectionTab").style.display = "none";
     
   }
@@ -392,10 +396,10 @@ document.addEventListener('keydown', function(event) {
   }
 });
 
-var canvasLastMouseDownPos = {x:0, y:0};
+export var canvasLastMouseDownPos = {x:0, y:0};
 export var canvasCurrentMousePos = {x:0, y:0};
-var canvasIsMouseDown = false;
-var canvasMouseClicked = false;
+export var canvasIsMouseDown = false;
+export var canvasMouseClicked = false;
 canvas.addEventListener("mousedown", function(event) {
   canvasLastMouseDownPos.x = event.offsetX;
   canvasLastMouseDownPos.y = event.offsetY;

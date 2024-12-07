@@ -1,9 +1,11 @@
 import * as monaco from 'monaco-editor';
+import { ComputePipeline } from './compute.js';
 import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
-import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, resetMouse } from './ui.js';
+import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse } from './ui.js';
 import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer } from './util.js';
 import pako from 'pako';
+import { MainModule, ThreadGroupSize } from "./slang-wasm.js";
 
 declare global {
     var hashedStrings: string;
@@ -326,8 +328,8 @@ async function execFrame(timeMS: number) {
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup || null);
-    if(computePipeline.pipeline == undefined) 
-        throw new Error("No pipeline");
+    if (computePipeline.pipeline == undefined)
+        throw new Error("Compute pipeline is not defined.");
     pass.setPipeline(computePipeline.pipeline);
     const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
     const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
@@ -339,6 +341,9 @@ async function execFrame(timeMS: number) {
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
         renderPass.setBindGroup(0, passThroughPipeline.bindGroup || null);
+        if(passThroughPipeline.pipeline == undefined) {
+            throw new Error("Pass through pipeline is undefined!")
+        }
         renderPass.setPipeline(passThroughPipeline.pipeline);
         renderPass.draw(6);  // call our vertex shader 6 times.
         renderPass.end();
@@ -366,7 +371,11 @@ async function execFrame(timeMS: number) {
     frameCount++;
     if (frameCount == 20) {
         var avgTime = (timeAggregate / frameCount);
-        document.getElementById("performanceInfo").innerText = avgTime.toFixed(1) + " ms ";
+        let performanceInfo = document.getElementById("performanceInfo");
+        if(!(performanceInfo instanceof HTMLDivElement)) {
+            throw new Error("performanceInfo has an invalid type")
+        }
+        performanceInfo.innerText = avgTime.toFixed(1) + " ms ";
         timeAggregate = 0;
         frameCount = 0;
     }
@@ -386,8 +395,8 @@ async function printResult() {
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
     pass.setBindGroup(0, computePipeline.bindGroup || null);
-    if(computePipeline.pipeline == undefined) {
-        throw new Error("Pipeline is undefined")
+    if (computePipeline.pipeline == undefined) {
+        throw new Error("Compute pipeline is undefined")
     }
     pass.setPipeline(computePipeline.pipeline);
     pass.dispatchWorkgroups(1, 1);
@@ -418,7 +427,11 @@ async function printResult() {
         textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
     allocatedResources.get("printfBufferRead").unmap();
-    document.getElementById("printResult").value = textResult;
+    let printResult = document.getElementById("printResult")
+    if(!(printResult instanceof HTMLTextAreaElement)) {
+        throw new Error("printResult invalid type")
+    }
+    printResult.value = textResult;
 }
 
 function checkShaderType(userSource: string) {
@@ -448,7 +461,7 @@ export type ParsedCommand = {
 function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: string, value: T) {
     if (map.has(key)) {
         let currentEntry = map.get(key);
-        if(currentEntry == undefined) throw new Error("Invalid state")
+        if (currentEntry == undefined) throw new Error("Invalid state")
         currentEntry.destroy()
     }
     map.set(key, value);
@@ -570,6 +583,9 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
+                if(compiler == null) {
+                    throw new Error("Compiler is not defined!")
+                }
                 const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL");
                 if (!compiledResult) {
                     throw new Error("[Internal] Failed to compile randFloat shader");
@@ -613,6 +629,10 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
                 pass.setBindGroup(0, randomPipeline.bindGroup || null);
+                
+                if (randomPipeline.pipeline == undefined) {
+                    throw new Error("Random pipeline is undefined")
+                }
                 pass.setPipeline(randomPipeline.pipeline);
 
                 const workGroupSizeX = Math.floor((size + 63) / 64);
@@ -744,7 +764,11 @@ var onRun = () => {
                 passThroughPipeline.createPipeline(shaderModule, inputTexture);
             }
 
-            passThroughPipeline.inputTexture = allocatedResources.get("outputTexture");
+            let outputTexture = allocatedResources.get("outputTexture");
+            if(!(outputTexture instanceof GPUTexture)) {
+                throw new Error("")
+            }
+            passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
 
             const module = device.createShaderModule({ code: ret.code });
@@ -754,10 +778,16 @@ var onRun = () => {
             for (const pipeline of globalThis.extraComputePipelines)
                 pipeline.createBindGroup(allocatedResources);
 
+            if(compiler == null) {
+                throw new Error("Could not get compiler")
+            }
             toggleDisplayMode(compiler.shaderType);
         },
         // renderFn
         async (timeMS: any) => {
+            if(compiler == null) {
+                throw new Error("Could not get compiler")
+            }
             if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
                 await printResult();
                 return false; // Stop after one frame.
@@ -821,7 +851,7 @@ type Shader = {
     layout: Bindings,
     hashedStrings: string,
     reflection: string,
-    threadGroupSize: number
+    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number }
 } | {
     succ: false
 };
@@ -841,7 +871,7 @@ function compileShader(userSource: any, entryPoint: string, compileTarget: strin
 
     codeGenArea.setValue(compiledCode);
     let model = codeGenArea.getModel();
-    if(model == null) {
+    if (model == null) {
         throw new Error("Cannot get editor model")
     }
     if (compileTarget == "WGSL")
@@ -919,7 +949,7 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
         monacoEditor = editor;
     else if (containerId == "diagnostics") {
         let model = editor.getModel();
-        if(model == null) {
+        if (model == null) {
             throw new Error("Cannot get editor model")
         }
         monaco.editor.setModelLanguage(model, "text")
@@ -933,16 +963,20 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
 
 // Event when loading the WebAssembly module
 var moduleLoadingMessage = "";
+type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
+export type ModuleType = MainModule & Omit<EmscriptenModule, "instantiateWasm"> & {
+    instantiateWasm: ReplaceReturnType<EmscriptenModule["instantiateWasm"], Promise<WebAssembly.Exports>>
+}
 
 // Define the Module object with a callback for initialization
-var Module = {
+var Module: ModuleType = {
     locateFile: function (path: string) {
         if (path.endsWith('.wasm')) {
             return 'slang-wasm.wasm.gz'; // Use the gzip compressed file
         }
         return path;
     },
-    instantiateWasm: async function (imports: WebAssembly.Imports | undefined, receiveInstance: (arg0: WebAssembly.Instance) => void) {
+    instantiateWasm: async function (imports: WebAssembly.Imports, receiveInstance: (arg0: WebAssembly.Instance) => void): Promise<WebAssembly.Exports> {
         // Step 1: Fetch the compressed .wasm.gz file
         var progressBar = document.getElementById('progress-bar');
         const compressedData = await fetchWithProgress('slang-wasm.wasm.gz', (loaded, total) => {
@@ -976,7 +1010,7 @@ var Module = {
             moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
         }
     }
-};
+} satisfies Partial<ModuleType> as any;
 
 var pageLoaded = false;
 // event when loading the page

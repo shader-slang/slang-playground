@@ -1,6 +1,7 @@
 import { Bindings } from "./compiler";
+import { ThreadGroupSize } from "./slang-wasm";
 
-class ComputePipeline
+export class ComputePipeline
 {
     pipeline: GPUComputePipeline | undefined;
     pipelineLayout: GPUPipelineLayout | "auto" | undefined;
@@ -15,7 +16,7 @@ class ComputePipeline
     bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
-    threadGroupSize: any;
+    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number} | undefined;
 
     // resource name (string) -> binding descriptor 
     resourceBindings: Bindings | undefined;
@@ -25,7 +26,7 @@ class ComputePipeline
         this.device = device;
     }
 
-    setThreadGroupSize(size: number)
+    setThreadGroupSize(size: ThreadGroupSize | { x: number, y: number, z: number})
     {
         this.threadGroupSize = size;
     }

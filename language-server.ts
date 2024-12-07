@@ -650,6 +650,9 @@ export function initLanguageServer() {
     {
         text = monacoEditor.getValue();
     }
+    if(slangd == null) {
+        throw new Error("Slang is undefined!")
+    }
     slangd.didOpenTextDocument(userCodeURI, text);
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
@@ -675,6 +678,9 @@ function translateSeverity(severity: number) {
 export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
     if (slangd == null)
         return;
+    if(compiler == null) {
+        throw new Error("Compiler is undefined!")
+    }
     let lspChanges = new compiler.slangWasmModule.TextEditList();
 
     e.changes.forEach(change =>
@@ -693,6 +699,9 @@ export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEve
             clearTimeout(diagnosticTimeout);
         }
         diagnosticTimeout = setTimeout(() => {
+            if(slangd == null) {
+                throw new Error("Slang is undefined!")
+            }
             let diagnostics = slangd.getDiagnostics(userCodeURI);
             let model = monacoEditor.getModel();
             if(model == null) {

@@ -57,6 +57,7 @@ jobs:
           path: |
             ./slang-wasm.wasm.gz
             ./slang-wasm.js
+            ./slang-wasm.d.ts
           key: ${{hashFiles('key.txt')}}
 
       - name: restore spirv-tools
@@ -83,6 +84,7 @@ jobs:
           path: |
             ./slang-wasm.wasm.gz
             ./slang-wasm.js
+            ./slang-wasm.d.ts
           key: ${{hashFiles('key.txt')}}
 
       - name: spirv-tools-wasm build
@@ -117,7 +119,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: ./_site/
-          compression-level: 0
+          compression-level: 1
       # - name: Upload artifact
       #   uses: actions/upload-pages-artifact@v3
 
