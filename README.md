@@ -32,7 +32,7 @@ The reason they're not included in this repo is that they are big binary files, 
    ```bash
    git clone https://github.com/shader-slang/slang --recursive
 
-   cd ./slang
+   cd slang
    ```
 
 2. Follow the instructions in the [WebAssembly build section](https://github.com/shader-slang/slang/blob/master/docs/building.md#webassembly-build) of the Slang documentation to:
@@ -48,11 +48,25 @@ The reason they're not included in this repo is that they are big binary files, 
    gzip -k slang-wasm.wasm
    ```
 
+### Building `spirv-tool`
+
+To enable SPIR-V disassembly in the playground (alongside the SPIR-V binary compilation supported by `slang-wasm.js`), you need to build the WebAssembly version of `spirv-tool`. This is necessary because `slang-wasm.js` does not include the SPIR-V disassembler.
+
+1. Refer to the build process outlined in the CI configuration:
+   - [GitHub Workflow](https://github.com/shader-slang/slang-playground/blob/main/.github/workflows/jekyll-gh-pages.yml#L43)
+   - [Build Script](https://github.com/shader-slang/slang-playground/blob/main/spirv-tool-wasm-build.sh)
+
+2. Use the provided [`spirv-tool-wasm-build.sh`](https://github.com/shader-slang/slang-playground/blob/main/spirv-tool-wasm-build.sh) script to compile the WebAssembly build of `spirv-tool`.
+
+3. Once built, place the resulting files in the **root of the playground directory** alongside `slang-wasm.js` and `slang-wasm.wasm`.
+
+By completing this step, the playground will support SPIR-V disassembly features.
+
 ### Starting the Server
 
 1. Navigate to the root of your playground directory (where `slang-wasm.js` and `slang-wasm.wasm.gz` are located).
    ```bash
-   cd ./slang-playground
+   cd slang-playground
    ```
 
 2. Start a Python web server to host the files:
