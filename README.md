@@ -58,7 +58,7 @@ To enable SPIR-V disassembly in the playground (alongside the SPIR-V binary comp
 
 2. Use the provided [`spirv-tool-wasm-build.sh`](https://github.com/shader-slang/slang-playground/blob/main/spirv-tool-wasm-build.sh) script to compile the WebAssembly build of `spirv-tool`.
 
-3. Once built, place the resulting files in the **root of the playground directory** alongside `slang-wasm.js` and `slang-wasm.wasm`.
+3. Once built, place the resulting files (`spirv-tools.wasm` and `spirv-tools.js`) in the **root of the playground directory** alongside `slang-wasm.js` and `slang-wasm.wasm`.
 
 By completing this step, the playground will support SPIR-V disassembly features.
 
