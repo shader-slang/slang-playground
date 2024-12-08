@@ -3,7 +3,7 @@ import { ComputePipeline } from './compute.js';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
 import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
-import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse } from './ui.js';
+import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse, renderOutput, canvas, entryPointSelect, targetSelect } from './ui.js';
 import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand } from './util.js';
 import type { LanguageServer, MainModule, ThreadGroupSize } from "./slang-wasm.js";
 
@@ -927,9 +927,9 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: st
 export async function onCompile() {
 
     toggleDisplayMode(HIDDEN_MODE);
-    const compileTarget = (document.getElementById("target-select") as HTMLSelectElement).value;
+    const compileTarget = targetSelect.value;
 
-    const entryPoint = (document.getElementById("entrypoint-select") as HTMLSelectElement).value;
+    const entryPoint = entryPointSelect.value;
     if (entryPoint == "" && !isWholeProgramTarget(compileTarget)) {
         diagnosticsArea.setValue("Please select the entry point name");
         return;

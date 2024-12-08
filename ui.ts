@@ -13,7 +13,51 @@ const targetProfileMap: {[target: string]: {default: string, options: string[]}}
   // "SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
 
-var entrypointSelect: HTMLSelectElement | null = null;
+function assertGetElementById(elementId: string): HTMLElement {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  return result;
+}
+
+type Constructor<T> = new (...args: any[]) => T;
+function assertGetElementByIdOfType<T extends HTMLElement>(elementId: string, elementType: Constructor<T>): T {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  if(!(result instanceof elementType)) throw new Error(`Element of id ${elementId} is not a ${elementType}`)
+  return result;
+}
+
+function assertQuerySelectorOfType<T extends HTMLElement>(selectors: string, elementType: Constructor<T>): T {
+  let result = document.querySelector(selectors)
+  if(result == null) throw new Error(`Failed to get element of selector ${selectors}`)
+    if(!(result instanceof elementType)) throw new Error(`Element of selector ${selectors} is not a ${elementType}`)
+  return result;
+}
+
+const entrypointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
+export const targetResultContainer = assertGetElementById("targetResultContainer")
+export const renderOverlay = assertGetElementById("renderOverlay")
+export const renderOutput = assertGetElementById("renderOutput")
+export const tooltip = assertGetElementById("tooltip")
+export const canvas = assertGetElementByIdOfType("canvas", HTMLCanvasElement)
+const profileDropdown = assertGetElementByIdOfType("profile-dropdown", HTMLDivElement);
+const entryPointDropdown = assertGetElementById("entrypoint-dropdown");
+export const entryPointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
+const leftContainer = assertGetElementById("leftContainerDiv");
+const workspaceDiv = assertGetElementById("workSpaceDiv")
+export const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
+const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
+const demoSelect = assertGetElementByIdOfType("demo-select", HTMLSelectElement)
+const btnTargetCode = assertGetElementById("btnTargetCode");
+const btnReflection = assertGetElementById("btnReflection");
+const compile_btn = assertGetElementById("compile-btn");
+const run_btn = assertGetElementById("run-btn");
+const reflectionTab = assertGetElementById("reflectionTab")
+
+btnTargetCode.addEventListener("click", () => openTab(0))
+btnReflection.addEventListener("click", () => openTab(1))
+compile_btn.addEventListener("click", () => onCompile())
+run_btn.addEventListener("click", () => onRun())
 
 // Function to update the profile dropdown based on the selected target
 function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HTMLSelectElement) {
@@ -23,10 +67,6 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
 
   // If the selected target does not have any profiles, hide the profile dropdown.
   const profiles = targetProfileMap[selectedTarget] || null;
-  let profileDropdown = document.getElementById("profile-dropdown");
-  if(!(profileDropdown instanceof HTMLDivElement)) {
-    throw new Error("profileDropdown invalid type")
-  }
   if (!profiles) {
     profileDropdown.style.display = "none";
   }
@@ -45,10 +85,10 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
 
   // If the target can be compiled as a whole program without entrypoint selection, hide the entrypoint dropdown.
   if (isWholeProgramTarget(targetSelect.value)) {
-    assertGetElementById("entrypoint-dropdown").style.display = "none";
-    assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement).value = "";
+    entryPointDropdown.style.display = "none";
+    entryPointSelect.value = "";
   } else {
-    assertGetElementById("entrypoint-dropdown").style.cssText = "";
+    entryPointDropdown.style.cssText = "";
     updateEntryPointOptions();
   }
 }
@@ -103,15 +143,14 @@ function prepareForResize() {
       continue;
     codeEditor.style.overflow = "hidden";
   }
-  assertGetElementById("workSpaceDiv").style.overflow = "hidden";
-  assertGetElementById("leftContainerDiv").style.overflowX = "hidden";
+  workspaceDiv.style.overflow = "hidden";
+  leftContainer.style.overflowX = "hidden";
   targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
 function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
-    assertGetElementById("workSpaceDiv").style.overflow = "visible";
-    var leftContainer = assertGetElementById("leftContainerDiv");
+    workspaceDiv.style.overflow = "visible";
     if (leftContainer.clientWidth < 30)
       leftContainer.style.overflowX = "hidden";
     else
@@ -127,9 +166,9 @@ function finishResizing() {
         parentNode.style.overflow = "hidden";
       codeEditor.style.overflow = "visible";
     }
-    assertGetElementById("reflectionTab").style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
+    reflectionTab.style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
     
-    var canvasRect = assertGetElementById("canvas").getBoundingClientRect();
+    var canvasRect = canvas.getBoundingClientRect();
     
     renderOverlay.style.top = 5 + "px";
     renderOverlay.style.left = (canvasRect.left + 5) + "px";
@@ -197,9 +236,7 @@ export function loadDemo(selectedDemoURL: string) {
 }
 
 function handleDemoDropdown() {
-  const selectInput = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
-
-  selectInput.addEventListener("change", function () {
+  demoSelect.addEventListener("change", function () {
     loadDemo(this.value);
   });
 }
@@ -209,8 +246,6 @@ export function restoreSelectedTargetFromURL()
   const urlParams = new URLSearchParams(window.location.search);
   const target = urlParams.get('target');
   if (target) {
-    const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
-    const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
     targetSelect.value = target;
     updateProfileOptions(targetSelect, profileSelect);
   }  
@@ -223,7 +258,6 @@ export function restoreDemoSelectionFromURL()
   if (demo) {
     if (!demo.endsWith(".slang"))
       demo += ".slang";
-    const demoSelect = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
     demoSelect.value = demo;
     loadDemo(demo);
     return true;
@@ -234,13 +268,12 @@ export function restoreDemoSelectionFromURL()
 function loadDemoList()
 {
   // Fill in demo-select dropdown using demoList.
-  let demoDropdown = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
   let firstOption = document.createElement("option");
   firstOption.value = "";
   firstOption.textContent = "Load Demo";
   firstOption.disabled = true;
   firstOption.selected = true;
-  demoDropdown.appendChild(firstOption);
+  demoSelect.appendChild(firstOption);
 
   // Create an option for each demo in the list.
   demoList.forEach((demo) => {
@@ -252,7 +285,7 @@ function loadDemoList()
       option.disabled = true;
       option.textContent = "──────────";
     }
-    demoDropdown.appendChild(option);
+    demoSelect.appendChild(option);
   });
 }
 
@@ -301,9 +334,6 @@ document.addEventListener("DOMContentLoaded", function () {
   handleDemoDropdown();
 
   // Target -> Profile handling
-  const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
-  const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
-  entrypointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
   entrypointSelect.addEventListener('focus', updateEntryPointOptions); // for keyboard access
   entrypointSelect.addEventListener('mousedown', updateEntryPointOptions); // for mouse access
 
@@ -320,7 +350,7 @@ document.addEventListener("DOMContentLoaded", function () {
 // Function to compress and decompress text, loading pako if necessary
 async function compressToBase64URL(text:string) {
   // Compress the text
-  const compressed = pako.deflate(text, { to: 'string' });
+  const compressed = pako.deflate(text, {});
   const base64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
 
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -337,7 +367,7 @@ async function decompressFromBase64URL(base64: string) {
 }
 
 function showTooltip(button: HTMLElement, text: string) {
-  assertGetElementById("tooltip").textContent = text;
+  tooltip.textContent = text;
   // Position the tooltip near the button
   const rect = button.getBoundingClientRect();
   tooltip.style.top = `${rect.bottom + window.scrollY + 15}px`;
@@ -359,7 +389,7 @@ btnShareLink.onclick = async function () {
     const code = monacoEditor.getValue();
     const compressed = await compressToBase64URL(code);
     let url = new URL(window.location.href.split('?')[0]);
-    const compileTarget = assertGetElementByIdOfType("target-select", HTMLSelectElement).value;
+    const compileTarget = targetSelect.value;
     url.searchParams.set("target", compileTarget)
     url.searchParams.set("code", compressed);
     navigator.clipboard.writeText(url.href);
@@ -374,7 +404,6 @@ function openTab(tabId: number)
 {
   let buttons = [btnTargetCode, btnReflection];
   let codeGen = assertGetElementById("codeGen")
-  let reflectionTab = assertGetElementById("reflectionTab")
   if (tabId == 0)
   {
     codeGen.style.cssText = "";
@@ -414,39 +443,6 @@ export var canvasLastMouseDownPos = {x:0, y:0};
 export var canvasCurrentMousePos = {x:0, y:0};
 export var canvasIsMouseDown = false;
 export var canvasMouseClicked = false;
-
-function assertGetElementById(elementId: string): HTMLElement {
-  let result = document.getElementById(elementId)
-  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
-  return result;
-}
-
-type Constructor<T> = new (...args: any[]) => T;
-function assertGetElementByIdOfType<T extends HTMLElement>(elementId: string, elementType: Constructor<T>): T {
-  let result = document.getElementById(elementId)
-  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
-  if(!(result instanceof elementType)) throw new Error(`Element of id ${elementId} is not a ${elementType}`)
-  return result;
-}
-
-function assertQuerySelectorOfType<T extends HTMLElement>(selectors: string, elementType: Constructor<T>): T {
-  let result = document.querySelector(selectors)
-  if(result == null) throw new Error(`Failed to get element of selector ${selectors}`)
-    if(!(result instanceof elementType)) throw new Error(`Element of selector ${selectors} is not a ${elementType}`)
-  return result;
-}
-
-let btnTargetCode = assertGetElementById("btnTargetCode");
-btnTargetCode.addEventListener("click", () => openTab(0))
-
-let btnReflection = assertGetElementById("btnReflection");
-btnReflection.addEventListener("click", () => openTab(1))
-
-let compile_btn = assertGetElementById("compile-btn");
-compile_btn.addEventListener("click", () => onCompile())
-
-let run_btn = assertGetElementById("run-btn");
-run_btn.addEventListener("click", () => onRun())
 
 canvas.addEventListener("mousedown", function(event) {
   canvasLastMouseDownPos.x = event.offsetX;
