@@ -908,11 +908,11 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: st
         throw new Error("Cannot get editor model")
     }
     if (compileTarget == "WGSL")
-        model.setLanguage("wgsl");
+        monaco.editor.setModelLanguage(model, "wgsl");
     else if (compileTarget == "SPIRV")
-        model.setLanguage("spirv");
+        monaco.editor.setModelLanguage(model, "spirv");
     else
-        model.setLanguage("generic-shader");
+        monaco.editor.setModelLanguage(model, "generic-shader");
 
     // Update reflection info.
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
