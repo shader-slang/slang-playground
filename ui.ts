@@ -13,7 +13,7 @@ const targetProfileMap: {[target: string]: {default: string, options: string[]}}
   // "SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
 
-var entrypointSelect: HTMLInputElement | null = null;
+var entrypointSelect: HTMLSelectElement | null = null;
 
 // Function to update the profile dropdown based on the selected target
 function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HTMLSelectElement) {
@@ -45,10 +45,10 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
 
   // If the target can be compiled as a whole program without entrypoint selection, hide the entrypoint dropdown.
   if (isWholeProgramTarget(targetSelect.value)) {
-    document.getElementById("entrypoint-dropdown").style.display = "none";
-    document.getElementById("entrypoint-select").value = "";
+    assertGetElementById("entrypoint-dropdown").style.display = "none";
+    assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement).value = "";
   } else {
-    document.getElementById("entrypoint-dropdown").style.cssText = "";
+    assertGetElementById("entrypoint-dropdown").style.cssText = "";
     updateEntryPointOptions();
   }
 }
@@ -100,19 +100,19 @@ function prepareForResize() {
       continue;
     codeEditors[i].style.overflow = "hidden";
   }
-  document.getElementById("workSpaceDiv").style.overflow = "hidden";
-  document.getElementById("leftContainerDiv").style["overflow-x"] = "hidden";
+  assertGetElementById("workSpaceDiv").style.overflow = "hidden";
+  assertGetElementById("leftContainerDiv").style["overflow-x"] = "hidden";
   targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
 function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
-    document.getElementById("workSpaceDiv").style.overflow = "visible";
-    var leftContainer = document.getElementById("leftContainerDiv");
+    assertGetElementById("workSpaceDiv").style.overflow = "visible";
+    var leftContainer = assertGetElementById("leftContainerDiv");
     if (leftContainer.clientWidth < 30)
-      leftContainer.style["overflow-x"] = "hidden";
+      leftContainer.style.overflowX = "hidden";
     else
-      leftContainer.style["overflow-x"] = "visible";
+      leftContainer.style.overflowX = "visible";
     for (var i = 0; i < codeEditors.length; i++) {
       if (codeEditors[i].style.display == "none")
         continue;
@@ -120,9 +120,9 @@ function finishResizing() {
         codeEditors[i].parentNode.style.overflow = "hidden";
       codeEditors[i].style.overflow = "visible";
     }
-    document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
+    assertGetElementById("reflectionTab").style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
     
-    var canvasRect = document.getElementById("canvas").getBoundingClientRect();
+    var canvasRect = assertGetElementById("canvas").getBoundingClientRect();
     
     renderOverlay.style.top = 5 + "px";
     renderOverlay.style.left = (canvasRect.left + 5) + "px";
@@ -142,8 +142,8 @@ window.onresize = function () {
 };
 
 function initializeModal() {
-  const modal = document.getElementById("helpModal");
-  const btn = document.getElementById("helpButton");
+  const modal = assertGetElementById("helpModal");
+  const btn = assertGetElementById("helpButton");
   const closeBtn = document.querySelector(".close");
 
   btn.onclick = () => {
@@ -187,7 +187,7 @@ export function loadDemo(selectedDemoURL: string) {
 }
 
 function handleDemoDropdown() {
-  const selectInput = document.getElementById("demo-select");
+  const selectInput = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
 
   selectInput.addEventListener("change", function () {
     loadDemo(this.value);
@@ -199,8 +199,8 @@ export function restoreSelectedTargetFromURL()
   const urlParams = new URLSearchParams(window.location.search);
   const target = urlParams.get('target');
   if (target) {
-    const targetSelect = document.getElementById("target-select");
-    const profileSelect = document.getElementById("profile-select");
+    const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
+    const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
     targetSelect.value = target;
     updateProfileOptions(targetSelect, profileSelect);
   }  
@@ -213,7 +213,7 @@ export function restoreDemoSelectionFromURL()
   if (demo) {
     if (!demo.endsWith(".slang"))
       demo += ".slang";
-    const demoSelect = document.getElementById("demo-select");
+    const demoSelect = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
     demoSelect.value = demo;
     loadDemo(demo);
     return true;
@@ -224,7 +224,7 @@ export function restoreDemoSelectionFromURL()
 function loadDemoList()
 {
   // Fill in demo-select dropdown using demoList.
-  let demoDropdown = document.getElementById("demo-select");
+  let demoDropdown = assertGetElementByIdOfType("demo-select", HTMLSelectElement);
   let firstOption = document.createElement("option");
   firstOption.value = "";
   firstOption.textContent = "Load Demo";
@@ -291,9 +291,9 @@ document.addEventListener("DOMContentLoaded", function () {
   handleDemoDropdown();
 
   // Target -> Profile handling
-  const targetSelect = document.getElementById("target-select");
-  const profileSelect = document.getElementById("profile-select");
-  entrypointSelect = document.getElementById("entrypoint-select");
+  const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
+  const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
+  entrypointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
   entrypointSelect.addEventListener('focus', updateEntryPointOptions); // for keyboard access
   entrypointSelect.addEventListener('mousedown', updateEntryPointOptions); // for mouse access
 
@@ -327,7 +327,7 @@ async function decompressFromBase64URL(base64: string) {
 }
 
 function showTooltip(button: HTMLElement, text: string) {
-  document.getElementById("tooltip").textContent = text;
+  assertGetElementById("tooltip").textContent = text;
   // Position the tooltip near the button
   const rect = button.getBoundingClientRect();
   tooltip.style.top = `${rect.bottom + window.scrollY + 15}px`;
@@ -342,14 +342,14 @@ function showTooltip(button: HTMLElement, text: string) {
   }, 3000);
 }
 
-var btnShareLink = document.getElementById("shareButton");
+var btnShareLink = assertGetElementById("shareButton");
 btnShareLink.onclick = async function () {
   if (!monacoEditor) return;
   try{
     const code = monacoEditor.getValue();
     const compressed = await compressToBase64URL(code);
     let url = new URL(window.location.href.split('?')[0]);
-    const compileTarget = document.getElementById("target-select").value;
+    const compileTarget = assertGetElementByIdOfType("target-select", HTMLSelectElement).value;
     url.searchParams.set("target", compileTarget)
     url.searchParams.set("code", compressed);
     navigator.clipboard.writeText(url.href);
@@ -362,17 +362,19 @@ btnShareLink.onclick = async function () {
 
 function openTab(tabId: number)
 {
-  var buttons = [document.getElementById("btnTargetCode"), document.getElementById("btnReflection")];
+  let buttons = [btnTargetCode, btnReflection];
+  let codeGen = assertGetElementById("codeGen")
+  let reflectionTab = assertGetElementById("reflectionTab")
   if (tabId == 0)
   {
-    document.getElementById("codeGen").style.cssText = "";
-    document.getElementById("reflectionTab").style.display = "none";
+    codeGen.style.cssText = "";
+    reflectionTab.style.display = "none";
     
   }
   else
   {
-    document.getElementById("codeGen").style.display = "none";
-    document.getElementById("reflectionTab").style.display = "block";
+    codeGen.style.display = "none";
+    reflectionTab.style.display = "block";
     finishResizing();
   }
   for (var i = 0; i < buttons.length; i++)
@@ -403,20 +405,30 @@ export var canvasCurrentMousePos = {x:0, y:0};
 export var canvasIsMouseDown = false;
 export var canvasMouseClicked = false;
 
-let btnTargetCode = document.getElementById("btnTargetCode");
-if(btnTargetCode == null) throw new Error("Cannot get btnTargetCode")
+function assertGetElementById(elementId: string): HTMLElement {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  return result;
+}
+
+type Constructor<T> = new (...args: any[]) => T;
+function assertGetElementByIdOfType<T extends HTMLElement>(elementId: string, elementType: Constructor<T>): T {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  if(!(result instanceof elementType)) throw new Error(`Element of id ${elementId} is not a ${elementType}`)
+  return result;
+}
+
+let btnTargetCode = assertGetElementById("btnTargetCode");
 btnTargetCode.addEventListener("click", () => openTab(0))
 
-let btnReflection = document.getElementById("btnReflection");
-if(btnReflection == null) throw new Error("Cannot get btnReflection")
+let btnReflection = assertGetElementById("btnReflection");
 btnReflection.addEventListener("click", () => openTab(1))
 
-let compile_btn = document.getElementById("compile-btn");
-if(compile_btn == null) throw new Error("Cannot get compile-btn")
+let compile_btn = assertGetElementById("compile-btn");
 compile_btn.addEventListener("click", () => onCompile())
 
-let run_btn = document.getElementById("run-btn");
-if(run_btn == null) throw new Error("Cannot get run-btn")
+let run_btn = assertGetElementById("run-btn");
 run_btn.addEventListener("click", () => onRun())
 
 canvas.addEventListener("mousedown", function(event) {

@@ -1,4 +1,4 @@
-// import './node_modules/monaco-editor/monaco';
+/// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { slangd, monacoEditor, compiler } from './try-slang.js';
 import { playgroundSource } from './playgroundShader.js';
 

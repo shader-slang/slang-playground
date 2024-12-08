@@ -1,4 +1,4 @@
-// import './node_modules/monaco-editor/monaco';
+/// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { ComputePipeline } from './compute.js';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
 import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
@@ -6,8 +6,17 @@ import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } 
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse } from './ui.js';
 import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer } from './util.js';
 import type { MainModule, ThreadGroupSize } from "./slang-wasm.js";
-import type PakoType from 'pako';
-declare let pako: typeof PakoType;
+
+// ignore complaint about missing types - added via tsconfig
+// @ts-ignore
+import * as pako from './node_modules/pako/dist/pako.esm.mjs';
+globalThis.pako = pako;
+
+import type { PublicApi as JJsonPublicApi } from "./node_modules/jjsontree.js/src/ts/api.js"
+declare global {
+    let $jsontree: JJsonPublicApi
+}
+
 declare let RequireJS: {
     require: typeof require
 };
@@ -42,8 +51,6 @@ var sourceCodeChange = true;
 
 var currentWindowSize = [300, 150];
 
-var $jsontree: any = globalThis.$jsontree; //TODO fix types
-
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
 const PRINT_MODE = SlangCompiler.PRINT_SHADER;
 const HIDDEN_MODE = SlangCompiler.NON_RUNNABLE_SHADER;
@@ -51,8 +58,8 @@ const defaultShaderURL = "circle.slang";
 
 var currentMode = RENDER_MODE;
 
-var randFloatPipeline;
-var randFloatResources;
+var randFloatPipeline: ComputePipeline;
+var randFloatResources: Map<String, GPUObjectBase>;
 
 async function webgpuInit() {
     try {
@@ -143,7 +150,7 @@ function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Pro
                     if (nextFrame)
                         requestAnimationFrame(newRenderLoop);
                 } catch (error: any) {
-                    if(error instanceof Error)
+                    if (error instanceof Error)
                         diagnosticsArea.setValue(`Error when rendering: ${error.message} in ${error.stack}`);
                     else
                         diagnosticsArea.setValue(`Error when rendering: ${error}`);
@@ -341,7 +348,7 @@ async function execFrame(timeMS: number) {
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
         renderPass.setBindGroup(0, passThroughPipeline.bindGroup || null);
-        if(passThroughPipeline.pipeline == undefined) {
+        if (passThroughPipeline.pipeline == undefined) {
             throw new Error("Pass through pipeline is undefined!")
         }
         renderPass.setPipeline(passThroughPipeline.pipeline);
@@ -372,7 +379,7 @@ async function execFrame(timeMS: number) {
     if (frameCount == 20) {
         var avgTime = (timeAggregate / frameCount);
         let performanceInfo = document.getElementById("performanceInfo");
-        if(!(performanceInfo instanceof HTMLDivElement)) {
+        if (!(performanceInfo instanceof HTMLDivElement)) {
             throw new Error("performanceInfo has an invalid type")
         }
         performanceInfo.innerText = avgTime.toFixed(1) + " ms ";
@@ -428,7 +435,7 @@ async function printResult() {
 
     allocatedResources.get("printfBufferRead").unmap();
     let printResult = document.getElementById("printResult")
-    if(!(printResult instanceof HTMLTextAreaElement)) {
+    if (!(printResult instanceof HTMLTextAreaElement)) {
         throw new Error("printResult invalid type")
     }
     printResult.value = textResult;
@@ -583,7 +590,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
-                if(compiler == null) {
+                if (compiler == null) {
                     throw new Error("Compiler is not defined!")
                 }
                 const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL");
@@ -629,7 +636,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
                 pass.setBindGroup(0, randomPipeline.bindGroup || null);
-                
+
                 if (randomPipeline.pipeline == undefined) {
                     throw new Error("Random pipeline is undefined")
                 }
@@ -764,7 +771,7 @@ export var onRun = () => {
             }
 
             let outputTexture = allocatedResources.get("outputTexture");
-            if(!(outputTexture instanceof GPUTexture)) {
+            if (!(outputTexture instanceof GPUTexture)) {
                 throw new Error("")
             }
             passThroughPipeline.inputTexture = outputTexture;
@@ -777,14 +784,14 @@ export var onRun = () => {
             for (const pipeline of extraComputePipelines)
                 pipeline.createBindGroup(allocatedResources);
 
-            if(compiler == null) {
+            if (compiler == null) {
                 throw new Error("Could not get compiler")
             }
             toggleDisplayMode(compiler.shaderType);
         },
         // renderFn
         async (timeMS: any) => {
-            if(compiler == null) {
+            if (compiler == null) {
                 throw new Error("Could not get compiler")
             }
             if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
@@ -827,23 +834,7 @@ export function compileOrRun() {
 }
 
 var reflectionJson: any = {};
-function getReflectionJson() {
-    return {
-        controlPanel: { enabled: false },
-        sideMenu: { enabled: false },
-        footer: { enabled: false },
-        lineNumbers: { enabled: false },
-        inspectionLevels: 8,
-        shortcutKeysEnabled: false,
-        title: {
-            text: null,
-            showCloseOpenAllButtons: false,
-            showCopyButton: false,
-            enableFullScreenToggling: false
-        },
-        data: reflectionJson
-    };
-}
+
 type Shader = {
     succ: true,
     code: string,
@@ -881,8 +872,8 @@ function compileShader(userSource: any, entryPoint: string, compileTarget: strin
         model.setLanguage("generic-shader");
 
     // Update reflection info.
-    $jsontree.setJson("reflectionDiv", reflectionJson);
-    $jsontree.refreshAll();
+    window.$jsontree.setJson("reflectionDiv", reflectionJson);
+    window.$jsontree.refreshAll();
 
     return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
 }
@@ -890,7 +881,7 @@ function compileShader(userSource: any, entryPoint: string, compileTarget: strin
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.
 // But if it doesn't define any of them, then user code has to define a entry point function name. Because our built-in shader
 // have no way to call the user defined function, and compile engine cannot compile the source code.
-export var onCompile = async () => {
+export async function onCompile() {
 
     toggleDisplayMode(HIDDEN_MODE);
     const compileTarget = (document.getElementById("target-select") as HTMLSelectElement).value;
@@ -969,9 +960,9 @@ export type ModuleType = MainModule & Omit<EmscriptenModule, "instantiateWasm"> 
     instantiateWasm: ReplaceReturnType<EmscriptenModule["instantiateWasm"], Promise<WebAssembly.Exports>>
 }
 
-RequireJS.require(["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"], function(foo: any) {
-  globalThis.pako = foo
-});
+declare global {
+    var Module: ModuleType
+}
 
 // Define the Module object with a callback for initialization
 globalThis.Module = {
@@ -1002,9 +993,9 @@ globalThis.Module = {
         var label = document.getElementById("loadingStatusLabel");
         if (label)
             label.innerText = "Initializing Slang Compiler...";
-        compiler = new SlangCompiler(Module);
+        compiler = new SlangCompiler(globalThis.Module);
         var result = compiler.init();
-        slangd = Module.createLanguageServer();
+        slangd = globalThis.Module.createLanguageServer();
         if (result.ret) {
             (document.getElementById("compile-btn") as HTMLButtonElement).disabled = false;
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";

@@ -1,4 +1,4 @@
-import spirvTools from "./spirv-tools.js";
+import {SpirvTools, default as spirvTools} from "./spirv-tools.js";
 import { ModuleType } from './try-slang.js';
 import type { ComponentType, EmbindString, GlobalSession, Module, Session, ThreadGroupSize } from './slang-wasm.js';
 import { playgroundSource } from "./playgroundShader.js";

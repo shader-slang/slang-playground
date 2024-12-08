@@ -175,7 +175,20 @@
           </div>
           <div class="targetCodeEditor editorContainer" id="codeGen"></div>
           <div class="reflectionView" id="reflectionTab" style="display: none">
-            <div id="reflectionDiv" style="overflow: visible" data-jsontree-js="getReflectionJson"></div>
+            <div id="reflectionDiv" style="overflow: visible" data-jsontree-js="{
+              controlPanel: { enabled: false },
+              sideMenu: { enabled: false },
+              footer: { enabled: false },
+              lineNumbers: { enabled: false },
+              inspectionLevels: 8,
+              shortcutKeysEnabled: false,
+              title: {
+                  text: null,
+                  showCloseOpenAllButtons: false,
+                  showCopyButton: false,
+                  enableFullScreenToggling: false
+              }
+          }"></div>
           </div>
         </div>
       </div>
