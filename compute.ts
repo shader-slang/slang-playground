@@ -9,9 +9,9 @@ export class ComputePipeline
     // TODO: We should make this field optional, and only when user select a "Debug" mode will this option be available,
     // and we will output this buffer to the output area.
 
-    outputBuffer: any;
-    outputBufferRead: any;
-    outputTexture: any;
+    // outputBuffer;
+    // outputBufferRead;
+    // outputTexture;
     device;
     bindGroup: GPUBindGroup | undefined;
 
@@ -51,7 +51,7 @@ export class ComputePipeline
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, resources: Map<any, any> | null)
+    createPipeline(shaderModule: GPUShaderModule, resources: Map<string, GPUTexture | GPUBuffer> | null)
     {
         if(this.pipelineLayout == undefined)
             throw new Error("Cannot create pipeline without layout")
@@ -68,14 +68,14 @@ export class ComputePipeline
             this.createBindGroup(resources);
     }
 
-    createBindGroup(allocatedResources: Map<any, any>)
+    createBindGroup(allocatedResources: Map<string, GPUObjectBase>)
     {
         if(this.resourceBindings == undefined)
             throw new Error("No resource bindings")
         if(this.pipeline == undefined)
             throw new Error("No pipeline")
 
-        const entries = [];
+        const entries: GPUBindGroupEntry[] = [];
         for (const [name, resource] of allocatedResources)
         {
             const bindInfo = this.resourceBindings.get(name);
@@ -84,14 +84,23 @@ export class ComputePipeline
             {
                 if (bindInfo.buffer)
                 {
+                    if(!(resource instanceof GPUBuffer)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: {buffer: resource}});
                 }
                 else if (bindInfo.storageTexture)
                 {
+                    if(!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: resource.createView()});
                 }
                 else if (bindInfo.texture)
                 {
+                    if(!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: resource.createView()});
                 }
             }

@@ -1,6 +1,6 @@
 import { ParsedCommand } from './try-slang.js';
 
-export function configContext(device: GPUDevice, canvas: { getContext: (arg0: string) => any; }) {
+export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
     let context = canvas.getContext('webgpu');
 
     const canvasConfig = {
@@ -9,6 +9,10 @@ export function configContext(device: GPUDevice, canvas: { getContext: (arg0: st
         usage:
             GPUTextureUsage.RENDER_ATTACHMENT,
     };
+
+    if(context == null) {
+        throw new Error("Could not get webgpu context")
+    }
 
     context.configure(canvasConfig);
     return context;
@@ -93,7 +97,17 @@ export function parseResourceCommands(userSource: string): { resourceName: strin
     return resourceCommands;
 }
 
-export function parseCallCommands(userSource: string) {
+export type CallCommand = {
+    type: "RESOURCE_BASED",
+    fnName: string,
+    resourceName: string,
+} | {
+    type: "FIXED_SIZE",
+    fnName: string,
+    size: number[],
+}
+
+export function parseCallCommands(userSource: string): CallCommand[] {
     // Look for commands of the form:
     //
     // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
@@ -103,7 +117,7 @@ export function parseCallCommands(userSource: string) {
     //                                    the provided work-group size.
     //
 
-    const callCommands = [];
+    const callCommands: CallCommand[] = [];
     const lines = userSource.split('\n');
     for (let line of lines) {
         const match = line.match(/\/\/!\s+CALL\((\w+),\s*(.*)\)/);
@@ -282,14 +296,14 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 //     uint32_t high = 0;
 // };
 //
-function hashToString(hashedStrings: string | any[], hash: number) {
+function hashToString(hashedStrings: any[], hash: number) {
     for (var i = 0; i < hashedStrings.length; i++) {
         if (hashedStrings[i].hash == hash) {
             return hashedStrings[i].string;
         }
     }
 }
-export function parsePrintfBuffer(hashedString: string, printfValueResource: { getMappedRange: () => any; }, bufferElementSize: number) {
+export function parsePrintfBuffer(hashedString: any, printfValueResource: GPUBuffer, bufferElementSize: number) {
 
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())

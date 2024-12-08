@@ -1,6 +1,7 @@
 /// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { slangd, monacoEditor, compiler } from './try-slang.js';
 import { playgroundSource } from './playgroundShader.js';
+import { CompletionContext, CompletionItem } from './slang-wasm.js';
 
 export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";
@@ -489,7 +490,7 @@ export function initMonaco() {
                 return null;
             }
             return {
-                contents: [{ value: result.contents.value }],
+                contents: [{ value: result.contents.value.toString() }],
                 range: {
                     startLineNumber: result.range.start.line + 1,
                     startColumn: result.range.start.character + 1,
@@ -511,8 +512,11 @@ export function initMonaco() {
             var resultArray = [];
             for (var i = 0; i < result.size(); i++) {
                 let lspResult = result.get(i);
+                if(lspResult == undefined) {
+                    throw new Error("Invalid state!")
+                }
                 resultArray.push({
-                    uri: monaco.Uri.parse(lspResult.uri),
+                    uri: monaco.Uri.parse(lspResult.uri.toString()),
                     range: {
                         startLineNumber: lspResult.range.start.line + 1,
                         startColumn: lspResult.range.start.character + 1,
@@ -530,9 +534,9 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let lspContext = {
+            let lspContext: CompletionContext = {
                 triggerKind: context.triggerKind,
-                triggerCharacter: context.hasOwnProperty("triggerCharacter") ? context.triggerCharacter : ""
+                triggerCharacter: context.hasOwnProperty("triggerCharacter") ? (context.triggerCharacter || ""): ""
             };
             let result = slangd.completion(
                 userCodeURI,
@@ -554,12 +558,15 @@ export function initMonaco() {
             };
             for (var i = 0; i < result.size(); i++) {
                 let lspItem = result.get(i);
-                var item = {
-                    label: lspItem.label,
+                if(lspItem == undefined) {
+                    throw new Error("Invalid state!")
+                }
+                var item: monaco.languages.CompletionItem = {
+                    label: lspItem.label.toString(),
                     kind: lspItem.kind,
-                    detail: lspItem.detail,
-                    documentation: lspItem.documentation.value,
-                    insertText: lspItem.label,
+                    detail: lspItem.detail.toString(),
+                    documentation: (lspItem.documentation?.value || "").toString(),
+                    insertText: lspItem.label.toString(),
                     range: curRange
                 };
                 items.push(item)
@@ -582,17 +589,23 @@ export function initMonaco() {
             let sigs: monaco.languages.SignatureInformation[] = [];
             for (var i = 0; i < result.signatures.size(); i++) {
                 let lspSignature = result.signatures.get(i);
+                if(lspSignature == undefined) {
+                    throw new Error("Invalid state!")
+                }
                 let params: monaco.languages.ParameterInformation[] = [];
                 for (var j = 0; j < lspSignature.parameters.size(); j++) {
                     let lspParameter = lspSignature.parameters.get(j);
+                    if(lspParameter == undefined) {
+                        throw new Error("Invalid state!")
+                    }
                     params.push({
                         label: [lspParameter.label[0], lspParameter.label[1]],
-                        documentation: lspParameter.documentation.value
+                        documentation: lspParameter.documentation.value.toString()
                     });
                 }
                 let signature: monaco.languages.SignatureInformation = {
-                    label: lspSignature.label,
-                    documentation: lspSignature.documentation.value,
+                    label: lspSignature.label.toString(),
+                    documentation: lspSignature.documentation.value.toString(),
                     parameters: params
                 };
                 sigs.push(signature);
@@ -636,7 +649,11 @@ export function initMonaco() {
             }
             let rawData = new Uint32Array(result.size());
             for (var i = 0; i < result.size(); i++) {
-                rawData[i] = result.get(i);
+                let indexedResult = result.get(i);
+                if(indexedResult == undefined) {
+                    throw new Error("Invalid state!")
+                }
+                rawData[i] = indexedResult;
             }
             return {
                 data: rawData
@@ -668,7 +685,7 @@ function translateSeverity(severity: number) {
         case 2:
             return monaco.MarkerSeverity.Warning;
         case 3:
-            return monaco.MarkerSeverity.Information;
+            return monaco.MarkerSeverity.Info;
         case 4:
             return monaco.MarkerSeverity.Hint;
         default:
@@ -712,17 +729,20 @@ export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEve
                 monaco.editor.setModelMarkers(model, "slang", []);
                 return;
             }
-            var markers = [];
+            var markers: monaco.editor.IMarkerData[] = [];
             for (var i = 0; i < diagnostics.size(); i++) {
                 let lspDiagnostic = diagnostics.get(i);
+                if(lspDiagnostic == undefined) {
+                    throw new Error("Invalid state!")
+                }
                 markers.push({
                     startLineNumber: lspDiagnostic.range.start.line + 1,
                     startColumn: lspDiagnostic.range.start.character + 1,
                     endLineNumber: lspDiagnostic.range.end.line + 1,
                     endColumn: lspDiagnostic.range.end.character + 1,
-                    message: lspDiagnostic.message,
+                    message: lspDiagnostic.message.toString(),
                     severity: translateSeverity(lspDiagnostic.severity),
-                    code: lspDiagnostic.code
+                    code: lspDiagnostic.code.toString()
                 });
             }
             monaco.editor.setModelMarkers(model, "slang", markers);

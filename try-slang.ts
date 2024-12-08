@@ -4,8 +4,8 @@ import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
 import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse } from './ui.js';
-import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer } from './util.js';
-import type { MainModule, ThreadGroupSize } from "./slang-wasm.js";
+import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand } from './util.js';
+import type { LanguageServer, MainModule, ThreadGroupSize } from "./slang-wasm.js";
 
 // ignore complaint about missing types - added via tsconfig
 // @ts-ignore
@@ -22,23 +22,23 @@ declare let RequireJS: {
 };
 
 export var compiler: SlangCompiler | null = null;
-export var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
+export var slangd: LanguageServer | null = null;
 var device: GPUDevice;
-var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): GPUTextureView; new(): any; }; }; };
+var context: GPUCanvasContext;
 var randFloatPipeline: ComputePipeline;
 var computePipeline: ComputePipeline;
 var extraComputePipelines: ComputePipeline[] = [];
 var passThroughPipeline: GraphicsPipeline;
 
 export var monacoEditor: monaco.editor.IStandaloneCodeEditor;
-var diagnosticsArea: { setValue: (arg0: string) => void; getValue: () => string; };
+var diagnosticsArea: monaco.editor.IStandaloneCodeEditor;
 var codeGenArea: monaco.editor.IStandaloneCodeEditor;
 
 var resourceBindings: Bindings;
 var resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[];
-var callCommands: any[];
-var allocatedResources: Map<any, any>;
-var hashedStrings: string;
+var callCommands: CallCommand[];
+var allocatedResources: Map<string, GPUTexture | GPUBuffer>;
+var hashedStrings: any;
 
 var renderThread: Promise<void> | null = null;
 var abortRender = false;
@@ -59,7 +59,7 @@ const defaultShaderURL = "circle.slang";
 var currentMode = RENDER_MODE;
 
 var randFloatPipeline: ComputePipeline;
-var randFloatResources: Map<String, GPUObjectBase>;
+var randFloatResources: Map<string, GPUObjectBase>;
 
 async function webgpuInit() {
     try {
@@ -86,18 +86,22 @@ async function webgpuInit() {
     observer.observe(canvas);
 }
 
-function resizeCanvas(entries: { target: any; }[]) {
+function resizeCanvas(entries: ResizeObserverEntry[]) {
     if (device == null)
         return;
 
     const canvas = entries[0].target;
 
+    if(!(canvas instanceof HTMLCanvasElement)) {
+        throw new Error("canvas object is not a canvas element")
+    }
+
     let width = canvas.clientWidth;
     let height = canvas.clientHeight;
     if (canvas.style.display == "none") {
         var parentDiv = document.getElementById("output");
-        width = parentDiv?.clientWidth;
-        height = parentDiv?.clientHeight;
+        width = parentDiv?.clientWidth || width;
+        height = parentDiv?.clientHeight || height;
     }
 
     if (width != currentWindowSize[0] || height != currentWindowSize[1]) {
@@ -124,7 +128,7 @@ function abortRendererIfActive(): Promise<void> {
     });
 }
 
-function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Promise<any>; }, renderFn: { (timeMS: any): Promise<boolean>; (timeMS: any): Promise<boolean>; (arg0: any): any; }) {
+function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: number): Promise<boolean>; }) {
     // Overwrite the onRenderAborted function to the new one.
     // This also makes sure that a single function is called when the render thread is aborted.
     //
@@ -142,7 +146,7 @@ function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Pro
             let releaseRenderLock = resolve;
 
             // Set up render loop function
-            const newRenderLoop = async (timeMS: any) => {
+            const newRenderLoop = async (timeMS: number) => {
                 var nextFrame = false;
                 try {
                     const keepRendering = await renderFn(timeMS);
@@ -164,7 +168,7 @@ function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Pro
             // Setup renderer and start the render loop.
             setupFn().then(() => {
                 requestAnimationFrame(newRenderLoop);
-            }).catch((error: { message: any; }) => {
+            }).catch((error: Error) => {
                 diagnosticsArea.setValue(error.message);
                 releaseRenderLock();
             });
@@ -280,16 +284,23 @@ async function execFrame(timeMS: number) {
     if (canvasMouseClicked)
         timeArray[3] = -timeArray[3];
     timeArray[4] = timeMS * 0.001;
-    computePipeline.device.queue.writeBuffer(allocatedResources.get("uniformInput"), 0, timeArray);
+    let uniformInput = allocatedResources.get("uniformInput");
+    if(!(uniformInput instanceof GPUBuffer)) {
+        throw new Error("uniformInput doesn't exist or is of incorrect type")
+    }
+    computePipeline.device.queue.writeBuffer(uniformInput, 0, timeArray);
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
 
     // The extra passes always go first.
     // zip the extraComputePipelines and callCommands together
-    for (const [pipeline, command] of callCommands.map((x: any, i: number) => [extraComputePipelines[i], x])) {
+    for (const [pipeline, command] of callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
         const pass = encoder.beginComputePass({ label: 'extra passes' });
-        pass.setBindGroup(0, pipeline.bindGroup);
+        pass.setBindGroup(0, pipeline.bindGroup || null);
+        if(pipeline.pipeline == undefined) {
+            throw new Error("pipeline is undefined")
+        }
         pass.setPipeline(pipeline.pipeline);
         // Determine the workgroup size based on the size of the buffer or texture.
         if (command.type == "RESOURCE_BASED") {
@@ -297,6 +308,10 @@ async function execFrame(timeMS: number) {
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();
                 return false;
+            }
+
+            if(pipeline.threadGroupSize == undefined) {
+                throw new Error("threadGroupSize is undefined")
             }
 
             let resource = allocatedResources.get(command.resourceName)
@@ -357,13 +372,22 @@ async function execFrame(timeMS: number) {
     }
 
     // copy output buffer back in print mode
-    if (currentMode == PRINT_MODE)
+    if (currentMode == PRINT_MODE) {
+        let outputBuffer = allocatedResources.get("outputBuffer");
+        if(!(outputBuffer instanceof GPUBuffer)) {
+            throw new Error("outputBuffer is incorrect type or doesn't exist")
+        }
+        let outputBufferRead = allocatedResources.get("outputBufferRead");
+        if(!(outputBufferRead instanceof GPUBuffer)) {
+            throw new Error("outputBufferRead is incorrect type or doesn't exist")
+        }
         encoder.copyBufferToBuffer(
-            allocatedResources.get("outputBuffer"),
+            outputBuffer,
             0,
-            allocatedResources.get("outputBufferRead"),
+            outputBufferRead,
             0,
-            allocatedResources.get("outputBuffer").size);
+            outputBuffer.size);
+    }
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
@@ -397,7 +421,11 @@ async function execFrame(timeMS: number) {
 async function printResult() {
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
-    encoder.clearBuffer(allocatedResources.get("printfBufferRead"));
+    let printfBufferRead = allocatedResources.get("printfBufferRead");
+    if(!(printfBufferRead instanceof GPUBuffer)) {
+        throw new Error("printfBufferRead is not a buffer")
+    }
+    encoder.clearBuffer(printfBufferRead);
 
     const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
@@ -410,10 +438,22 @@ async function printResult() {
     pass.end();
 
     // copy output buffer back in print mode
+    let outputBuffer = allocatedResources.get("outputBuffer")
+    if(!(outputBuffer instanceof GPUBuffer)) {
+        throw new Error("outputBuffer is not a buffer")
+    }
+    let outputBufferRead = allocatedResources.get("outputBufferRead")
+    if(!(outputBufferRead instanceof GPUBuffer)) {
+        throw new Error("outputBufferRead is not a buffer")
+    }
+    let g_printedBuffer = allocatedResources.get("g_printedBuffer")
+    if(!(g_printedBuffer instanceof GPUBuffer)) {
+        throw new Error("g_printedBuffer is not a buffer")
+    }
     encoder.copyBufferToBuffer(
-        allocatedResources.get("outputBuffer"), 0, allocatedResources.get("outputBufferRead"), 0, allocatedResources.get("outputBuffer").size);
+        outputBuffer, 0, outputBufferRead, 0, outputBuffer.size);
     encoder.copyBufferToBuffer(
-        allocatedResources.get("g_printedBuffer"), 0, allocatedResources.get("printfBufferRead"), 0, allocatedResources.get("g_printedBuffer").size);
+        g_printedBuffer, 0, printfBufferRead, 0, g_printedBuffer.size);
 
     // Finish encoding and submit the commands
     const commandBuffer = encoder.finish();
@@ -422,18 +462,18 @@ async function printResult() {
     await device.queue.onSubmittedWorkDone();
 
     // Read the results once the job is done
-    await allocatedResources.get("printfBufferRead").mapAsync(GPUMapMode.READ);
+    await printfBufferRead.mapAsync(GPUMapMode.READ);
 
     let textResult = "";
     const formatPrint = parsePrintfBuffer(
         hashedStrings,
-        allocatedResources.get("printfBufferRead"),
+        printfBufferRead,
         printfBufferElementSize);
 
     if (formatPrint.length != 0)
         textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
 
-    allocatedResources.get("printfBufferRead").unmap();
+    printfBufferRead.unmap();
     let printResult = document.getElementById("printResult")
     if (!(printResult instanceof HTMLTextAreaElement)) {
         throw new Error("printResult invalid type")
@@ -686,7 +726,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
     return allocatedResources;
 }
 
-function freeAllocatedResources(resources: any[]) {
+function freeAllocatedResources(resources: Map<string, GPUBuffer | GPUTexture>) {
     for (const resource of resources.values()) {
         resource.destroy();
     }
@@ -767,6 +807,9 @@ export var onRun = () => {
                 passThroughPipeline = new GraphicsPipeline(device);
                 const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
                 const inputTexture = allocatedResources.get("outputTexture");
+                if(!(inputTexture instanceof GPUTexture)) {
+                    throw new Error("inputTexture is not a texture")
+                }
                 passThroughPipeline.createPipeline(shaderModule, inputTexture);
             }
 
@@ -790,7 +833,7 @@ export var onRun = () => {
             toggleDisplayMode(compiler.shaderType);
         },
         // renderFn
-        async (timeMS: any) => {
+        async (timeMS: number) => {
             if (compiler == null) {
                 throw new Error("Could not get compiler")
             }
@@ -805,7 +848,7 @@ export var onRun = () => {
         });
 }
 
-function appendOutput(editor: { setValue: (arg0: string) => void; getValue: () => any; }, textLine: string) {
+function appendOutput(editor: monaco.editor.IStandaloneCodeEditor, textLine: string) {
     editor.setValue(editor.getValue() + textLine + "\n");
 }
 
@@ -839,13 +882,13 @@ type Shader = {
     succ: true,
     code: string,
     layout: Bindings,
-    hashedStrings: string,
-    reflection: string,
+    hashedStrings: any,
+    reflection: any,
     threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number }
 } | {
     succ: false
 };
-function compileShader(userSource: any, entryPoint: string, compileTarget: string, includePlaygroundModule = true): Shader {
+function compileShader(userSource: string, entryPoint: string, compileTarget: string, includePlaygroundModule = true): Shader {
     if (compiler == null) throw new Error("No compiler available")
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
     diagnosticsArea.setValue(compiler.diagnosticsMsg);

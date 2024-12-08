@@ -79,7 +79,7 @@ export class GraphicsPipeline
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, inputTexture: any)
+    createPipeline(shaderModule: GPUShaderModule, inputTexture: GPUTexture)
     {
         this.createGraphicsPipelineLayout();
 

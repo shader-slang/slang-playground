@@ -104,6 +104,11 @@ jobs:
             ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
+      - name: build typescript
+        run: |
+          npm install
+          npx tsc
+
       - name: Cleanup workspace
         run: |
           rm -rf slang-repo

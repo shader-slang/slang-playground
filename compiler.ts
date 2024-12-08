@@ -1,6 +1,6 @@
 import {SpirvTools, default as spirvTools} from "./spirv-tools.js";
 import { ModuleType } from './try-slang.js';
-import type { ComponentType, EmbindString, GlobalSession, Module, Session, ThreadGroupSize } from './slang-wasm.js';
+import type { ComponentType, EmbindString, GlobalSession, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
 import { playgroundSource } from "./playgroundShader.js";
 declare let RequireJS: {
     require: typeof require
@@ -131,7 +131,7 @@ export class SlangCompiler {
     }
 
     // In our playground, we only allow to run shaders with two entry points: renderMain and printMain
-    findRunnableEntryPoint(module: { findAndCheckEntryPoint: (arg0: string, arg1: number) => any; }) {
+    findRunnableEntryPoint(module: Module) {
         const runnableEntryPointNames = ['imageMain', 'printMain'];
         for (var i = 0; i < runnableEntryPointNames.length; i++) {
             var entryPointName = runnableEntryPointNames[i];
@@ -148,7 +148,7 @@ export class SlangCompiler {
         return null;
     }
 
-    findEntryPoint(module: { findAndCheckEntryPoint: (arg0: any, arg1: any) => any; }, entryPointName: string | null, stage: number) {
+    findEntryPoint(module: Module, entryPointName: string | null, stage: number) {
         if (entryPointName == null || entryPointName == "") {
             var entryPoint = this.findRunnableEntryPoint(module);
             if (!entryPoint) {
@@ -200,7 +200,7 @@ export class SlangCompiler {
     // dropdown list. Then, we will find whether user code also defines other entry points, if it has
     // we will also add them to the dropdown list.
     findDefinedEntryPoints(shaderSource: string): string[] {
-        var result: any[] = [];
+        var result: string[] = [];
         if (shaderSource.match("imageMain")) {
             return ["imageMain"];
         }
@@ -251,7 +251,7 @@ export class SlangCompiler {
         if(source == undefined) {
             throw new Error(`Could not get module ${moduleName}`)
         }
-        var module = slangSession.loadModuleFromSource(source, moduleName, '/' + moduleName + '.slang');
+        var module: Module | null = slangSession.loadModuleFromSource(source, moduleName, '/' + moduleName + '.slang');
 
         if (!module) {
             var error = this.slangWasmModule.getLastError();
@@ -279,7 +279,7 @@ export class SlangCompiler {
         return mainModule;
     }
 
-    addActiveEntryPoints(slangSession: Session, shaderSource: any, entryPointName: string, isWholeProgram: boolean, userModule: Module, componentList: any[]) {
+    addActiveEntryPoints(slangSession: Session, shaderSource: string, entryPointName: string, isWholeProgram: boolean, userModule: Module, componentList: Module[]) {
         if (entryPointName == "" && !isWholeProgram) {
             this.diagnosticsMsg += ("error: No entry point specified");
             return false;
@@ -345,8 +345,12 @@ export class SlangCompiler {
         return true;
     }
 
-    getBindingDescriptor(index: any, programReflection: { getGlobalParamsTypeLayout: () => any; }, parameter: { getName: () => string; }): BindingDescriptor {
+    getBindingDescriptor(index: number, programReflection: ProgramLayout, parameter: VariableLayoutReflection): BindingDescriptor {
         const globalLayout = programReflection.getGlobalParamsTypeLayout();
+
+        if(globalLayout == null) {
+            throw new Error("Could not get layout")
+        }
 
         const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
 
@@ -373,14 +377,21 @@ export class SlangCompiler {
         throw new Error(`Binding type ${bindingType} not supported`)
     }
 
-    getResourceBindings(linkedProgram: { getLayout: (arg0: number) => any; }): Bindings {
-        const reflection = linkedProgram.getLayout(0); // assume target-index = 0
+    getResourceBindings(linkedProgram: ComponentType): Bindings {
+        const reflection: ProgramLayout | null = linkedProgram.getLayout(0); // assume target-index = 0
+
+        if(reflection == null) {
+            throw new Error("Could not get reflection!")
+        }
 
         const count = reflection.getParameterCount();
 
         var resourceDescriptors = new Map();
         for (let i = 0; i < count; i++) {
             const parameter = reflection.getParameterByIndex(i);
+            if(parameter == null) {
+                throw new Error("Invalid state!")
+            }
             const name = parameter.getName();
             var binding = {
                 binding: parameter.getBindingIndex(),
@@ -398,8 +409,8 @@ export class SlangCompiler {
         return resourceDescriptors;
     }
 
-    loadModule(slangSession: Session, moduleName: string, source: string, componentTypeList: any[]) {
-        var module = slangSession.loadModuleFromSource(source, moduleName, "/" + moduleName + ".slang");
+    loadModule(slangSession: Session, moduleName: string, source: string, componentTypeList: Module[]) {
+        var module: Module | null = slangSession.loadModuleFromSource(source, moduleName, "/" + moduleName + ".slang");
         if (!module) {
             var error = this.slangWasmModule.getLastError();
             console.error(error.type + " error: " + error.message);
@@ -435,7 +446,7 @@ export class SlangCompiler {
                 return null;
             }
 
-            let components: any[] = [];
+            let components: Module[] = [];
 
             let userModuleIndex = 0;
             if (shouldLinkPlaygroundModule) {

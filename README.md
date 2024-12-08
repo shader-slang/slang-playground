@@ -2,12 +2,16 @@
 
 ## Setup
 
-### Development environment shell
+### Prerequisites
 
-On Windows, set up the environment as follows:
+* Install [Docker](https://www.docker.com/get-started/)
+* Install [Github CLI](https://cli.github.com/)
+* install [Github Act](https://github.com/nektos/gh-act) as an extension using `gh extension install https://github.com/nektos/gh-act`
 
-    set TRY_SLANG_SOURCE_DIRECTORY_PATH=%userprofile%\source\try-slang
-    set TRY_SLANG_TARGET_DIRECTORY_PATH=%userprofile%\target\try-slang
+### Building
+
+* Run `gh act -P ubuntu-latest=catthehacker/ubuntu:full-latest -j 'build' --artifact-server-path ./out`
+* This will create a file at `out/1/artifact/artifact.zip`
 
 In the following, it is also assumed that GNU Make, Python and gzip are in PATH.
 Follow the setup instructions in `docs/building.md` for building `slang-wasm` in the Slang repository.
