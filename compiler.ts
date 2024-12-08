@@ -1,8 +1,10 @@
-import '@types/emscripten';
-
-import spirvTools, { SpirvTools } from "./spirv-tools.js";
+import spirvTools from "./spirv-tools.js";
 import { ModuleType } from './try-slang.js';
-import { ComponentType, EmbindString, GlobalSession, Module, Session, ThreadGroupSize } from './slang-wasm.js';
+import type { ComponentType, EmbindString, GlobalSession, Module, Session, ThreadGroupSize } from './slang-wasm.js';
+import { playgroundSource } from "./playgroundShader.js";
+declare let RequireJS: {
+    require: typeof require
+};
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
@@ -95,8 +97,8 @@ export class SlangCompiler {
         this.shaderType = SlangCompiler.NON_RUNNABLE_SHADER;
         this.mainModules.set('imageMain', { source: imageMainSource });
         this.mainModules.set('printMain', { source: printMainSource });
-        FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer()), true, true, false);
-        FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer()), true, true, false);
+        FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer(0)), true, true, false);
+        FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer(0)), true, true, false);
     }
 
     init() {
@@ -168,7 +170,8 @@ export class SlangCompiler {
     }
 
     async initSpirvTools() {
-        if (!this.spirvToolsModule) {
+        if (!this.spirvToolsModule)
+        {
             this.spirvToolsModule = await spirvTools();
         }
     }

@@ -1,5 +1,5 @@
 
-var passThroughshaderCode = `
+export var passThroughshaderCode = `
 
       struct VertexShaderOutput {
         @builtin(position) position: vec4f,
@@ -49,7 +49,7 @@ var passThroughshaderCode = `
       }
 `;
 
-class GraphicsPipeline
+export class GraphicsPipeline
 {
     device: GPUDevice;
     pipeline: GPURenderPipeline | undefined;

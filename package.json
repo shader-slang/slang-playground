@@ -2,12 +2,14 @@
   "devDependencies": {
     "@types/emscripten": "^1.39.13",
     "@types/pako": "^2.0.3",
+    "@types/requirejs": "^2.1.37",
     "@webgpu/types": "^0.1.51"
   },
   "dependencies": {
     "jjsontree.js": "^4.6.4",
     "monaco-editor": "^0.52.0",
     "pako": "^2.1.0",
+    "requirejs": "^2.3.7",
     "split-grid": "^1.0.11"
   }
 }

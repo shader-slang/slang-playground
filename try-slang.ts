@@ -1,24 +1,22 @@
-import * as monaco from 'monaco-editor';
+// import './node_modules/monaco-editor/monaco';
 import { ComputePipeline } from './compute.js';
+import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
 import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse } from './ui.js';
 import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer } from './util.js';
-import pako from 'pako';
-import { MainModule, ThreadGroupSize } from "./slang-wasm.js";
-
-declare global {
-    var hashedStrings: string;
-    var allocatedResources: Map<string, GPUBuffer | GPUTexture>;
-    var randFloatPipeline: ComputePipeline;
-    var randFloatResources: Map<string, GPUBuffer | GPUTexture>;
-    var extraComputePipelines: GraphicsPipeline[];
-}
+import type { MainModule, ThreadGroupSize } from "./slang-wasm.js";
+import type PakoType from 'pako';
+declare let pako: typeof PakoType;
+declare let RequireJS: {
+    require: typeof require
+};
 
 export var compiler: SlangCompiler | null = null;
 export var slangd: { hover: (arg0: string, arg1: { line: number; character: number; }) => any; gotoDefinition: (arg0: string, arg1: { line: number; character: number; }) => any; completion: (arg0: string, arg1: { line: number; character: number; }, arg2: { triggerKind: any; triggerCharacter: any; }) => any; signatureHelp: (arg0: string, arg1: { line: number; character: number; }) => any; semanticTokens: (arg0: string) => any; didOpenTextDocument: (arg0: string, arg1: string) => void; didChangeTextDocument: (arg0: string, arg1: any) => void; getDiagnostics: (arg0: string) => any; } | null = null;
 var device: GPUDevice;
 var context: { getCurrentTexture: () => { (): any; new(): any; createView: { (): GPUTextureView; new(): any; }; }; };
+var randFloatPipeline: ComputePipeline;
 var computePipeline: ComputePipeline;
 var extraComputePipelines: ComputePipeline[] = [];
 var passThroughPipeline: GraphicsPipeline;
@@ -44,7 +42,7 @@ var sourceCodeChange = true;
 
 var currentWindowSize = [300, 150];
 
-var $jsontree: any; //TODO fix types
+var $jsontree: any = globalThis.$jsontree; //TODO fix types
 
 const RENDER_MODE = SlangCompiler.RENDER_SHADER;
 const PRINT_MODE = SlangCompiler.PRINT_SHADER;
@@ -145,7 +143,10 @@ function withRenderLock(setupFn: { (): Promise<void>; (): Promise<void>; (): Pro
                     if (nextFrame)
                         requestAnimationFrame(newRenderLoop);
                 } catch (error: any) {
-                    diagnosticsArea.setValue("Error when rendering: " + error.message);
+                    if(error instanceof Error)
+                        diagnosticsArea.setValue(`Error when rendering: ${error.message} in ${error.stack}`);
+                    else
+                        diagnosticsArea.setValue(`Error when rendering: ${error}`);
                 }
                 finally {
                     if (!nextFrame)
@@ -190,9 +191,8 @@ function startRendering() {
         if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
             throw new Error("window not ready");
 
-        const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+        allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
 
-        globalThis.allocatedResources = allocatedResources;
         computePipeline.createBindGroup(allocatedResources);
 
         passThroughPipeline.inputTexture = (allocatedResources.get("outputTexture") as GPUTexture);
@@ -286,13 +286,13 @@ async function execFrame(timeMS: number) {
         pass.setPipeline(pipeline.pipeline);
         // Determine the workgroup size based on the size of the buffer or texture.
         if (command.type == "RESOURCE_BASED") {
-            if (!globalThis.allocatedResources.has(command.resourceName)) {
+            if (!allocatedResources.has(command.resourceName)) {
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();
                 return false;
             }
 
-            let resource = globalThis.allocatedResources.get(command.resourceName)
+            let resource = allocatedResources.get(command.resourceName)
             if (resource instanceof GPUBuffer) {
                 let size = resource.size / 4;
                 const blockSizeX = pipeline.threadGroupSize.x;
@@ -419,7 +419,7 @@ async function printResult() {
 
     let textResult = "";
     const formatPrint = parsePrintfBuffer(
-        globalThis.hashedStrings,
+        hashedStrings,
         allocatedResources.get("printfBufferRead"),
         printfBufferElementSize);
 
@@ -578,7 +578,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             safeSet(allocatedResources, resourceName, buffer);
 
             // Place a call to a shader that fills the buffer with random numbers.
-            if (!globalThis.randFloatPipeline) {
+            if (!randFloatPipeline) {
                 const randomPipeline = new ComputePipeline(pipeline.device);
 
                 // Load randFloat shader code from the file.
@@ -599,27 +599,27 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 // Create the pipeline (without resource bindings for now)
                 randomPipeline.createPipeline(module, null);
 
-                globalThis.randFloatPipeline = randomPipeline;
+                randFloatPipeline = randomPipeline;
             }
 
             // Dispatch a random number generation shader.
             {
-                const randomPipeline = globalThis.randFloatPipeline;
+                const randomPipeline = randFloatPipeline;
 
                 // Alloc resources for the shader.
-                if (!globalThis.randFloatResources)
-                    globalThis.randFloatResources = new Map();
+                if (!randFloatResources)
+                    randFloatResources = new Map();
 
-                globalThis.randFloatResources.set("outputBuffer", buffer);
+                randFloatResources.set("outputBuffer", buffer);
 
-                if (!globalThis.randFloatResources.has("seed"))
-                    globalThis.randFloatResources.set("seed",
+                if (!randFloatResources.has("seed"))
+                    randFloatResources.set("seed",
                         pipeline.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
-                const seedBuffer = globalThis.randFloatResources.get("seed") as GPUBuffer;
+                const seedBuffer = randFloatResources.get("seed") as GPUBuffer;
 
                 // Set bindings on the pipeline.
-                globalThis.randFloatPipeline.createBindGroup(globalThis.randFloatResources);
+                randFloatPipeline.createBindGroup(randFloatResources);
 
                 const seedValue = new Float32Array([Math.random(), 0, 0, 0]);
                 pipeline.device.queue.writeBuffer(seedBuffer, 0, seedValue);
@@ -685,7 +685,7 @@ function freeAllocatedResources(resources: any[]) {
     }
 }
 
-var onRun = () => {
+export var onRun = () => {
     if (!device)
         return;
     if (!monacoEditor)
@@ -719,7 +719,7 @@ var onRun = () => {
                 throw new Error("");
             }
 
-            globalThis.hashedStrings = ret.hashedStrings;
+            hashedStrings = ret.hashedStrings;
 
             resourceCommands = parseResourceCommands(userSource);
 
@@ -753,9 +753,8 @@ var onRun = () => {
                 }
             }
 
-            const allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
+            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
 
-            globalThis.allocatedResources = allocatedResources;
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);
@@ -775,7 +774,7 @@ var onRun = () => {
             computePipeline.createPipeline(module, allocatedResources);
 
             // Create bind groups for the extra pipelines
-            for (const pipeline of globalThis.extraComputePipelines)
+            for (const pipeline of extraComputePipelines)
                 pipeline.createBindGroup(allocatedResources);
 
             if(compiler == null) {
@@ -918,46 +917,48 @@ export var onCompile = async () => {
 }
 
 export function loadEditor(readOnlyMode = false, containerId: string, preloadCode: string) {
-    let container = document.getElementById(containerId);
-    if (container == null) {
-        throw new Error("Could not find container for editor")
-    }
-    initMonaco();
-    let model = readOnlyMode
-        ? monaco.editor.createModel(preloadCode)
-        : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
-    let editor = monaco.editor.create(container, {
-        model: model,
-        language: readOnlyMode ? 'csharp' : 'slang',
-        theme: 'slang-dark',
-        readOnly: readOnlyMode,
-        lineNumbers: readOnlyMode ? "off" : "on",
-        automaticLayout: true,
-        wordWrap: containerId == "diagnostics" ? "on" : "off",
-        "semanticHighlighting.enabled": true,
-        renderValidationDecorations: "on",
-        minimap: {
-            enabled: false
-        },
-    });
-    if (!readOnlyMode) {
-        model.onDidChangeContent(codeEditorChangeContent);
-        model.setValue(preloadCode);
-    }
-
-    if (containerId == "codeEditor")
-        monacoEditor = editor;
-    else if (containerId == "diagnostics") {
-        let model = editor.getModel();
-        if (model == null) {
-            throw new Error("Cannot get editor model")
+    RequireJS.require(["vs/editor/editor.main"], function () {
+        let container = document.getElementById(containerId);
+        if (container == null) {
+            throw new Error("Could not find container for editor")
         }
-        monaco.editor.setModelLanguage(model, "text")
-        diagnosticsArea = editor;
-    }
-    else if (containerId == "codeGen") {
-        codeGenArea = editor;
-    }
+        initMonaco();
+        let model = readOnlyMode
+            ? monaco.editor.createModel(preloadCode)
+            : monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
+        let editor = monaco.editor.create(container, {
+            model: model,
+            language: readOnlyMode ? 'csharp' : 'slang',
+            theme: 'slang-dark',
+            readOnly: readOnlyMode,
+            lineNumbers: readOnlyMode ? "off" : "on",
+            automaticLayout: true,
+            wordWrap: containerId == "diagnostics" ? "on" : "off",
+            "semanticHighlighting.enabled": true,
+            renderValidationDecorations: "on",
+            minimap: {
+                enabled: false
+            },
+        });
+        if (!readOnlyMode) {
+            model.onDidChangeContent(codeEditorChangeContent);
+            model.setValue(preloadCode);
+        }
+
+        if (containerId == "codeEditor")
+            monacoEditor = editor;
+        else if (containerId == "diagnostics") {
+            let model = editor.getModel();
+            if (model == null) {
+                throw new Error("Cannot get editor model")
+            }
+            monaco.editor.setModelLanguage(model, "text")
+            diagnosticsArea = editor;
+        }
+        else if (containerId == "codeGen") {
+            codeGenArea = editor;
+        }
+    })
 }
 
 
@@ -968,8 +969,12 @@ export type ModuleType = MainModule & Omit<EmscriptenModule, "instantiateWasm"> 
     instantiateWasm: ReplaceReturnType<EmscriptenModule["instantiateWasm"], Promise<WebAssembly.Exports>>
 }
 
+RequireJS.require(["https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"], function(foo: any) {
+  globalThis.pako = foo
+});
+
 // Define the Module object with a callback for initialization
-var Module: ModuleType = {
+globalThis.Module = {
     locateFile: function (path: string) {
         if (path.endsWith('.wasm')) {
             return 'slang-wasm.wasm.gz'; // Use the gzip compressed file
@@ -986,7 +991,7 @@ var Module: ModuleType = {
         });
 
         // Step 2: Decompress the gzip data
-        const wasmBinary = pako.inflate(compressedData);
+        const wasmBinary = globalThis.pako.inflate(compressedData);
 
         // Step 3: Instantiate the WebAssembly module from the decompressed data
         const { instance } = await WebAssembly.instantiate(wasmBinary, imports);
@@ -1012,6 +1017,9 @@ var Module: ModuleType = {
     }
 } satisfies Partial<ModuleType> as any;
 
+
+RequireJS.require(["./slang-wasm.js"]);
+
 var pageLoaded = false;
 // event when loading the page
 window.onload = async function () {
@@ -1030,7 +1038,7 @@ window.onload = async function () {
 }
 
 function runIfFullyInitialized() {
-    if (compiler && slangd && pageLoaded) {
+    if (compiler && slangd && pageLoaded && monacoEditor) {
         initLanguageServer();
 
         const loadingScreen = document.getElementById('loading-screen');

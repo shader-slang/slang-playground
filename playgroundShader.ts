@@ -1,5 +1,4 @@
-
-const playgroundSource = `
+export const playgroundSource = `
 internal struct UniformInput
 {
     float4 mousePosition;

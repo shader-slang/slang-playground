@@ -1,5 +1,6 @@
-import * as monaco from 'monaco-editor';
+// import './node_modules/monaco-editor/monaco';
 import { slangd, monacoEditor, compiler } from './try-slang.js';
+import { playgroundSource } from './playgroundShader.js';
 
 export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";

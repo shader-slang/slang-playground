@@ -1,9 +1,11 @@
-import { monacoEditor, compiler, compileOrRun, onCompile } from './try-slang.js';
+import { monacoEditor, compiler, compileOrRun, onCompile, onRun } from './try-slang.js';
 import { demoList } from './demos/demo-list.js';
 import { isWholeProgramTarget } from './compiler.js';
 import { loadEditor } from './try-slang.js';
-import Split from 'split-grid';
-import pako from 'pako';
+import type SplitType from 'split-grid';
+declare let Split: typeof SplitType;
+import type PakoType from 'pako';
+declare let pako: typeof PakoType
 
 // target -> profile mappings
 const targetProfileMap: {[target: string]: {default: string, options: string[]}} = {
@@ -400,6 +402,23 @@ export var canvasLastMouseDownPos = {x:0, y:0};
 export var canvasCurrentMousePos = {x:0, y:0};
 export var canvasIsMouseDown = false;
 export var canvasMouseClicked = false;
+
+let btnTargetCode = document.getElementById("btnTargetCode");
+if(btnTargetCode == null) throw new Error("Cannot get btnTargetCode")
+btnTargetCode.addEventListener("click", () => openTab(0))
+
+let btnReflection = document.getElementById("btnReflection");
+if(btnReflection == null) throw new Error("Cannot get btnReflection")
+btnReflection.addEventListener("click", () => openTab(1))
+
+let compile_btn = document.getElementById("compile-btn");
+if(compile_btn == null) throw new Error("Cannot get compile-btn")
+compile_btn.addEventListener("click", () => onCompile())
+
+let run_btn = document.getElementById("run-btn");
+if(run_btn == null) throw new Error("Cannot get run-btn")
+run_btn.addEventListener("click", () => onRun())
+
 canvas.addEventListener("mousedown", function(event) {
   canvasLastMouseDownPos.x = event.offsetX;
   canvasLastMouseDownPos.y = event.offsetY;
