@@ -95,13 +95,16 @@ function updateEntryPointOptions()
 function prepareForResize() {
   var codeEditors = document.getElementsByClassName("editorContainer");
 
-  for (var i = 0; i < codeEditors.length; i++) {
-    if (codeEditors[i].style.display == "none")
+  for (let codeEditor of codeEditors) {
+    if(!(codeEditor instanceof HTMLElement)) {
+      throw new Error("codeEditor invalid element")
+    }
+    if (codeEditor.style.display == "none")
       continue;
-    codeEditors[i].style.overflow = "hidden";
+    codeEditor.style.overflow = "hidden";
   }
   assertGetElementById("workSpaceDiv").style.overflow = "hidden";
-  assertGetElementById("leftContainerDiv").style["overflow-x"] = "hidden";
+  assertGetElementById("leftContainerDiv").style.overflowX = "hidden";
   targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
@@ -113,12 +116,16 @@ function finishResizing() {
       leftContainer.style.overflowX = "hidden";
     else
       leftContainer.style.overflowX = "visible";
-    for (var i = 0; i < codeEditors.length; i++) {
-      if (codeEditors[i].style.display == "none")
+    for (let codeEditor of codeEditors) {
+      if(!(codeEditor instanceof HTMLElement)) {
+        throw new Error("codeEditor invalid element")
+      }
+      if (codeEditor.style.display == "none")
         continue;
-      if (codeEditors[i].clientHeight < 30)
-        codeEditors[i].parentNode.style.overflow = "hidden";
-      codeEditors[i].style.overflow = "visible";
+      let parentNode = codeEditor.parentNode
+      if (codeEditor.clientHeight < 30 && parentNode instanceof HTMLElement)
+        parentNode.style.overflow = "hidden";
+      codeEditor.style.overflow = "visible";
     }
     assertGetElementById("reflectionTab").style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
     
@@ -145,6 +152,9 @@ function initializeModal() {
   const modal = assertGetElementById("helpModal");
   const btn = assertGetElementById("helpButton");
   const closeBtn = document.querySelector(".close");
+  if(!(closeBtn instanceof HTMLElement)) {
+    throw new Error("closeBtn does not exist")
+  }
 
   btn.onclick = () => {
     modal.style.display = "flex";
@@ -266,17 +276,17 @@ document.addEventListener("DOMContentLoaded", function () {
     columnGutters: [
       {
         track: 1,
-        element: document.querySelector(".mainContainer > .gutter-horizontal"),
+        element: assertQuerySelectorOfType(".mainContainer > .gutter-horizontal", HTMLElement),
       },
     ],
     rowGutters: [
       {
         track: 1,
-        element: document.querySelector(".workSpace > .gutter-vertical"),
+        element: assertQuerySelectorOfType(".workSpace > .gutter-vertical", HTMLElement),
       },
       {
         track: 1,
-        element: document.querySelector(".resultSpace > .gutter-vertical"),
+        element: assertQuerySelectorOfType(".resultSpace > .gutter-vertical", HTMLElement),
       },
     ],
     onDragStart: ()=>prepareForResize(),
@@ -416,6 +426,13 @@ function assertGetElementByIdOfType<T extends HTMLElement>(elementId: string, el
   let result = document.getElementById(elementId)
   if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
   if(!(result instanceof elementType)) throw new Error(`Element of id ${elementId} is not a ${elementType}`)
+  return result;
+}
+
+function assertQuerySelectorOfType<T extends HTMLElement>(selectors: string, elementType: Constructor<T>): T {
+  let result = document.querySelector(selectors)
+  if(result == null) throw new Error(`Failed to get element of selector ${selectors}`)
+    if(!(result instanceof elementType)) throw new Error(`Element of selector ${selectors} is not a ${elementType}`)
   return result;
 }
 
