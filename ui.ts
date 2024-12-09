@@ -88,7 +88,12 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
     entryPointDropdown.style.display = "none";
     entryPointSelect.value = "";
   } else {
+    prepareForResize();
     entryPointDropdown.style.cssText = "";
+    finishResizingTimeout = setTimeout(() => {
+      finishResizing();
+      finishResizingTimeout = null;
+    }, 50);
     updateEntryPointOptions();
   }
 }
@@ -120,10 +125,10 @@ function updateEntryPointOptions()
       prevValueExists = true;
     }
   }
-  if (prevValue == "" && entryPoints.length > 0)
-    entrypointSelect.value = entryPoints[0];
-  else if (prevValueExists)
+  if (prevValueExists)
     entrypointSelect.value = prevValue;
+  else if (entryPoints.length > 0)
+    entrypointSelect.value = entryPoints[0];
   else
   {
     entrypointSelect.value = "";
@@ -230,6 +235,7 @@ export function loadDemo(selectedDemoURL: string) {
       .then((response) => response.text())
       .then((data) => {
         monacoEditor.setValue(data);
+        updateEntryPointOptions();
         compileOrRun();
       });
   }
