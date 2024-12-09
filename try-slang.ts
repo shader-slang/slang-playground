@@ -92,7 +92,7 @@ function resizeCanvas(entries: ResizeObserverEntry[]) {
 
     const canvas = entries[0].target;
 
-    if(!(canvas instanceof HTMLCanvasElement)) {
+    if (!(canvas instanceof HTMLCanvasElement)) {
         throw new Error("canvas object is not a canvas element")
     }
 
@@ -285,7 +285,7 @@ async function execFrame(timeMS: number) {
         timeArray[3] = -timeArray[3];
     timeArray[4] = timeMS * 0.001;
     let uniformInput = allocatedResources.get("uniformInput");
-    if(!(uniformInput instanceof GPUBuffer)) {
+    if (!(uniformInput instanceof GPUBuffer)) {
         throw new Error("uniformInput doesn't exist or is of incorrect type")
     }
     computePipeline.device.queue.writeBuffer(uniformInput, 0, timeArray);
@@ -298,7 +298,7 @@ async function execFrame(timeMS: number) {
     for (const [pipeline, command] of callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
         const pass = encoder.beginComputePass({ label: 'extra passes' });
         pass.setBindGroup(0, pipeline.bindGroup || null);
-        if(pipeline.pipeline == undefined) {
+        if (pipeline.pipeline == undefined) {
             throw new Error("pipeline is undefined")
         }
         pass.setPipeline(pipeline.pipeline);
@@ -310,7 +310,7 @@ async function execFrame(timeMS: number) {
                 return false;
             }
 
-            if(pipeline.threadGroupSize == undefined) {
+            if (pipeline.threadGroupSize == undefined) {
                 throw new Error("threadGroupSize is undefined")
             }
 
@@ -374,11 +374,11 @@ async function execFrame(timeMS: number) {
     // copy output buffer back in print mode
     if (currentMode == PRINT_MODE) {
         let outputBuffer = allocatedResources.get("outputBuffer");
-        if(!(outputBuffer instanceof GPUBuffer)) {
+        if (!(outputBuffer instanceof GPUBuffer)) {
             throw new Error("outputBuffer is incorrect type or doesn't exist")
         }
         let outputBufferRead = allocatedResources.get("outputBufferRead");
-        if(!(outputBufferRead instanceof GPUBuffer)) {
+        if (!(outputBufferRead instanceof GPUBuffer)) {
             throw new Error("outputBufferRead is incorrect type or doesn't exist")
         }
         encoder.copyBufferToBuffer(
@@ -422,7 +422,7 @@ async function printResult() {
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
     let printfBufferRead = allocatedResources.get("printfBufferRead");
-    if(!(printfBufferRead instanceof GPUBuffer)) {
+    if (!(printfBufferRead instanceof GPUBuffer)) {
         throw new Error("printfBufferRead is not a buffer")
     }
     encoder.clearBuffer(printfBufferRead);
@@ -439,15 +439,15 @@ async function printResult() {
 
     // copy output buffer back in print mode
     let outputBuffer = allocatedResources.get("outputBuffer")
-    if(!(outputBuffer instanceof GPUBuffer)) {
+    if (!(outputBuffer instanceof GPUBuffer)) {
         throw new Error("outputBuffer is not a buffer")
     }
     let outputBufferRead = allocatedResources.get("outputBufferRead")
-    if(!(outputBufferRead instanceof GPUBuffer)) {
+    if (!(outputBufferRead instanceof GPUBuffer)) {
         throw new Error("outputBufferRead is not a buffer")
     }
     let g_printedBuffer = allocatedResources.get("g_printedBuffer")
-    if(!(g_printedBuffer instanceof GPUBuffer)) {
+    if (!(g_printedBuffer instanceof GPUBuffer)) {
         throw new Error("g_printedBuffer is not a buffer")
     }
     encoder.copyBufferToBuffer(
@@ -807,7 +807,7 @@ export var onRun = () => {
                 passThroughPipeline = new GraphicsPipeline(device);
                 const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
                 const inputTexture = allocatedResources.get("outputTexture");
-                if(!(inputTexture instanceof GPUTexture)) {
+                if (!(inputTexture instanceof GPUTexture)) {
                     throw new Error("inputTexture is not a texture")
                 }
                 passThroughPipeline.createPipeline(shaderModule, inputTexture);
