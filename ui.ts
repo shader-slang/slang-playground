@@ -1,13 +1,66 @@
+import { monacoEditor, compiler, compileOrRun, onCompile, onRun } from './try-slang.js';
+import { demoList } from './demos/demo-list.js';
+import { isWholeProgramTarget } from './compiler.js';
+import { loadEditor } from './try-slang.js';
+import type SplitType from 'split-grid';
+declare let Split: typeof SplitType;
+import type PakoType from 'pako';
+declare let pako: typeof PakoType
+
 // target -> profile mappings
-const targetProfileMap = {
+const targetProfileMap: {[target: string]: {default: string, options: string[]}} = {
   // TODO: uncomment when we support specifying profiles.
-  //"SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
+  // "SPIRV": {default:"1.5", options:["1.3", "1.4", "1.5", "1.6"]},
 };
 
-var entrypointSelect = null;
+function assertGetElementById(elementId: string): HTMLElement {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  return result;
+}
+
+type Constructor<T> = new (...args: any[]) => T;
+function assertGetElementByIdOfType<T extends HTMLElement>(elementId: string, elementType: Constructor<T>): T {
+  let result = document.getElementById(elementId)
+  if(result == null) throw new Error(`Failed to get element of id ${elementId}`)
+  if(!(result instanceof elementType)) throw new Error(`Element of id ${elementId} is not a ${elementType}`)
+  return result;
+}
+
+function assertQuerySelectorOfType<T extends HTMLElement>(selectors: string, elementType: Constructor<T>): T {
+  let result = document.querySelector(selectors)
+  if(result == null) throw new Error(`Failed to get element of selector ${selectors}`)
+    if(!(result instanceof elementType)) throw new Error(`Element of selector ${selectors} is not a ${elementType}`)
+  return result;
+}
+
+const entrypointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
+export const targetResultContainer = assertGetElementById("targetResultContainer")
+export const renderOverlay = assertGetElementById("renderOverlay")
+export const renderOutput = assertGetElementById("renderOutput")
+export const tooltip = assertGetElementById("tooltip")
+export const canvas = assertGetElementByIdOfType("canvas", HTMLCanvasElement)
+const profileDropdown = assertGetElementByIdOfType("profile-dropdown", HTMLDivElement);
+const entryPointDropdown = assertGetElementById("entrypoint-dropdown");
+export const entryPointSelect = assertGetElementByIdOfType("entrypoint-select", HTMLSelectElement);
+const leftContainer = assertGetElementById("leftContainerDiv");
+const workspaceDiv = assertGetElementById("workSpaceDiv")
+export const targetSelect = assertGetElementByIdOfType("target-select", HTMLSelectElement);
+const profileSelect = assertGetElementByIdOfType("profile-select", HTMLSelectElement);
+const demoSelect = assertGetElementByIdOfType("demo-select", HTMLSelectElement)
+const btnTargetCode = assertGetElementById("btnTargetCode");
+const btnReflection = assertGetElementById("btnReflection");
+const compile_btn = assertGetElementById("compile-btn");
+const run_btn = assertGetElementById("run-btn");
+const reflectionTab = assertGetElementById("reflectionTab")
+
+btnTargetCode.addEventListener("click", () => openTab(0))
+btnReflection.addEventListener("click", () => openTab(1))
+compile_btn.addEventListener("click", () => onCompile())
+run_btn.addEventListener("click", () => onRun())
 
 // Function to update the profile dropdown based on the selected target
-function updateProfileOptions(targetSelect, profileSelect) {
+function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HTMLSelectElement) {
   const selectedTarget = targetSelect.value;
   // Clear the existing options in profile dropdown
   profileSelect.innerHTML = "";
@@ -15,10 +68,10 @@ function updateProfileOptions(targetSelect, profileSelect) {
   // If the selected target does not have any profiles, hide the profile dropdown.
   const profiles = targetProfileMap[selectedTarget] || null;
   if (!profiles) {
-    document.getElementById("profile-dropdown").style.display = "none";
+    profileDropdown.style.display = "none";
   }
   else{
-    document.getElementById("profile-dropdown").style = "";
+    profileDropdown.style.cssText = "";
 
     // Populate the profile dropdown with new options
     profiles.options.forEach((profile) => {
@@ -32,11 +85,11 @@ function updateProfileOptions(targetSelect, profileSelect) {
 
   // If the target can be compiled as a whole program without entrypoint selection, hide the entrypoint dropdown.
   if (isWholeProgramTarget(targetSelect.value)) {
-    document.getElementById("entrypoint-dropdown").style.display = "none";
-    document.getElementById("entrypoint-select").value = "";
+    entryPointDropdown.style.display = "none";
+    entryPointSelect.value = "";
   } else {
     prepareForResize();
-    document.getElementById("entrypoint-dropdown").style = "";
+    entryPointDropdown.style.cssText = "";
     finishResizingTimeout = setTimeout(() => {
       finishResizing();
       finishResizingTimeout = null;
@@ -61,7 +114,7 @@ function updateEntryPointOptions()
 
   const entryPoints = compiler.findDefinedEntryPoints(monacoEditor.getValue());
   var prevValueExists = false;
-  entryPoints.forEach((entryPoint) => {
+  for(let entryPoint of entryPoints) {
     const option = document.createElement("option");
     option.value = entryPoint;
     option.textContent = entryPoint;
@@ -71,7 +124,7 @@ function updateEntryPointOptions()
       option.selected = true;
       prevValueExists = true;
     }
-  });
+  }
   if (prevValueExists)
     entrypointSelect.value = prevValue;
   else if (entryPoints.length > 0)
@@ -87,34 +140,40 @@ function updateEntryPointOptions()
 function prepareForResize() {
   var codeEditors = document.getElementsByClassName("editorContainer");
 
-  for (var i = 0; i < codeEditors.length; i++) {
-    if (codeEditors[i].style.display == "none")
+  for (let codeEditor of codeEditors) {
+    if(!(codeEditor instanceof HTMLElement)) {
+      throw new Error("codeEditor invalid element")
+    }
+    if (codeEditor.style.display == "none")
       continue;
-    codeEditors[i].style.overflow = "hidden";
+    codeEditor.style.overflow = "hidden";
   }
-  document.getElementById("workSpaceDiv").style.overflow = "hidden";
-  document.getElementById("leftContainerDiv").style["overflow-x"] = "hidden";
+  workspaceDiv.style.overflow = "hidden";
+  leftContainer.style.overflowX = "hidden";
   targetResultContainer.style.overflow = "hidden";
 }
 // Restore the containers to overflow:visible after resizing.
 function finishResizing() {
     var codeEditors = document.getElementsByClassName("editorContainer");
-    document.getElementById("workSpaceDiv").style.overflow = "visible";
-    var leftContainer = document.getElementById("leftContainerDiv");
+    workspaceDiv.style.overflow = "visible";
     if (leftContainer.clientWidth < 30)
-      leftContainer.style["overflow-x"] = "hidden";
+      leftContainer.style.overflowX = "hidden";
     else
-      leftContainer.style["overflow-x"] = "visible";
-    for (var i = 0; i < codeEditors.length; i++) {
-      if (codeEditors[i].style.display == "none")
+      leftContainer.style.overflowX = "visible";
+    for (let codeEditor of codeEditors) {
+      if(!(codeEditor instanceof HTMLElement)) {
+        throw new Error("codeEditor invalid element")
+      }
+      if (codeEditor.style.display == "none")
         continue;
-      if (codeEditors[i].clientHeight < 30)
-        codeEditors[i].parentNode.style.overflow = "hidden";
-      codeEditors[i].style.overflow = "visible";
+      let parentNode = codeEditor.parentNode
+      if (codeEditor.clientHeight < 30 && parentNode instanceof HTMLElement)
+        parentNode.style.overflow = "hidden";
+      codeEditor.style.overflow = "visible";
     }
-    document.getElementById("reflectionTab").style["max-width"] = document.getElementById("rightContainerDiv").clientWidth + "px";
+    reflectionTab.style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
     
-    var canvasRect = document.getElementById("canvas").getBoundingClientRect();
+    var canvasRect = canvas.getBoundingClientRect();
     
     renderOverlay.style.top = 5 + "px";
     renderOverlay.style.left = (canvasRect.left + 5) + "px";
@@ -122,7 +181,7 @@ function finishResizing() {
     resetMouse();
 }
 
-var finishResizingTimeout = null;
+var finishResizingTimeout: number | null = null;
 window.onresize = function () {
   prepareForResize();
   if (finishResizingTimeout)
@@ -134,9 +193,12 @@ window.onresize = function () {
 };
 
 function initializeModal() {
-  const modal = document.getElementById("helpModal");
-  const btn = document.getElementById("helpButton");
+  const modal = assertGetElementById("helpModal");
+  const btn = assertGetElementById("helpButton");
   const closeBtn = document.querySelector(".close");
+  if(!(closeBtn instanceof HTMLElement)) {
+    throw new Error("closeBtn does not exist")
+  }
 
   btn.onclick = () => {
     modal.style.display = "flex";
@@ -153,7 +215,7 @@ function initializeModal() {
   };
 }
 
-function loadDemo(selectedDemoURL) {
+export function loadDemo(selectedDemoURL: string) {
   if (selectedDemoURL != "")
   {
     // Is `selectedDemoURL` a relative path?
@@ -180,33 +242,28 @@ function loadDemo(selectedDemoURL) {
 }
 
 function handleDemoDropdown() {
-  const selectInput = document.getElementById("demo-select");
-
-  selectInput.addEventListener("change", function () {
+  demoSelect.addEventListener("change", function () {
     loadDemo(this.value);
   });
 }
 
-function restoreSelectedTargetFromURL()
+export function restoreSelectedTargetFromURL()
 {
   const urlParams = new URLSearchParams(window.location.search);
   const target = urlParams.get('target');
   if (target) {
-    const targetSelect = document.getElementById("target-select");
-    const profileSelect = document.getElementById("profile-select");
     targetSelect.value = target;
     updateProfileOptions(targetSelect, profileSelect);
   }  
 }
 
-function restoreDemoSelectionFromURL()
+export function restoreDemoSelectionFromURL()
 {
   const urlParams = new URLSearchParams(window.location.search);
   var demo = urlParams.get('demo');
   if (demo) {
     if (!demo.endsWith(".slang"))
       demo += ".slang";
-    const demoSelect = document.getElementById("demo-select");
     demoSelect.value = demo;
     loadDemo(demo);
     return true;
@@ -217,13 +274,12 @@ function restoreDemoSelectionFromURL()
 function loadDemoList()
 {
   // Fill in demo-select dropdown using demoList.
-  let demoDropdown = document.getElementById("demo-select");
   let firstOption = document.createElement("option");
   firstOption.value = "";
   firstOption.textContent = "Load Demo";
   firstOption.disabled = true;
   firstOption.selected = true;
-  demoDropdown.appendChild(firstOption);
+  demoSelect.appendChild(firstOption);
 
   // Create an option for each demo in the list.
   demoList.forEach((demo) => {
@@ -235,7 +291,7 @@ function loadDemoList()
       option.disabled = true;
       option.textContent = "──────────";
     }
-    demoDropdown.appendChild(option);
+    demoSelect.appendChild(option);
   });
 }
 
@@ -259,17 +315,17 @@ document.addEventListener("DOMContentLoaded", function () {
     columnGutters: [
       {
         track: 1,
-        element: document.querySelector(".mainContainer > .gutter-horizontal"),
+        element: assertQuerySelectorOfType(".mainContainer > .gutter-horizontal", HTMLElement),
       },
     ],
     rowGutters: [
       {
         track: 1,
-        element: document.querySelector(".workSpace > .gutter-vertical"),
+        element: assertQuerySelectorOfType(".workSpace > .gutter-vertical", HTMLElement),
       },
       {
         track: 1,
-        element: document.querySelector(".resultSpace > .gutter-vertical"),
+        element: assertQuerySelectorOfType(".resultSpace > .gutter-vertical", HTMLElement),
       },
     ],
     onDragStart: ()=>prepareForResize(),
@@ -284,9 +340,6 @@ document.addEventListener("DOMContentLoaded", function () {
   handleDemoDropdown();
 
   // Target -> Profile handling
-  const targetSelect = document.getElementById("target-select");
-  const profileSelect = document.getElementById("profile-select");
-  entrypointSelect = document.getElementById("entrypoint-select");
   entrypointSelect.addEventListener('focus', updateEntryPointOptions); // for keyboard access
   entrypointSelect.addEventListener('mousedown', updateEntryPointOptions); // for mouse access
 
@@ -300,29 +353,16 @@ document.addEventListener("DOMContentLoaded", function () {
   initializeModal();
 });
 
-
-let pakoLoaded = false;
-var pako = null;
-// Lazy load function that loads pako on the first call
-function loadPako() {
-  if (pako == null)
-    pako = BrowserCJS.require("https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js");
-  return pako;
-}
-
 // Function to compress and decompress text, loading pako if necessary
-async function compressToBase64URL(text) {
-  const pako = loadPako(); // Ensure pako is loaded
-
+async function compressToBase64URL(text:string) {
   // Compress the text
-  const compressed = pako.deflate(text, { to: 'string' });
+  const compressed = pako.deflate(text, {});
   const base64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
 
   return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function decompressFromBase64URL(base64) {
-  const pako = loadPako(); // Ensure pako is loaded
+async function decompressFromBase64URL(base64: string) {
   // Decode the base64 URL
   base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
   const compressed = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
@@ -332,8 +372,8 @@ async function decompressFromBase64URL(base64) {
   return decompressed;
 }
 
-function showTooltip(button, text) {
-  document.getElementById("tooltip").textContent = text;
+function showTooltip(button: HTMLElement, text: string) {
+  tooltip.textContent = text;
   // Position the tooltip near the button
   const rect = button.getBoundingClientRect();
   tooltip.style.top = `${rect.bottom + window.scrollY + 15}px`;
@@ -348,14 +388,14 @@ function showTooltip(button, text) {
   }, 3000);
 }
 
-var btnShareLink = document.getElementById("shareButton");
+var btnShareLink = assertGetElementById("shareButton");
 btnShareLink.onclick = async function () {
   if (!monacoEditor) return;
   try{
     const code = monacoEditor.getValue();
     const compressed = await compressToBase64URL(code);
     let url = new URL(window.location.href.split('?')[0]);
-    const compileTarget = document.getElementById("target-select").value;
+    const compileTarget = targetSelect.value;
     url.searchParams.set("target", compileTarget)
     url.searchParams.set("code", compressed);
     navigator.clipboard.writeText(url.href);
@@ -366,19 +406,20 @@ btnShareLink.onclick = async function () {
   }
 };
 
-function openTab(tabId)
+function openTab(tabId: number)
 {
-  var buttons = [document.getElementById("btnTargetCode"), document.getElementById("btnReflection")];
+  let buttons = [btnTargetCode, btnReflection];
+  let codeGen = assertGetElementById("codeGen")
   if (tabId == 0)
   {
-    document.getElementById("codeGen").style = "";
-    document.getElementById("reflectionTab").style.display = "none";
+    codeGen.style.cssText = "";
+    reflectionTab.style.display = "none";
     
   }
   else
   {
-    document.getElementById("codeGen").style.display = "none";
-    document.getElementById("reflectionTab").style.display = "block";
+    codeGen.style.display = "none";
+    reflectionTab.style.display = "block";
     finishResizing();
   }
   for (var i = 0; i < buttons.length; i++)
@@ -404,10 +445,11 @@ document.addEventListener('keydown', function(event) {
   }
 });
 
-var canvasLastMouseDownPos = {x:0, y:0};
-var canvasCurrentMousePos = {x:0, y:0};
-var canvasIsMouseDown = false;
-var canvasMouseClicked = false;
+export var canvasLastMouseDownPos = {x:0, y:0};
+export var canvasCurrentMousePos = {x:0, y:0};
+export var canvasIsMouseDown = false;
+export var canvasMouseClicked = false;
+
 canvas.addEventListener("mousedown", function(event) {
   canvasLastMouseDownPos.x = event.offsetX;
   canvasLastMouseDownPos.y = event.offsetY;
@@ -426,7 +468,7 @@ canvas.addEventListener("mousemove", function(event) {
 canvas.addEventListener("mouseup", function(event) {
   canvasIsMouseDown = false;
 });
-function resetMouse()
+export function resetMouse()
 {
   canvasIsMouseDown = false;
   canvasLastMouseDownPos.x = 0;

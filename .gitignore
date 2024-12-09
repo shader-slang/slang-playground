@@ -1,3 +1,11 @@
 slang-wasm.js
+slang-wasm.d.ts
 slang-wasm.wasm
 slang-wasm.wasm.gz
+spirv-tools.js
+spirv-tools.d.ts
+spirv-tools.wasm
+node_modules/*
+package-lock.json
+*.js
+out/*

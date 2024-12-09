@@ -1,4 +1,6 @@
-function configContext(device, canvas) {
+import { ParsedCommand } from './try-slang.js';
+
+export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
     let context = canvas.getContext('webgpu');
 
     const canvasConfig = {
@@ -8,11 +10,15 @@ function configContext(device, canvas) {
             GPUTextureUsage.RENDER_ATTACHMENT,
     };
 
+    if(context == null) {
+        throw new Error("Could not get webgpu context")
+    }
+
     context.configure(canvasConfig);
     return context;
 }
 
-function createOutputTexture(device, width, height, format) {
+export function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
     const textureDesc = {
         label: 'output storage texture',
         size: { width: width, height: height },
@@ -26,7 +32,7 @@ function createOutputTexture(device, width, height, format) {
     return storageTexture;
 }
 
-function reinterpretUint32AsFloat(uint32) {
+function reinterpretUint32AsFloat(uint32: number) {
     const buffer = new ArrayBuffer(4);
     const uint32View = new Uint32Array(buffer);
     const float32View = new Float32Array(buffer);
@@ -36,7 +42,7 @@ function reinterpretUint32AsFloat(uint32) {
 }
 
 
-function parseResourceCommand(command) {
+function parseResourceCommand(command: string): ParsedCommand {
     const match = command.match(/(\w+)\((.*)\)/);
     if (match) {
         const funcName = match[1];
@@ -51,7 +57,7 @@ function parseResourceCommand(command) {
             // remove the quotes
             const validURLMatch = args[0].match(/"(.*)"/)
             if (!validURLMatch) {
-                throw new Error(`Invalid URL: ${url}`);
+                throw new Error(`Invalid URL: ${args[0]}`);
             }
 
             return { type: "URL", url: validURLMatch[1] };
@@ -59,6 +65,7 @@ function parseResourceCommand(command) {
         else if (funcName === "RAND") {
             return { type: "RAND", size: args.map(Number) };
         };
+        throw new Error(`Unrecognized command: ${command}`);
 
     }
     else {
@@ -66,7 +73,7 @@ function parseResourceCommand(command) {
     }
 }
 
-function parseResourceCommands(userSource) {
+export function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
     // Now we'll handle some special comments that the user can provide to initialize their resources.
     //
     // Here are some patterns we support:
@@ -90,7 +97,17 @@ function parseResourceCommands(userSource) {
     return resourceCommands;
 }
 
-function parseCallCommands(userSource) {
+export type CallCommand = {
+    type: "RESOURCE_BASED",
+    fnName: string,
+    resourceName: string,
+} | {
+    type: "FIXED_SIZE",
+    fnName: string,
+    size: number[],
+}
+
+export function parseCallCommands(userSource: string): CallCommand[] {
     // Look for commands of the form:
     //
     // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
@@ -100,7 +117,7 @@ function parseCallCommands(userSource) {
     //                                    the provided work-group size.
     //
 
-    const callCommands = [];
+    const callCommands: CallCommand[] = [];
     const lines = userSource.split('\n');
     for (let line of lines) {
         const match = line.match(/\/\/!\s+CALL\((\w+),\s*(.*)\)/);
@@ -120,8 +137,19 @@ function parseCallCommands(userSource) {
     return callCommands;
 }
 
-function parsePrintfFormat(formatString) {
-    const formatSpecifiers = [];
+type FormatSpecifier = {
+    type: "text",
+    value: string,
+} | {
+    type: "specifier",
+    flags: string,
+    width: number | null,
+    precision: number | null,
+    specifierType: string,
+};
+
+function parsePrintfFormat(formatString: string): FormatSpecifier[] {
+    const formatSpecifiers: FormatSpecifier[] = [];
     const regex = /%([-+ #0]*)(\d*)(\.\d+)?([diufFeEgGxXosc])/g;
     let lastIndex = 0;
 
@@ -135,12 +163,17 @@ function parsePrintfFormat(formatString) {
             formatSpecifiers.push({ type: 'text', value: literalText });
         }
 
+        let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
+        let precision_number = precision_text?parseInt(precision):null
+
+        let width_number = width ? parseInt(width) : null
+
         // Add the format specifier as a token
         formatSpecifiers.push({
             type: 'specifier',
             flags: flags || '',
-            width: width || null,
-            precision: precision ? precision.slice(1) : null, // remove leading '.'
+            width: width_number,
+            precision: precision_number,
             specifierType: type
         });
 
@@ -155,11 +188,11 @@ function parsePrintfFormat(formatString) {
     return formatSpecifiers;
 }
 
-function formatPrintfString(parsedTokens, data) {
+function formatPrintfString(parsedTokens: FormatSpecifier[], data: any[]) {
     let result = '';
     let dataIndex = 0;
 
-    parsedTokens.forEach(token => {
+    parsedTokens.forEach((token) => {
         if (token.type === 'text') {
             result += token.value;
         }
@@ -173,9 +206,10 @@ function formatPrintfString(parsedTokens, data) {
 }
 
 // Helper function to format each specifier
-function formatSpecifier(value, { flags, width, precision, specifierType }) {
+function formatSpecifier(value: string, { flags, width, precision, specifierType }: FormatSpecifier & { type: 'specifier' }) {
     let formattedValue;
-
+    if(precision == null)
+        precision = 6; //eww magic number
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
@@ -195,17 +229,17 @@ function formatSpecifier(value, { flags, width, precision, specifierType }) {
             break;
         case 'f':
         case 'F': // Floating-point
-            formattedValue = parseFloat(value).toFixed(precision || 6);
+            formattedValue = parseFloat(value).toFixed(precision);
             break;
         case 'e': // Scientific notation (lowercase)
-            formattedValue = parseFloat(value).toExponential(precision || 6);
+            formattedValue = parseFloat(value).toExponential(precision);
             break;
         case 'E': // Scientific notation (uppercase)
-            formattedValue = parseFloat(value).toExponential(precision || 6).toUpperCase();
+            formattedValue = parseFloat(value).toExponential(precision).toUpperCase();
             break;
         case 'g':
         case 'G': // Shortest representation of floating-point
-            formattedValue = parseFloat(value).toPrecision(precision || 6);
+            formattedValue = parseFloat(value).toPrecision(precision);
             break;
         case 'c': // Character
             formattedValue = String.fromCharCode(parseInt(value));
@@ -262,14 +296,14 @@ function formatSpecifier(value, { flags, width, precision, specifierType }) {
 //     uint32_t high = 0;
 // };
 //
-function hashToString(hashedStrings, hash) {
+function hashToString(hashedStrings: any[], hash: number) {
     for (var i = 0; i < hashedStrings.length; i++) {
         if (hashedStrings[i].hash == hash) {
             return hashedStrings[i].string;
         }
     }
 }
-function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize) {
+export function parsePrintfBuffer(hashedString: any, printfValueResource: GPUBuffer, bufferElementSize: number) {
 
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
@@ -337,7 +371,7 @@ function parsePrintfBuffer(hashedString, printfValueResource, bufferElementSize)
     return outStrArry;
 }
 
-async function fetchWithProgress(url, onProgress) {
+export async function fetchWithProgress(url: string, onProgress: { (loaded: number, total: number): void; }) {
     const response = await fetch(url);
     const contentLength = response.headers.get('Content-Length');
 
@@ -350,6 +384,10 @@ async function fetchWithProgress(url, onProgress) {
     let buffer = new Uint8Array(total); // Initial buffer
     let position = 0; // Tracks the current position in the buffer
 
+    if (!response.body) {
+        // Probably needs to be handled properly
+        throw new Error("No response body")
+    }
     const reader = response.body.getReader();
     const chunks = [];
 

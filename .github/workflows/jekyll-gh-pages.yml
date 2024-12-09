@@ -29,11 +29,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
 
       - name: get slang head commit
         run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
           mkdir slang-repo
           pushd slang-repo
           git clone https://github.com/shader-slang/slang.git
@@ -55,6 +55,7 @@ jobs:
           path: |
             ./slang-wasm.wasm.gz
             ./slang-wasm.js
+            ./slang-wasm.d.ts
           key: ${{hashFiles('key.txt')}}
 
       - name: restore spirv-tools
@@ -64,11 +65,14 @@ jobs:
           path: |
             ./spirv-tools.wasm
             ./spirv-tools.js
+            ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
       - name: slang-wasm build
         if: steps.cache_slang.outputs.cache-hit != 'true'
         run: |
+          sed -i -e 's/\r$//' ./slang-wasm-build.sh
+          chmod +x ./slang-wasm-build.sh
           ./slang-wasm-build.sh
 
       - name: save slang-wasm
@@ -78,11 +82,14 @@ jobs:
           path: |
             ./slang-wasm.wasm.gz
             ./slang-wasm.js
+            ./slang-wasm.d.ts
           key: ${{hashFiles('key.txt')}}
 
       - name: spirv-tools-wasm build
         if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
         run: |
+          sed -i -e 's/\r$//' ./spirv-tool-wasm-build.sh
+          chmod +x ./spirv-tool-wasm-build.sh
           ./spirv-tool-wasm-build.sh
 
       - name: save spirv-tools-wasm
@@ -92,6 +99,7 @@ jobs:
           path: |
             ./spirv-tools.wasm
             ./spirv-tools.js
+            ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
       - name: Cleanup workspace
@@ -100,13 +108,29 @@ jobs:
           rm -rf emsdk
           rm -rf spirv-tools
 
+      - name: Build typescript
+        run: |
+          npm install
+          npx tsc
+
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./
           destination: ./_site
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+
+      - name: Copy depencencies
+        run: |
+          sudo mkdir ./_site/node_modules
+          sudo cp -r node_modules/jjsontree.js ./_site/node_modules/jjsontree.js
+          sudo cp -r node_modules/requirejs ./_site/node_modules/requirejs
+          sudo cp -r node_modules/pako ./_site/node_modules/pako
+      - name: Upload export artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-artifact
+          path: ./_site/
+          compression-level: 1  
 
   # Deployment job
   deploy:
@@ -116,6 +140,18 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Download a single artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: site-artifact
+          path: ./_site/
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

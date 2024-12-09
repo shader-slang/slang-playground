@@ -21,11 +21,33 @@ pushd ./slang-repo
 pushd slang
 git submodule update --init --recursive
 
+echo "if(EMSCRIPTEN)
+    slang_add_target(
+        .
+        EXECUTABLE
+        EXCLUDE_FROM_ALL
+        USE_FEWER_WARNINGS
+        LINK_WITH_PRIVATE
+            miniz
+            lz4_static
+            slang
+            core
+            compiler-core
+            slang-capability-defs
+            slang-capability-lookup
+            slang-reflect-headers
+            slang-lookup-tables
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
+    )
+    # To generate binding code
+    target_link_options(slang-wasm PUBLIC "--bind" --emit-tsd \"$<TARGET_FILE_DIR:slang-wasm>/slang-wasm.d.ts\")
+endif()" > "source/slang-wasm/CMakeLists.txt"
+
 cmake --workflow --preset generators --fresh
 mkdir generators
 cmake --install build --prefix generators --component generators
 
-emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE -DSLANG_ENABLE_SPLIT_DEBUG_INFO=FALSE
 cmake --build --preset emscripten --target slang-wasm
 
 cmakeRet=$?

@@ -13,13 +13,13 @@
   <link rel="shortcut icon" href="/images/favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
   <link href="./styles/styles.css" rel="stylesheet" />
-  <link href="json-tree/jsontree.js.css" rel="stylesheet" />
+  <link rel="stylesheet" href="node_modules/jjsontree.js/dist/jsontree.js.css">
   <script src="https://unpkg.com/split-grid/dist/split-grid.js"></script>
-  <script src="https://unpkg.com/browser-cjs/require.min.js"></script>
-  <script src="json-tree/jsontree.min.js"></script>
+  <script src="node_modules/requirejs/require.js"></script>
+  <script src="node_modules/jjsontree.js/dist/jsontree.js"></script>
   <script>
-    let BrowserCJS = {};
-    BrowserCJS.require = require;
+    let RequireJS = {};
+    RequireJS.require = require;
   </script>
   <script src="https://microsoft.github.io/monaco-editor/node_modules/monaco-editor/min/vs/loader.js"></script>
   <script>
@@ -43,15 +43,14 @@
       )
     );
   </script>
-  <script src="util.js"></script>
-  <script src="playgroundShader.js"></script>
-  <script src="demos/demo-list.js"></script>
-  <script src="pass_through.js"></script>
-  <script src="compute.js"></script>
-  <script src="compiler.js"></script>
-  <script src="try-slang.js"></script>
-  <script src="language-server.js"></script>
-  <script async src="slang-wasm.js"></script>
+  <script type="module" src="util.js"></script>
+  <script type="module" src="playgroundShader.js"></script>
+  <script type="module" src="demos/demo-list.js"></script>
+  <script type="module" src="pass_through.js"></script>
+  <script type="module" src="compute.js"></script>
+  <script type="module" src="compiler.js"></script>
+  <script type="module" src="try-slang.js"></script>
+  <script type="module" src="language-server.js"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-TMTZVLLMBP"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -95,7 +94,7 @@
 
         <!-- Run section -->
         <div class="navbar-run navbar-item">
-          <button id="run-btn" onclick="onRun()" disabled
+          <button id="run-btn" disabled
             title="(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.)">&#9658;
             Run</button>
         </div>
@@ -124,7 +123,7 @@
             </select>
           </div>
 
-          <button id="compile-btn" onclick="onCompile()" disabled
+          <button id="compile-btn" disabled
             title='(Ctrl+B) Compile the shader to the selected target. Entrypoints needs to be marked with the `[shader("stage")]` attribute.'>
             Compile
           </button>
@@ -175,12 +174,25 @@
         <div class="gutter gutter-vertical"></div>
         <div class="codeGenSpace" id="targetResultContainer">
           <div class="codeGenHeader">
-            <button class="tabButton tabButtonActive" onclick="openTab(0)" id="btnTargetCode">Target Code</button>
-            <button class="tabButton" onclick="openTab(1)" id="btnReflection">Reflection</button>
+            <button class="tabButton tabButtonActive" id="btnTargetCode">Target Code</button>
+            <button class="tabButton" id="btnReflection">Reflection</button>
           </div>
           <div class="targetCodeEditor editorContainer" id="codeGen"></div>
           <div class="reflectionView" id="reflectionTab" style="display: none">
-            <div id="reflectionDiv" style="overflow: visible" data-jsontree-js="getReflectionJson"></div>
+            <div id="reflectionDiv" style="overflow: visible" data-jsontree-js="{
+              controlPanel: { enabled: false },
+              sideMenu: { enabled: false },
+              footer: { enabled: false },
+              lineNumbers: { enabled: false },
+              inspectionLevels: 8,
+              shortcutKeysEnabled: false,
+              title: {
+                  text: null,
+                  showCloseOpenAllButtons: false,
+                  showCopyButton: false,
+                  enableFullScreenToggling: false
+              }
+          }"></div>
           </div>
         </div>
       </div>
@@ -242,7 +254,7 @@
           </p>
       </div>
     </div>
-    <script src="ui.js"></script>
+    <script type="module" src="ui.js"></script>
 </body>
 
 </html>

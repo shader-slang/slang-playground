@@ -1,57 +1,61 @@
+import { Bindings } from "./compiler";
+import { ThreadGroupSize } from "./slang-wasm";
 
-class ComputePipeline
+export class ComputePipeline
 {
-    pipeline;
-    pipelineLayout;
+    pipeline: GPUComputePipeline | undefined;
+    pipelineLayout: GPUPipelineLayout | "auto" | undefined;
 
     // TODO: We should make this field optional, and only when user select a "Debug" mode will this option be available,
     // and we will output this buffer to the output area.
 
-    outputBuffer;
-    outputBufferRead;
-    outputTexture;
+    // outputBuffer;
+    // outputBufferRead;
+    // outputTexture;
     device;
-    bindGroup;
+    bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
-    threadGroupSize;
+    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number} | undefined;
 
     // resource name (string) -> binding descriptor 
-    resourceBindings;
+    resourceBindings: Bindings | undefined;
 
-    constructor(device)
+    constructor(device: GPUDevice)
     {
         this.device = device;
     }
 
-    setThreadGroupSize(size)
+    setThreadGroupSize(size: ThreadGroupSize | { x: number, y: number, z: number})
     {
         this.threadGroupSize = size;
     }
 
-    createPipelineLayout(resourceDescriptors)
+    createPipelineLayout(resourceDescriptors: Bindings)
     {
         this.resourceBindings = resourceDescriptors;
 
-        const entries = [];
+        const entries: GPUBindGroupLayoutEntry[] = [];
         for (const [name, binding] of this.resourceBindings)
         {
             entries.push(binding);
         }
-        const bindGroupLayoutDescriptor = {
+        const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
             label: 'compute pipeline bind group layout',
             entries: entries,
         };
 
-        const bindGroupLayout = device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
+        const bindGroupLayout = this.device.createBindGroupLayout(bindGroupLayoutDescriptor);
+        const layout = this.device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
 
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule, resources)
+    createPipeline(shaderModule: GPUShaderModule, resources: Map<string, GPUTexture | GPUBuffer> | null)
     {
-        const pipeline = device.createComputePipeline({
+        if(this.pipelineLayout == undefined)
+            throw new Error("Cannot create pipeline without layout")
+        const pipeline = this.device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
             compute: {module: shaderModule},
@@ -64,9 +68,14 @@ class ComputePipeline
             this.createBindGroup(resources);
     }
 
-    createBindGroup(allocatedResources)
+    createBindGroup(allocatedResources: Map<string, GPUObjectBase>)
     {
-        const entries = [];
+        if(this.resourceBindings == undefined)
+            throw new Error("No resource bindings")
+        if(this.pipeline == undefined)
+            throw new Error("No pipeline")
+
+        const entries: GPUBindGroupEntry[] = [];
         for (const [name, resource] of allocatedResources)
         {
             const bindInfo = this.resourceBindings.get(name);
@@ -75,14 +84,23 @@ class ComputePipeline
             {
                 if (bindInfo.buffer)
                 {
+                    if(!(resource instanceof GPUBuffer)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: {buffer: resource}});
                 }
                 else if (bindInfo.storageTexture)
                 {
+                    if(!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: resource.createView()});
                 }
                 else if (bindInfo.texture)
                 {
+                    if(!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state")
+                    }
                     entries.push({binding: bindInfo.binding, resource: resource.createView()});
                 }
             }
@@ -91,10 +109,11 @@ class ComputePipeline
         // Check that all resources are bound
         if (entries.length != this.resourceBindings.size)
         {
+            let missingEntries = []
             // print out the names of the resources that aren't bound
             for (const [name, resource] of this.resourceBindings)
             {
-                var missingEntries = []
+                missingEntries = []
                 if (!entries.find(entry => entry.binding == resource.binding))
                 {
                     missingEntries.push(name);
@@ -104,7 +123,7 @@ class ComputePipeline
             throw new Error("Cannot create bind-group. The following resources are not bound: " + missingEntries.join(", "));
         }
         
-        this.bindGroup = device.createBindGroup({
+        this.bindGroup = this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
             entries: entries,
         });

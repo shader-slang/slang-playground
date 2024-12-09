@@ -559,3 +559,8 @@ label {
     width: 150px;
   }
 }
+
+#reflectionDiv {
+  border: none;
+  background-color: transparent;
+}
