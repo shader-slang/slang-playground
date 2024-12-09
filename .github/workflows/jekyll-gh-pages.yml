@@ -102,16 +102,16 @@ jobs:
             ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
-      - name: build typescript
-        run: |
-          npm install
-          npx tsc
-
       - name: Cleanup workspace
         run: |
           rm -rf slang-repo
           rm -rf emsdk
           rm -rf spirv-tools
+
+      - name: Build typescript
+        run: |
+          npm install
+          npx tsc
 
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
