@@ -98,7 +98,7 @@ function updateProfileOptions(targetSelect: HTMLSelectElement, profileSelect: HT
   }
 }
 
-function updateEntryPointOptions()
+export function updateEntryPointOptions()
 {
   if (!compiler)
     return;
