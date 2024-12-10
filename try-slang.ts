@@ -5,6 +5,8 @@ import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse, renderOutput, canvas, entryPointSelect, targetSelect } from './ui.js';
 import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand } from './util.js';
+import { updateEntryPointOptions } from "./ui.js";
+
 import type { LanguageServer, MainModule, ThreadGroupSize } from "./slang-wasm.js";
 
 // ignore complaint about missing types - added via tsconfig
@@ -21,6 +23,12 @@ declare let RequireJS: {
     require: typeof require
 };
 
+class NotReadyError extends Error {
+    constructor(message: string) {
+        super(message);
+    }
+}
+  
 export var compiler: SlangCompiler | null = null;
 export var slangd: LanguageServer | null = null;
 var device: GPUDevice;
@@ -169,7 +177,12 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
             setupFn().then(() => {
                 requestAnimationFrame(newRenderLoop);
             }).catch((error: Error) => {
-                diagnosticsArea.setValue(error.message);
+                if (error instanceof NotReadyError) {
+                }
+                else {
+                    if (diagnosticsArea != null)
+                        diagnosticsArea.setValue(error.message);
+                }
                 releaseRenderLock();
             });
         });
@@ -197,10 +210,10 @@ function startRendering() {
     // This is a lighter-weight setup function that doesn't need to re-compile the shader code.
     const setupRenderer = async () => {
         if (!computePipeline || !passThroughPipeline)
-            throw new Error("pipeline not ready");
+            throw new NotReadyError("pipeline not ready");
 
         if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
-            throw new Error("window not ready");
+            throw new NotReadyError("window not ready");
 
         allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
 
@@ -929,7 +942,9 @@ export async function onCompile() {
     toggleDisplayMode(HIDDEN_MODE);
     const compileTarget = targetSelect.value;
 
+    await updateEntryPointOptions();
     const entryPoint = entryPointSelect.value;
+    
     if (entryPoint == "" && !isWholeProgramTarget(compileTarget)) {
         diagnosticsArea.setValue("Please select the entry point name");
         return;

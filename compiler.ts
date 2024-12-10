@@ -345,7 +345,7 @@ export class SlangCompiler {
         return true;
     }
 
-    getBindingDescriptor(index: number, programReflection: ProgramLayout, parameter: VariableLayoutReflection): BindingDescriptor {
+    getBindingDescriptor(index: number, programReflection: ProgramLayout, parameter: VariableLayoutReflection): BindingDescriptor|null {
         const globalLayout = programReflection.getGlobalParamsTypeLayout();
 
         if(globalLayout == null) {
@@ -374,7 +374,7 @@ export class SlangCompiler {
         else if (bindingType == this.slangWasmModule.BindingType.MutableRawBuffer) {
             return { buffer: { type: 'storage' } };
         }
-        throw new Error(`Binding type ${bindingType} not supported`)
+        return null;
     }
 
     getResourceBindings(linkedProgram: ComponentType): Bindings {
@@ -401,7 +401,8 @@ export class SlangCompiler {
             const resourceInfo = this.getBindingDescriptor(parameter.getBindingIndex(), reflection, parameter);
 
             // extend binding with resourceInfo
-            Object.assign(binding, resourceInfo);
+            if (resourceInfo)
+                Object.assign(binding, resourceInfo);
 
             resourceDescriptors.set(name, binding);
         }

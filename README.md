@@ -31,7 +31,7 @@ git clone https://github.com/shader-slang/slang-playground.git
 2. Start a Python web server to host the files:
 
    ```bash
-   python -m http.server 8000
+   python serve.py
    ```
 
 3. Open `http://localhost:8000` in your browser to verify the server is running and the files are accessible. You should see the application loading the `.wasm` and `.js` files correctly.
@@ -54,3 +54,5 @@ Run `npm install` to install dependencies.
 You can then run `npx tsc` and host the webserver from the main directory. You will either need to run `npx tsc` whenever you make a code change, or you can run `npx tsc --watch` to continuously compile.
 
 Now load or reload `localhost:8000` in your browser to see the results.
+
+When updating CSS or some transitively included files, the browser may use the out of date file stored in the cache. To prevent this, you can hold Shift key and click Refresh to force the browser to reload all files.
