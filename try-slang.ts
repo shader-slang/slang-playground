@@ -316,6 +316,7 @@ async function execFrame(timeMS: number) {
         }
         pass.setPipeline(pipeline.pipeline);
         // Determine the workgroup size based on the size of the buffer or texture.
+        let size: [number, number, number]
         if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
@@ -323,39 +324,47 @@ async function execFrame(timeMS: number) {
                 return false;
             }
 
-            if (pipeline.threadGroupSize == undefined) {
-                throw new Error("threadGroupSize is undefined")
-            }
-
             let resource = allocatedResources.get(command.resourceName)
             if (resource instanceof GPUBuffer) {
-                let size = resource.size / 4;
-                const blockSizeX = pipeline.threadGroupSize.x;
-                const blockSizeY = pipeline.threadGroupSize.y;
-
-                const workGroupSizeX = Math.floor((size + blockSizeX - 1) / blockSizeX);
-                const workGroupSizeY = Math.floor((1 + blockSizeY - 1) / blockSizeY);
-
-                pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
+                size = [resource.size / 4, 1, 1];
             }
             else if (resource instanceof GPUTexture) {
-                let size = [0, 0];
-                size[0] = resource.width;
-                size[1] = resource.height;
-                const blockSizeX = pipeline.threadGroupSize.x;
-                const blockSizeY = pipeline.threadGroupSize.y;
-
-                const workGroupSizeX = Math.floor((size[0] + blockSizeX - 1) / blockSizeX);
-                const workGroupSizeY = Math.floor((size[1] + blockSizeY - 1) / blockSizeY);
-
-                pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
+                size = [resource.width, resource.height, 1];
             }
             else {
                 pass.end();
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
                 return false;
             }
+        } else if (command.type == "FIXED_SIZE") {
+            if(command.size.length > 3) {
+                diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Too many parameters: " + command.size);
+                pass.end();
+                return false;
+            }
+            size = [1, 1, 1]
+            for(let i = 0; i < command.size.length; i++) {
+                size[i] = command.size[i]
+            }
+        } else {
+            // exhaustiveness check
+            let x: never = command;
+            throw new Error("Invalid state!")
         }
+
+        if (pipeline.threadGroupSize == undefined) {
+            throw new Error("threadGroupSize is undefined")
+        }
+
+        const blockSizeX = pipeline.threadGroupSize.x;
+        const blockSizeY = pipeline.threadGroupSize.y;
+        const blockSizeZ = pipeline.threadGroupSize.z;
+
+        const workGroupSizeX = Math.floor((size[0] + blockSizeX - 1) / blockSizeX);
+        const workGroupSizeY = Math.floor((size[1] + blockSizeY - 1) / blockSizeY);
+        const workGroupSizeZ = Math.floor((size[2] + blockSizeZ - 1) / blockSizeZ);
+
+        pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY, workGroupSizeZ);
 
         pass.end();
     }
