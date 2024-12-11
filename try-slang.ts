@@ -69,6 +69,14 @@ var currentMode = RENDER_MODE;
 var randFloatPipeline: ComputePipeline;
 var randFloatResources: Map<string, GPUObjectBase>;
 
+export function setEditorValue(editor:monaco.editor.IStandaloneCodeEditor, value: string, revealEnd:boolean = false) {
+    editor.setValue(value);
+    if (revealEnd)
+        editor.revealLine(editor.getModel()?.getLineCount() || 0);
+    else
+        editor.revealLine(0);
+}
+
 async function webgpuInit() {
     try {
         const adapter = await navigator.gpu?.requestAdapter();
@@ -163,9 +171,9 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
                         requestAnimationFrame(newRenderLoop);
                 } catch (error: any) {
                     if (error instanceof Error)
-                        diagnosticsArea.setValue(`Error when rendering: ${error.message} in ${error.stack}`);
+                        setEditorValue(diagnosticsArea, `Error when rendering: ${error.message} in ${error.stack}`, true);
                     else
-                        diagnosticsArea.setValue(`Error when rendering: ${error}`);
+                        setEditorValue(diagnosticsArea, `Error when rendering: ${error}`, true);
                 }
                 finally {
                     if (!nextFrame)
@@ -181,7 +189,7 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
                 }
                 else {
                     if (diagnosticsArea != null)
-                        diagnosticsArea.setValue(error.message);
+                        setEditorValue(diagnosticsArea, error.message, true);
                 }
                 releaseRenderLock();
             });
@@ -319,7 +327,7 @@ async function execFrame(timeMS: number) {
         let size: [number, number, number]
         if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
-                diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
+                setEditorValue(diagnosticsArea, "Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();
                 return false;
             }
@@ -333,7 +341,7 @@ async function execFrame(timeMS: number) {
             }
             else {
                 pass.end();
-                diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
+                setEditorValue(diagnosticsArea, "Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
                 return false;
             }
         } else if (command.type == "FIXED_SIZE") {
@@ -776,7 +784,7 @@ export var onRun = () => {
             const shaderType = checkShaderType(userSource);
             if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
                 toggleDisplayMode(HIDDEN_MODE);
-                codeGenArea.setValue("");
+                setEditorValue(codeGenArea, "");
                 throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
             }
 
@@ -871,7 +879,7 @@ export var onRun = () => {
 }
 
 function appendOutput(editor: monaco.editor.IStandaloneCodeEditor, textLine: string) {
-    editor.setValue(editor.getValue() + textLine + "\n");
+    setEditorValue(editor, editor.getValue() + textLine + "\n", true);
 }
 
 export function compileOrRun() {
@@ -913,18 +921,18 @@ type Shader = {
 function compileShader(userSource: string, entryPoint: string, compileTarget: string, includePlaygroundModule = true): Shader {
     if (compiler == null) throw new Error("No compiler available")
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
-    diagnosticsArea.setValue(compiler.diagnosticsMsg);
+    setEditorValue(diagnosticsArea, compiler.diagnosticsMsg, true);
 
     // If compile is failed, we just clear the codeGenArea
     if (!compiledResult) {
-        codeGenArea.setValue('Compilation returned empty result.');
+        setEditorValue(codeGenArea, 'Compilation returned empty result.');
         return { succ: false };
     }
 
     let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSize] = compiledResult;
     reflectionJson = reflectionJsonObj;
 
-    codeGenArea.setValue(compiledCode);
+    setEditorValue(codeGenArea, compiledCode);
     let model = codeGenArea.getModel();
     if (model == null) {
         throw new Error("Cannot get editor model")
@@ -955,7 +963,7 @@ export async function onCompile() {
     const entryPoint = entryPointSelect.value;
     
     if (entryPoint == "" && !isWholeProgramTarget(compileTarget)) {
-        diagnosticsArea.setValue("Please select the entry point name");
+        setEditorValue(diagnosticsArea, "Please select the entry point name");
         return;
     }
 
@@ -969,7 +977,7 @@ export async function onCompile() {
     compileShader(userSource, entryPoint, compileTarget);
 
     if (compiler.diagnosticsMsg.length > 0) {
-        diagnosticsArea.setValue(compiler.diagnosticsMsg);
+        setEditorValue(diagnosticsArea, compiler.diagnosticsMsg);
         return;
     }
 }
@@ -1016,6 +1024,7 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
         else if (containerId == "codeGen") {
             codeGenArea = editor;
         }
+        runIfFullyInitialized();
     })
 }
 
@@ -1060,17 +1069,25 @@ globalThis.Module = {
         var label = document.getElementById("loadingStatusLabel");
         if (label)
             label.innerText = "Initializing Slang Compiler...";
-        compiler = new SlangCompiler(globalThis.Module);
-        var result = compiler.init();
-        slangd = globalThis.Module.createLanguageServer();
-        if (result.ret) {
-            (document.getElementById("compile-btn") as HTMLButtonElement).disabled = false;
-            moduleLoadingMessage = "Slang compiler initialized successfully.\n";
-            runIfFullyInitialized();
+        try {
+            compiler = new SlangCompiler(globalThis.Module);
+            var result = compiler.init();
+            slangd = globalThis.Module.createLanguageServer();
+            if (result.ret) {
+                (document.getElementById("compile-btn") as HTMLButtonElement).disabled = false;
+                moduleLoadingMessage = "Slang compiler initialized successfully.\n";
+                runIfFullyInitialized();
+            }
+            else {
+                console.log(result.msg);
+                moduleLoadingMessage = "Failed to initialize Slang Compiler.\n";
+                if (label)
+                    label.innerText = moduleLoadingMessage;
+            }
         }
-        else {
-            console.log(result.msg);
-            moduleLoadingMessage = "Failed to initialize Slang Compiler, Run and Compile features are disabled.\n";
+        catch(error:any) {
+            if (label)
+                label.innerText = error.toString(error);
         }
     }
 } satisfies Partial<ModuleType> as any;
@@ -1089,7 +1106,7 @@ window.onload = async function () {
         button.disabled = false;
     }
     else {
-        diagnosticsArea.setValue(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
+        setEditorValue(diagnosticsArea, moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
         button.title = "Run shader feature is disabled because the current browser does not support WebGPU.";
     }
     runIfFullyInitialized();

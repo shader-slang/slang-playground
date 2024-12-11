@@ -1,4 +1,4 @@
-import { monacoEditor, compiler, compileOrRun, onCompile, onRun } from './try-slang.js';
+import { monacoEditor, compiler, compileOrRun, onCompile, onRun, setEditorValue } from './try-slang.js';
 import { demoList } from './demos/demo-list.js';
 import { isWholeProgramTarget } from './compiler.js';
 import { loadEditor } from './try-slang.js';
@@ -234,7 +234,7 @@ export function loadDemo(selectedDemoURL: string) {
     fetch(finalURL)
       .then((response) => response.text())
       .then((data) => {
-        monacoEditor.setValue(data);
+        setEditorValue(monacoEditor, data);
         updateEntryPointOptions();
         compileOrRun();
       });
