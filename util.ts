@@ -1,3 +1,4 @@
+import { ReflectionJSON } from './compiler.js';
 import { ParsedCommand } from './try-slang.js';
 
 export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
@@ -10,7 +11,7 @@ export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
             GPUTextureUsage.RENDER_ATTACHMENT,
     };
 
-    if(context == null) {
+    if (context == null) {
         throw new Error("Could not get webgpu context")
     }
 
@@ -53,15 +54,6 @@ function parseResourceCommand(command: string): ParsedCommand {
         if (funcName === "ZEROS") {
             return { type: "ZEROS", size: args.map(Number) };
         }
-        else if (funcName === "URL") {
-            // remove the quotes
-            const validURLMatch = args[0].match(/"(.*)"/)
-            if (!validURLMatch) {
-                throw new Error(`Invalid URL: ${args[0]}`);
-            }
-
-            return { type: "URL", url: validURLMatch[1] };
-        }
         else if (funcName === "RAND") {
             return { type: "RAND", size: args.map(Number) };
         };
@@ -78,11 +70,10 @@ export function parseResourceCommands(userSource: string): { resourceName: strin
     //
     // Here are some patterns we support:
     // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
-    // 2. //! @myBuffer: URL("https://example.com/image.png")   ==> Initialize "myBuffer" with image from URL.
     // 3. //! @noiseBuffer: RAND(1000)   ==> Initialize "myBuffer" with uniform random floats between 0 and 1.
     //
 
-    const resourceCommands = [];
+    const resourceCommands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
     const lines = userSource.split('\n');
     for (let line of lines) {
         const match = line.match(/\/\/!\s+@(\w+):\s*(.*)/);
@@ -95,6 +86,27 @@ export function parseResourceCommands(userSource: string): { resourceName: strin
     }
 
     return resourceCommands;
+}
+
+export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
+    let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = []
+
+    for (let parameter of reflection.parameters) {
+        if (parameter.userAttribs == undefined) continue;
+        for (let attribute of parameter.userAttribs) {
+            if (attribute.name == "URL") {
+                commands.push({
+                    resourceName: parameter.name,
+                    parsedCommand: {
+                        type: "URL",
+                        url: attribute.arguments[0] as string
+                    }
+                })
+            }
+        }
+    }
+
+    return commands
 }
 
 export type CallCommand = {
@@ -164,7 +176,7 @@ function parsePrintfFormat(formatString: string): FormatSpecifier[] {
         }
 
         let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
-        let precision_number = precision_text?parseInt(precision):null
+        let precision_number = precision_text ? parseInt(precision) : null
 
         let width_number = width ? parseInt(width) : null
 
@@ -208,7 +220,7 @@ function formatPrintfString(parsedTokens: FormatSpecifier[], data: any[]) {
 // Helper function to format each specifier
 function formatSpecifier(value: string, { flags, width, precision, specifierType }: FormatSpecifier & { type: 'specifier' }) {
     let formattedValue;
-    if(precision == null)
+    if (precision == null)
         precision = 6; //eww magic number
     switch (specifierType) {
         case 'd':

@@ -229,8 +229,8 @@
             WebGPU shaders in browser can use certain commands to specify how they will run.
             
             <li><code>//! @outputBuffer: ZEROS(512, 512)</code></li>
-            Initialize "outputBuffer" with zeros of the provided size. Also works on Textures, but for <code>RWTexture</code>s you will need to add a <code>[format("r32f")]</code> attribute.
-            <li><code>//! @myImage: URL("https://example.com/image.png")</code></li>
+            Initialize "outputBuffer" with zeros of the provided size. Also works on float Textures.
+            <li><code>[URL("https://example.com/image.png")]</code></li>
             Initialize "myImage" texture with image from URL.
             <li><code>//! @noiseBuffer: RAND(1000)</code></li>
             Initialize "noiseBuffer" with uniform random floats between 0 and 1.

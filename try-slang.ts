@@ -1,10 +1,10 @@
 /// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { ComputePipeline } from './compute.js';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
-import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
+import { SlangCompiler, Bindings, isWholeProgramTarget, ReflectionJSON } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse, renderOutput, canvas, entryPointSelect, targetSelect } from './ui.js';
-import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand } from './util.js';
+import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand, getCommandsFromAttributes } from './util.js';
 import { updateEntryPointOptions } from "./ui.js";
 
 import type { LanguageServer, MainModule, ThreadGroupSize } from "./slang-wasm.js";
@@ -800,6 +800,8 @@ export var onRun = () => {
 
             resourceCommands = parseResourceCommands(userSource);
 
+            resourceCommands = resourceCommands.concat(getCommandsFromAttributes(ret.reflection))
+
             try {
                 callCommands = parseCallCommands(userSource);
             }
@@ -913,7 +915,7 @@ type Shader = {
     code: string,
     layout: Bindings,
     hashedStrings: any,
-    reflection: any,
+    reflection: ReflectionJSON,
     threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number }
 } | {
     succ: false

@@ -59,7 +59,7 @@ RWStructuredBuffer<float> adamFirstMoment;
 //! @adamSecondMoment: ZEROS(184320)
 RWStructuredBuffer<float> adamSecondMoment;
 
-//! @targetTexture: URL("static/jeep.jpg")
+[URL("static/jeep.jpg")]
 Texture2D<float4> targetTexture;
 
 // ----- Shared memory declarations --------

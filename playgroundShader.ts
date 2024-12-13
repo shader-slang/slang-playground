@@ -103,4 +103,11 @@ public void printf<each T>(String format, expand each T values) where T : IPrint
 {
     print(format, expand each values);
 }
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct URLAttribute
+{
+    string url;
+};
+
 `;
