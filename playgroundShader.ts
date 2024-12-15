@@ -105,9 +105,28 @@ public void printf<each T>(String format, expand each T values) where T : IPrint
 }
 
 [__AttributeUsage(_AttributeTargets.Var)]
+public struct ZEROSAttribute
+{
+    int count;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct BLACKAttribute
+{
+    int width;
+    int height;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
 public struct URLAttribute
 {
     string url;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct RANDAttribute
+{
+    int count;
 };
 
 `;

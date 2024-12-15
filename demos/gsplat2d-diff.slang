@@ -47,16 +47,16 @@ static const float ADAM_EPSILON = 1e-8;
 // initializing & binding these buffers.
 //
 
-//! @blobsBuffer: RAND(184320)
+[RAND(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> blobsBuffer;
 
-//! @derivBuffer: ZEROS(184320)
+[ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<Atomic<uint>> derivBuffer;
 
-//! @adamFirstMoment: ZEROS(184320)
+[ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> adamFirstMoment;
 
-//! @adamSecondMoment: ZEROS(184320)
+[ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> adamSecondMoment;
 
 [URL("static/jeep.jpg")]

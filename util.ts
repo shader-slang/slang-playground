@@ -42,65 +42,45 @@ function reinterpretUint32AsFloat(uint32: number) {
     return float32View[0];
 }
 
-
-function parseResourceCommand(command: string): ParsedCommand {
-    const match = command.match(/(\w+)\((.*)\)/);
-    if (match) {
-        const funcName = match[1];
-
-        // TODO: This isn't a very robust parser.. any commas in the url will break it.
-        const args = match[2].split(',').map(arg => arg.trim());
-
-        if (funcName === "ZEROS") {
-            return { type: "ZEROS", size: args.map(Number) };
-        }
-        else if (funcName === "RAND") {
-            return { type: "RAND", size: args.map(Number) };
-        };
-        throw new Error(`Unrecognized command: ${command}`);
-
-    }
-    else {
-        throw new Error(`Invalid command: ${command}`);
-    }
-}
-
-export function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
-    // Now we'll handle some special comments that the user can provide to initialize their resources.
-    //
-    // Here are some patterns we support:
-    // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
-    // 3. //! @noiseBuffer: RAND(1000)   ==> Initialize "myBuffer" with uniform random floats between 0 and 1.
-    //
-
-    const resourceCommands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
-    const lines = userSource.split('\n');
-    for (let line of lines) {
-        const match = line.match(/\/\/!\s+@(\w+):\s*(.*)/);
-        if (match) {
-            const resourceName = match[1];
-            const command = match[2];
-            const parsedCommand = parseResourceCommand(command);
-            resourceCommands.push({ resourceName, parsedCommand });
-        }
-    }
-
-    return resourceCommands;
-}
-
+/**
+ * Here are some patterns we support:
+ * 
+ * | Attribute                                | Result                        
+ * | :--------------------------------------- | :-
+ * | `[ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
+ * | `[BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
+ * | `[URL("https://example.com/image.png")]` | Initialize a texture with image from URL
+ * | `[RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
+ */
 export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
     let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = []
 
     for (let parameter of reflection.parameters) {
         if (parameter.userAttribs == undefined) continue;
         for (let attribute of parameter.userAttribs) {
-            if (attribute.name == "URL") {
+            let command: ParsedCommand | null = null;
+            if (attribute.name == "ZEROS" || attribute.name == "RAND") {
+                command = {
+                    type: attribute.name,
+                    count: attribute.arguments[0] as number,
+                }
+            } else if (attribute.name == "BLACK") {
+                command = {
+                    type: "BLACK",
+                    width: attribute.arguments[0] as number,
+                    height: attribute.arguments[1] as number,
+                }
+            } else if (attribute.name == "URL") {
+                command = {
+                    type: "URL",
+                    url: attribute.arguments[0] as string,
+                }
+            }
+
+            if (command != null) {
                 commands.push({
                     resourceName: parameter.name,
-                    parsedCommand: {
-                        type: "URL",
-                        url: attribute.arguments[0] as string
-                    }
+                    parsedCommand: command
                 })
             }
         }
