@@ -68,6 +68,23 @@ type BindingDescriptor = {
 
 export type Bindings = Map<string, GPUBindGroupLayoutEntry>
 
+export type ReflectionJSON = {
+    "entryPoints": {
+        "name": string,
+        "semanticName": string,
+        "type": unknown
+    }[],
+    "parameters": {
+        "binding": unknown,
+        "name": string,
+        "type": unknown,
+        "userAttribs"?: {
+            "arguments": any[],
+            "name": string,
+        }[],
+    }[],
+}
+
 
 export class SlangCompiler {
     static SLANG_STAGE_VERTEX = 1;
@@ -422,7 +439,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, any, ThreadGroupSize | {x: number, y: number, z: number}] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, ReflectionJSON, ThreadGroupSize | {x: number, y: number, z: number}] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = (shaderSource.match(/printMain|imageMain/) != null);

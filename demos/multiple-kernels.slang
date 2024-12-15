@@ -1,6 +1,6 @@
 import playground;
 
-//! @buf: RAND(131072)
+[RAND(131072)]
 RWStructuredBuffer<float> buf;
 
 // Fills buffer with a sine wave
