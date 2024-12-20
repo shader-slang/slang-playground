@@ -47,10 +47,10 @@ function reinterpretUint32AsFloat(uint32: number) {
  * 
  * | Attribute                                | Result                        
  * | :--------------------------------------- | :-
- * | `[ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
- * | `[BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
- * | `[URL("https://example.com/image.png")]` | Initialize a texture with image from URL
- * | `[RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
+ * | `[playground::ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
+ * | `[playground::BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
+ * | `[playground::URL("https://example.com/image.png")]` | Initialize a texture with image from URL
+ * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
  */
 export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
     let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = []
@@ -59,18 +59,22 @@ export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourc
         if (parameter.userAttribs == undefined) continue;
         for (let attribute of parameter.userAttribs) {
             let command: ParsedCommand | null = null;
-            if (attribute.name == "ZEROS" || attribute.name == "RAND") {
+
+            if(!attribute.name.startsWith("playground_")) continue;
+
+            let playground_attribute_name  =  attribute.name.slice(11)
+            if (playground_attribute_name == "ZEROS" || playground_attribute_name == "RAND") {
                 command = {
-                    type: attribute.name,
+                    type: playground_attribute_name,
                     count: attribute.arguments[0] as number,
                 }
-            } else if (attribute.name == "BLACK") {
+            } else if (playground_attribute_name == "BLACK") {
                 command = {
                     type: "BLACK",
                     width: attribute.arguments[0] as number,
                     height: attribute.arguments[1] as number,
                 }
-            } else if (attribute.name == "URL") {
+            } else if (playground_attribute_name == "URL") {
                 command = {
                     type: "URL",
                     url: attribute.arguments[0] as string,

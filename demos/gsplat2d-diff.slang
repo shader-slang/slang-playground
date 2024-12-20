@@ -47,19 +47,19 @@ static const float ADAM_EPSILON = 1e-8;
 // initializing & binding these buffers.
 //
 
-[RAND(BLOB_BUFFER_SIZE)]
+[playground::RAND(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> blobsBuffer;
 
-[ZEROS(BLOB_BUFFER_SIZE)]
+[playground::ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<Atomic<uint>> derivBuffer;
 
-[ZEROS(BLOB_BUFFER_SIZE)]
+[playground::ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> adamFirstMoment;
 
-[ZEROS(BLOB_BUFFER_SIZE)]
+[playground::ZEROS(BLOB_BUFFER_SIZE)]
 RWStructuredBuffer<float> adamSecondMoment;
 
-[URL("static/jeep.jpg")]
+[playground::URL("static/jeep.jpg")]
 Texture2D<float4> targetTexture;
 
 // ----- Shared memory declarations --------
