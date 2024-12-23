@@ -1,6 +1,6 @@
 import playground;
 
-//! @randBuffer: RAND(131072)
+[playground::RAND(131072)]
 RWStructuredBuffer<float> randBuffer;
 
 #define GAUSSIANS_PER_BLOCK 256

@@ -2,7 +2,7 @@
 
 import playground;
 
-//! @myImage: URL("static/jeep.jpg")
+[playground::URL("static/jeep.jpg")]
 Texture2D<float4> myImage;
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)

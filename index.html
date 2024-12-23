@@ -228,12 +228,14 @@
           <p>
             WebGPU shaders in browser can use certain commands to specify how they will run.
             
-            <li><code>//! @outputBuffer: ZEROS(512, 512)</code></li>
-            Initialize "outputBuffer" with zeros of the provided size. Also works on Textures, but for <code>RWTexture</code>s you will need to add a <code>[format("r32f")]</code> attribute.
-            <li><code>//! @myImage: URL("https://example.com/image.png")</code></li>
-            Initialize "myImage" texture with image from URL.
-            <li><code>//! @noiseBuffer: RAND(1000)</code></li>
-            Initialize "noiseBuffer" with uniform random floats between 0 and 1.
+            <li><code>[playground::ZEROS(512)]</code></li>
+            Initialize a float buffer with zeros of the provided size.
+            <li><code>[playground::BLACK(512, 512)]</code></li>
+            Initialize a float texture with zeros of the provided size.
+            <li><code>[playground::URL("https://example.com/image.png")]</code></li>
+            Initialize a texture with image from URL.
+            <li><code>[playground::RAND(1000)]</code></li>
+            Initialize a float buffer with uniform random floats between 0 and 1.
             <li><code>//! CALL(fn-name, SIZE_OF(<resource-name>))</code></li>
             Dispatch a compute pass with the given function name and using the resource size to determine the work-group size.
             <li><code>//! CALL(fn-name, 512, 512)</code></li>

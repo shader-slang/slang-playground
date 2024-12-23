@@ -103,4 +103,30 @@ public void printf<each T>(String format, expand each T values) where T : IPrint
 {
     print(format, expand each values);
 }
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_ZEROSAttribute
+{
+    int count;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_BLACKAttribute
+{
+    int width;
+    int height;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_URLAttribute
+{
+    string url;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_RANDAttribute
+{
+    int count;
+};
+
 `;

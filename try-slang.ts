@@ -1,10 +1,10 @@
 /// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { ComputePipeline } from './compute.js';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
-import { SlangCompiler, Bindings, isWholeProgramTarget } from './compiler.js';
+import { SlangCompiler, Bindings, isWholeProgramTarget, ReflectionJSON } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse, renderOutput, canvas, entryPointSelect, targetSelect } from './ui.js';
-import { fetchWithProgress, configContext, parseResourceCommands, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand } from './util.js';
+import { fetchWithProgress, configContext, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand, getCommandsFromAttributes } from './util.js';
 import { updateEntryPointOptions } from "./ui.js";
 
 import type { LanguageServer, MainModule, ThreadGroupSize } from "./slang-wasm.js";
@@ -28,7 +28,7 @@ class NotReadyError extends Error {
         super(message);
     }
 }
-  
+
 export var compiler: SlangCompiler | null = null;
 export var slangd: LanguageServer | null = null;
 var device: GPUDevice;
@@ -69,7 +69,7 @@ var currentMode = RENDER_MODE;
 var randFloatPipeline: ComputePipeline;
 var randFloatResources: Map<string, GPUObjectBase>;
 
-export function setEditorValue(editor:monaco.editor.IStandaloneCodeEditor, value: string, revealEnd:boolean = false) {
+export function setEditorValue(editor: monaco.editor.IStandaloneCodeEditor, value: string, revealEnd: boolean = false) {
     editor.setValue(value);
     if (revealEnd)
         editor.revealLine(editor.getModel()?.getLineCount() || 0);
@@ -84,7 +84,7 @@ async function webgpuInit() {
             console.log('need a browser that supports WebGPU');
             return;
         }
-        const requiredFeatures: never[] = [];
+        const requiredFeatures: [] = [];
 
         device = await adapter?.requestDevice({ requiredFeatures });
         if (!device) {
@@ -345,13 +345,13 @@ async function execFrame(timeMS: number) {
                 return false;
             }
         } else if (command.type == "FIXED_SIZE") {
-            if(command.size.length > 3) {
+            if (command.size.length > 3) {
                 diagnosticsArea.setValue("Error when dispatching " + command.fnName + ". Too many parameters: " + command.size);
                 pass.end();
                 return false;
             }
             size = [1, 1, 1]
-            for(let i = 0; i < command.size.length; i++) {
+            for (let i = 0; i < command.size.length; i++) {
                 size[i] = command.size[i]
             }
         } else {
@@ -529,7 +529,11 @@ function checkShaderType(userSource: string) {
 
 export type ParsedCommand = {
     "type": "ZEROS" | "RAND",
-    "size": number[],
+    "count": number,
+} | {
+    "type": "BLACK",
+    "width": number,
+    "height": number,
 } | {
     "type": "URL",
     "url": string,
@@ -549,53 +553,63 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
-            const size = parsedCommand.size.reduce((a: number, b: number) => a * b);
             const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
 
-            if (bindingInfo.buffer) {
-                const buffer = pipeline.device.createBuffer({
-                    size: size * elementSize,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-                });
-
-                safeSet(allocatedResources, resourceName, buffer);
-
-                // Initialize the buffer with zeros.
-                const zeros = new Float32Array(size);
-                pipeline.device.queue.writeBuffer(buffer, 0, zeros);
-            } else if (bindingInfo.texture || bindingInfo.storageTexture) {
-                if (parsedCommand.size.length !== 2) {
-                    throw new Error(`Invalid parameter count ${parsedCommand.size.length} for ZEROS on texture ${resourceName}, should be 2.`);
-                }
-                try {
-                    let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
-                    if (bindingInfo.storageTexture) {
-                        usage |= GPUTextureUsage.STORAGE_BINDING;
-                    }
-                    const texture = pipeline.device.createTexture({
-                        size: parsedCommand.size,
-                        format: bindingInfo.storageTexture ? 'r32float' : 'rgba8unorm',
-                        usage: usage,
-                    });
-
-                    safeSet(allocatedResources, resourceName, texture);
-
-                    // Initialize the texture with zeros.
-                    let zeros = new Uint8Array(Array(size * elementSize).fill(0));
-                    pipeline.device.queue.writeTexture({ texture }, zeros, { bytesPerRow: parsedCommand.size[0] * elementSize }, { width: parsedCommand.size[0], height: parsedCommand.size[1] });
-                }
-                catch (error) {
-                    throw new Error(`Failed to create texture: ${error}`);
-                }
-            } else {
+            if (!bindingInfo.buffer) {
                 throw new Error(`Resource ${resourceName} is an invalid type for ZEROS`);
             }
-        }
-        else if (parsedCommand.type === "URL") {
+
+            const buffer = pipeline.device.createBuffer({
+                size: parsedCommand.count * elementSize,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+            });
+
+            safeSet(allocatedResources, resourceName, buffer);
+
+            // Initialize the buffer with zeros.
+            let zeros: BufferSource;
+            if(elementSize == 4) {
+                zeros = new Float32Array(parsedCommand.count);
+            } else {
+                throw new Error("Element size isn't handled")
+            }
+            pipeline.device.queue.writeBuffer(buffer, 0, zeros);
+        } else if (parsedCommand.type === "BLACK") {
+            const size = parsedCommand.width * parsedCommand.height;
+            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
+            const bindingInfo = resourceBindings.get(resourceName);
+            if (!bindingInfo) {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            if (!bindingInfo.texture && !bindingInfo.storageTexture) {
+                throw new Error(`Resource ${resourceName} is an invalid type for BLACK`);
+            }
+            try {
+                let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT;
+                if (bindingInfo.storageTexture) {
+                    usage |= GPUTextureUsage.STORAGE_BINDING;
+                }
+                const texture = pipeline.device.createTexture({
+                    size: [parsedCommand.width, parsedCommand.height],
+                    format: bindingInfo.storageTexture ? 'r32float' : 'rgba8unorm',
+                    usage: usage,
+                });
+
+                safeSet(allocatedResources, resourceName, texture);
+
+                // Initialize the texture with zeros.
+                let zeros = new Uint8Array(Array(size * elementSize).fill(0));
+                pipeline.device.queue.writeTexture({ texture }, zeros, { bytesPerRow: parsedCommand.width * elementSize }, { width: parsedCommand.width, height: parsedCommand.height });
+            }
+            catch (error) {
+                throw new Error(`Failed to create texture: ${error}`);
+            }
+        } else if (parsedCommand.type === "URL") {
             // Load image from URL and wait for it to be ready.
             const bindingInfo = resourceBindings.get(resourceName);
 
@@ -634,9 +648,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             catch (error) {
                 throw new Error(`Failed to create texture from image: ${error}`);
             }
-        }
-        else if (parsedCommand.type === "RAND") {
-            const size = parsedCommand.size.reduce((a: number, b: number) => a * b);
+        } else if (parsedCommand.type === "RAND") {
             const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
@@ -648,7 +660,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             }
 
             const buffer = pipeline.device.createBuffer({
-                size: size * elementSize,
+                size: parsedCommand.count * elementSize,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             });
 
@@ -712,7 +724,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 }
                 pass.setPipeline(randomPipeline.pipeline);
 
-                const workGroupSizeX = Math.floor((size + 63) / 64);
+                const workGroupSizeX = Math.floor((parsedCommand.count + 63) / 64);
                 pass.dispatchWorkgroups(workGroupSizeX, 1);
                 pass.end();
 
@@ -721,6 +733,10 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 pipeline.device.queue.submit([commandBuffer]);
                 await pipeline.device.queue.onSubmittedWorkDone();
             }
+        } else {
+            // exhaustiveness check
+            let x: never = parsedCommand.type;
+            throw new Error("Invalid resource command type")
         }
     }
 
@@ -798,7 +814,7 @@ export var onRun = () => {
 
             hashedStrings = ret.hashedStrings;
 
-            resourceCommands = parseResourceCommands(userSource);
+            resourceCommands = getCommandsFromAttributes(ret.reflection);
 
             try {
                 callCommands = parseCallCommands(userSource);
@@ -913,7 +929,7 @@ type Shader = {
     code: string,
     layout: Bindings,
     hashedStrings: any,
-    reflection: any,
+    reflection: ReflectionJSON,
     threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number }
 } | {
     succ: false
@@ -961,7 +977,7 @@ export async function onCompile() {
 
     await updateEntryPointOptions();
     const entryPoint = entryPointSelect.value;
-    
+
     if (entryPoint == "" && !isWholeProgramTarget(compileTarget)) {
         setEditorValue(diagnosticsArea, "Please select the entry point name");
         return;
@@ -1085,7 +1101,7 @@ globalThis.Module = {
                     label.innerText = moduleLoadingMessage;
             }
         }
-        catch(error:any) {
+        catch (error: any) {
             if (label)
                 label.innerText = error.toString(error);
         }

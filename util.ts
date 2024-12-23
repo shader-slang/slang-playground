@@ -1,3 +1,4 @@
+import { ReflectionJSON } from './compiler.js';
 import { ParsedCommand } from './try-slang.js';
 
 export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
@@ -10,7 +11,7 @@ export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
             GPUTextureUsage.RENDER_ATTACHMENT,
     };
 
-    if(context == null) {
+    if (context == null) {
         throw new Error("Could not get webgpu context")
     }
 
@@ -41,60 +42,55 @@ function reinterpretUint32AsFloat(uint32: number) {
     return float32View[0];
 }
 
+/**
+ * Here are some patterns we support:
+ * 
+ * | Attribute                                | Result                        
+ * | :--------------------------------------- | :-
+ * | `[playground::ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
+ * | `[playground::BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
+ * | `[playground::URL("https://example.com/image.png")]` | Initialize a texture with image from URL
+ * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
+ */
+export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
+    let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = []
 
-function parseResourceCommand(command: string): ParsedCommand {
-    const match = command.match(/(\w+)\((.*)\)/);
-    if (match) {
-        const funcName = match[1];
+    for (let parameter of reflection.parameters) {
+        if (parameter.userAttribs == undefined) continue;
+        for (let attribute of parameter.userAttribs) {
+            let command: ParsedCommand | null = null;
 
-        // TODO: This isn't a very robust parser.. any commas in the url will break it.
-        const args = match[2].split(',').map(arg => arg.trim());
+            if(!attribute.name.startsWith("playground_")) continue;
 
-        if (funcName === "ZEROS") {
-            return { type: "ZEROS", size: args.map(Number) };
-        }
-        else if (funcName === "URL") {
-            // remove the quotes
-            const validURLMatch = args[0].match(/"(.*)"/)
-            if (!validURLMatch) {
-                throw new Error(`Invalid URL: ${args[0]}`);
+            let playground_attribute_name  =  attribute.name.slice(11)
+            if (playground_attribute_name == "ZEROS" || playground_attribute_name == "RAND") {
+                command = {
+                    type: playground_attribute_name,
+                    count: attribute.arguments[0] as number,
+                }
+            } else if (playground_attribute_name == "BLACK") {
+                command = {
+                    type: "BLACK",
+                    width: attribute.arguments[0] as number,
+                    height: attribute.arguments[1] as number,
+                }
+            } else if (playground_attribute_name == "URL") {
+                command = {
+                    type: "URL",
+                    url: attribute.arguments[0] as string,
+                }
             }
 
-            return { type: "URL", url: validURLMatch[1] };
-        }
-        else if (funcName === "RAND") {
-            return { type: "RAND", size: args.map(Number) };
-        };
-        throw new Error(`Unrecognized command: ${command}`);
-
-    }
-    else {
-        throw new Error(`Invalid command: ${command}`);
-    }
-}
-
-export function parseResourceCommands(userSource: string): { resourceName: string, parsedCommand: ParsedCommand }[] {
-    // Now we'll handle some special comments that the user can provide to initialize their resources.
-    //
-    // Here are some patterns we support:
-    // 1. //! @outputBuffer: ZEROS(512, 512)   ==> Initialize "outputBuffer" with zeros of the provided size.
-    // 2. //! @myBuffer: URL("https://example.com/image.png")   ==> Initialize "myBuffer" with image from URL.
-    // 3. //! @noiseBuffer: RAND(1000)   ==> Initialize "myBuffer" with uniform random floats between 0 and 1.
-    //
-
-    const resourceCommands = [];
-    const lines = userSource.split('\n');
-    for (let line of lines) {
-        const match = line.match(/\/\/!\s+@(\w+):\s*(.*)/);
-        if (match) {
-            const resourceName = match[1];
-            const command = match[2];
-            const parsedCommand = parseResourceCommand(command);
-            resourceCommands.push({ resourceName, parsedCommand });
+            if (command != null) {
+                commands.push({
+                    resourceName: parameter.name,
+                    parsedCommand: command
+                })
+            }
         }
     }
 
-    return resourceCommands;
+    return commands
 }
 
 export type CallCommand = {
@@ -164,7 +160,7 @@ function parsePrintfFormat(formatString: string): FormatSpecifier[] {
         }
 
         let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
-        let precision_number = precision_text?parseInt(precision):null
+        let precision_number = precision_text ? parseInt(precision) : null
 
         let width_number = width ? parseInt(width) : null
 
@@ -208,7 +204,7 @@ function formatPrintfString(parsedTokens: FormatSpecifier[], data: any[]) {
 // Helper function to format each specifier
 function formatSpecifier(value: string, { flags, width, precision, specifierType }: FormatSpecifier & { type: 'specifier' }) {
     let formattedValue;
-    if(precision == null)
+    if (precision == null)
         precision = 6; //eww magic number
     switch (specifierType) {
         case 'd':
