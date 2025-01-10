@@ -217,16 +217,16 @@ export class SlangCompiler {
     // dropdown list. Then, we will find whether user code also defines other entry points, if it has
     // we will also add them to the dropdown list.
     findDefinedEntryPoints(shaderSource: string): string[] {
-        var result: string[] = [];
+        let result: string[] = [];
         if (shaderSource.match("imageMain")) {
-            return ["imageMain"];
+            result.push("imageMain");
         }
         if (shaderSource.match("printMain")) {
-            return ["printMain"];
+            result.push("printMain");
         }
-
+        let slangSession: Session | null | undefined;
         try {
-            var slangSession = this.globalSlangSession?.createSession(
+            slangSession = this.globalSlangSession?.createSession(
                 this.findCompileTarget("SPIRV"));
             if (!slangSession) {
                 return [];
@@ -430,7 +430,7 @@ export class SlangCompiler {
     loadModule(slangSession: Session, moduleName: string, source: string, componentTypeList: Module[]) {
         var module: Module | null = slangSession.loadModuleFromSource(source, moduleName, "/" + moduleName + ".slang");
         if (!module) {
-            var error = this.slangWasmModule.getLastError();
+            const error = this.slangWasmModule.getLastError();
             console.error(error.type + " error: " + error.message);
             this.diagnosticsMsg += (error.type + " error: " + error.message);
             return false;
