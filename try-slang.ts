@@ -77,6 +77,10 @@ export function setEditorValue(editor: monaco.editor.IStandaloneCodeEditor, valu
         editor.revealLine(0);
 }
 
+export function appendEditorValue(editor: monaco.editor.IStandaloneCodeEditor, value: string, revealEnd: boolean = false) {
+    setEditorValue(editor, editor.getValue() + value, revealEnd);
+}
+
 async function webgpuInit() {
     try {
         const adapter = await navigator.gpu?.requestAdapter();
@@ -186,10 +190,10 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
                 requestAnimationFrame(newRenderLoop);
             }).catch((error: Error) => {
                 if (error instanceof NotReadyError) {
-                }
-                else {
+                    // do nothing
+                } else {
                     if (diagnosticsArea != null)
-                        setEditorValue(diagnosticsArea, error.message, true);
+                        appendEditorValue(diagnosticsArea, error.message, true);
                 }
                 releaseRenderLock();
             });
