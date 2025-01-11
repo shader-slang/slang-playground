@@ -122,7 +122,8 @@ jobs:
       - name: Copy depencencies
         run: |
           sudo mkdir ./_site/node_modules
-          sudo cp -r node_modules/jjsontree.js ./_site/node_modules/jjsontree.js
+          sudo mkdir ./_site/external
+          sudo cp -r external/ ./_site/external/
           sudo cp -r node_modules/requirejs ./_site/node_modules/requirejs
           sudo cp -r node_modules/pako ./_site/node_modules/pako
       - name: Upload export artifact
