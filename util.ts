@@ -12,7 +12,7 @@ export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
     };
 
     if (context == null) {
-        throw new Error("Could not get webgpu context")
+        throw new Error("Could not get webgpu context");
     }
 
     context.configure(canvasConfig);
@@ -53,39 +53,39 @@ function reinterpretUint32AsFloat(uint32: number) {
  * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
  */
 export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
-    let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = []
+    let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
 
     for (let parameter of reflection.parameters) {
         if (parameter.userAttribs == undefined) continue;
         for (let attribute of parameter.userAttribs) {
             let command: ParsedCommand | null = null;
 
-            if(!attribute.name.startsWith("playground_")) continue;
+            if (!attribute.name.startsWith("playground_")) continue;
 
-            let playground_attribute_name  =  attribute.name.slice(11)
+            let playground_attribute_name = attribute.name.slice(11);
             if (playground_attribute_name == "ZEROS" || playground_attribute_name == "RAND") {
                 command = {
                     type: playground_attribute_name,
                     count: attribute.arguments[0] as number,
-                }
+                };
             } else if (playground_attribute_name == "BLACK") {
                 command = {
                     type: "BLACK",
                     width: attribute.arguments[0] as number,
                     height: attribute.arguments[1] as number,
-                }
+                };
             } else if (playground_attribute_name == "URL") {
                 command = {
                     type: "URL",
                     url: attribute.arguments[0] as string,
-                }
+                };
             }
 
             if (command != null) {
                 commands.push({
                     resourceName: parameter.name,
                     parsedCommand: command
-                })
+                });
             }
         }
     }
@@ -101,7 +101,7 @@ export type CallCommand = {
     type: "FIXED_SIZE",
     fnName: string,
     size: number[],
-}
+};
 
 export function parseCallCommands(userSource: string): CallCommand[] {
     // Look for commands of the form:
@@ -160,9 +160,9 @@ function parsePrintfFormat(formatString: string): FormatSpecifier[] {
         }
 
         let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
-        let precision_number = precision_text ? parseInt(precision) : null
+        let precision_number = precision_text ? parseInt(precision) : null;
 
-        let width_number = width ? parseInt(width) : null
+        let width_number = width ? parseInt(width) : null;
 
         // Add the format specifier as a token
         formatSpecifiers.push({
@@ -293,7 +293,7 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 // };
 //
 function hashToString(hashedStrings: any[], hash: number) {
-    for (var i = 0; i < hashedStrings.length; i++) {
+    for (let i = 0; i < hashedStrings.length; i++) {
         if (hashedStrings[i].hash == hash) {
             return hashedStrings[i].string;
         }
@@ -304,17 +304,17 @@ export function parsePrintfBuffer(hashedString: any, printfValueResource: GPUBuf
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
 
-    var elementIndex = 0;
-    var numberElements = printfBufferArray.byteLength / bufferElementSize;
+    let elementIndex = 0;
+    let numberElements = printfBufferArray.byteLength / bufferElementSize;
 
     // TODO: We currently doesn't support 64-bit data type (e.g. uint64_t, int64_t, double, etc.)
     // so 32-bit array should be able to contain everything we need.
-    var dataArray = [];
+    let dataArray = [];
     const elementSizeInWords = bufferElementSize / 4;
-    var outStrArry = [];
-    var formatString = "";
+    let outStrArry = [];
+    let formatString = "";
     for (elementIndex = 0; elementIndex < numberElements; elementIndex++) {
-        var offset = elementIndex * elementSizeInWords;
+        let offset = elementIndex * elementSizeInWords;
         const type = printfBufferArray[offset];
         switch (type) {
             case 1: // format string
@@ -382,10 +382,9 @@ export async function fetchWithProgress(url: string, onProgress: { (loaded: numb
 
     if (!response.body) {
         // Probably needs to be handled properly
-        throw new Error("No response body")
+        throw new Error("No response body");
     }
     const reader = response.body.getReader();
-    const chunks = [];
 
     while (true) {
         const { done, value } = await reader.read();

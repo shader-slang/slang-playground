@@ -1,7 +1,7 @@
 /// <reference path="node_modules/monaco-editor/monaco.d.ts" />
 import { ComputePipeline } from './compute.js';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through.js';
-import { SlangCompiler, Bindings, isWholeProgramTarget, ReflectionJSON } from './compiler.js';
+import { SlangCompiler, Bindings, isWholeProgramTarget, ReflectionJSON, ShaderType, RUNNABLE_ENTRY_POINT_NAMES } from './compiler.js';
 import { initMonaco, userCodeURI, codeEditorChangeContent, initLanguageServer } from './language-server.js';
 import { restoreSelectedTargetFromURL, restoreDemoSelectionFromURL, loadDemo, canvasCurrentMousePos, canvasLastMouseDownPos, canvasIsMouseDown, canvasMouseClicked, resetMouse, renderOutput, canvas, entryPointSelect, targetSelect } from './ui.js';
 import { fetchWithProgress, configContext, parseCallCommands, createOutputTexture, parsePrintfBuffer, CallCommand, getCommandsFromAttributes } from './util.js';
@@ -29,45 +29,39 @@ class NotReadyError extends Error {
     }
 }
 
-export var compiler: SlangCompiler | null = null;
-export var slangd: LanguageServer | null = null;
-var device: GPUDevice;
-var context: GPUCanvasContext;
-var randFloatPipeline: ComputePipeline;
-var computePipeline: ComputePipeline;
-var extraComputePipelines: ComputePipeline[] = [];
-var passThroughPipeline: GraphicsPipeline;
+export let compiler: SlangCompiler | null = null;
+export let slangd: LanguageServer | null = null;
+let device: GPUDevice;
+let context: GPUCanvasContext;
+let randFloatPipeline: ComputePipeline;
+let computePipeline: ComputePipeline;
+let extraComputePipelines: ComputePipeline[] = [];
+let passThroughPipeline: GraphicsPipeline;
 
-export var monacoEditor: monaco.editor.IStandaloneCodeEditor;
-var diagnosticsArea: monaco.editor.IStandaloneCodeEditor;
-var codeGenArea: monaco.editor.IStandaloneCodeEditor;
+export let monacoEditor: monaco.editor.IStandaloneCodeEditor;
+let diagnosticsArea: monaco.editor.IStandaloneCodeEditor;
+let codeGenArea: monaco.editor.IStandaloneCodeEditor;
 
-var resourceBindings: Bindings;
-var resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[];
-var callCommands: CallCommand[];
-var allocatedResources: Map<string, GPUTexture | GPUBuffer>;
-var hashedStrings: any;
+let resourceBindings: Bindings;
+let resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[];
+let callCommands: CallCommand[];
+let allocatedResources: Map<string, GPUTexture | GPUBuffer>;
+let randFloatResources: Map<string, GPUObjectBase>;
+let hashedStrings: any;
 
-var renderThread: Promise<void> | null = null;
-var abortRender = false;
-var onRenderAborted: (() => void) | null = null;
+let renderThread: Promise<void> | null = null;
+let abortRender = false;
+let onRenderAborted: (() => void) | null = null;
 
 const printfBufferElementSize = 12;
 const printfBufferSize = printfBufferElementSize * 2048; // 12 bytes per printf struct
 
-var sourceCodeChange = true;
+let currentWindowSize = [300, 150];
 
-var currentWindowSize = [300, 150];
-
-const RENDER_MODE = SlangCompiler.RENDER_SHADER;
-const PRINT_MODE = SlangCompiler.PRINT_SHADER;
-const HIDDEN_MODE = SlangCompiler.NON_RUNNABLE_SHADER;
 const defaultShaderURL = "circle.slang";
 
-var currentMode = RENDER_MODE;
+let currentEntryPoint: ShaderType = "imageMain";
 
-var randFloatPipeline: ComputePipeline;
-var randFloatResources: Map<string, GPUObjectBase>;
 
 export function setEditorValue(editor: monaco.editor.IStandaloneCodeEditor, value: string, revealEnd: boolean = false) {
     editor.setValue(value);
@@ -113,13 +107,13 @@ function resizeCanvas(entries: ResizeObserverEntry[]) {
     const canvas = entries[0].target;
 
     if (!(canvas instanceof HTMLCanvasElement)) {
-        throw new Error("canvas object is not a canvas element")
+        throw new Error("canvas object is not a canvas element");
     }
 
     let width = canvas.clientWidth;
     let height = canvas.clientHeight;
     if (canvas.style.display == "none") {
-        var parentDiv = document.getElementById("output");
+        let parentDiv = document.getElementById("output");
         width = parentDiv?.clientWidth || width;
         height = parentDiv?.clientHeight || height;
     }
@@ -167,7 +161,7 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
 
             // Set up render loop function
             const newRenderLoop = async (timeMS: number) => {
-                var nextFrame = false;
+                let nextFrame = false;
                 try {
                     const keepRendering = await renderFn(timeMS);
                     nextFrame = keepRendering && !abortRender;
@@ -244,62 +238,61 @@ function startRendering() {
 // We use the timer in the resize handler debounce the resize event, otherwise we could end of rendering
 // multiple useless frames.
 function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
-    var needResize = resizeCanvas(entries);
+    let needResize = resizeCanvas(entries);
     if (needResize) {
         startRendering();
     }
 }
 
-function toggleDisplayMode(displayMode: number) {
-    if (currentMode == displayMode)
+function toggleDisplayMode(displayMode: ShaderType) {
+    if (currentEntryPoint == displayMode)
         return;
     let resultSplitContainer = document.getElementById("resultSplitContainer")
     if (resultSplitContainer == null) {
-        throw new Error("Cannot get resultSplitContatiner element")
+        throw new Error("Cannot get resultSplitContatiner element");
     }
     let printResult = document.getElementById("printResult")
     if (printResult == null) {
-        throw new Error("Cannot get printResult element")
+        throw new Error("Cannot get printResult element");
     }
-    if (currentMode == HIDDEN_MODE && displayMode != HIDDEN_MODE) {
+    if (currentEntryPoint == null && displayMode != null) {
         resultSplitContainer.style.gridTemplateRows = "50% 14px 1fr";
     }
-    if (displayMode == RENDER_MODE) {
+    currentEntryPoint = displayMode;
+    if (displayMode == "imageMain") {
         printResult.style.display = "none";
         renderOutput.style.display = "block";
         canvas.style.width = "100%";
         canvas.style.height = "100%";
-        currentMode = RENDER_MODE;
     }
-    else if (displayMode == PRINT_MODE) {
+    else if (displayMode == "printMain") {
         renderOutput.style.display = "none";
         printResult.style.display = "grid";
-
-        currentMode = PRINT_MODE;
     }
-    else if (displayMode == HIDDEN_MODE) {
+    else if (displayMode == null) {
         renderOutput.style.display = "none";
         printResult.style.display = "none";
         resultSplitContainer.style.gridTemplateRows = "0px 14px 1fr";
-        currentMode = HIDDEN_MODE;
     }
     else {
+        // exhaustiveness check
+        let x: never = displayMode;
         console.log("Invalid display mode " + displayMode);
     }
 }
 
-var timeAggregate = 0;
-var frameCount = 0;
+let timeAggregate = 0;
+let frameCount = 0;
 
 async function execFrame(timeMS: number) {
-    if (currentMode == HIDDEN_MODE)
+    if (currentEntryPoint == null)
         return false;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
         return false;
 
     const startTime = performance.now();
 
-    var timeArray = new Float32Array(8);
+    let timeArray = new Float32Array(8);
     timeArray[0] = canvasCurrentMousePos.x;
     timeArray[1] = canvasCurrentMousePos.y;
     timeArray[2] = canvasLastMouseDownPos.x;
@@ -311,12 +304,20 @@ async function execFrame(timeMS: number) {
     timeArray[4] = timeMS * 0.001;
     let uniformInput = allocatedResources.get("uniformInput");
     if (!(uniformInput instanceof GPUBuffer)) {
-        throw new Error("uniformInput doesn't exist or is of incorrect type")
+        throw new Error("uniformInput doesn't exist or is of incorrect type");
     }
     computePipeline.device.queue.writeBuffer(uniformInput, 0, timeArray);
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
+
+    let printfBufferRead = allocatedResources.get("printfBufferRead");
+    if (!(printfBufferRead instanceof GPUBuffer)) {
+        throw new Error("printfBufferRead is not a buffer");
+    }
+    if (currentEntryPoint == "printMain") {
+        encoder.clearBuffer(printfBufferRead);
+    }
 
     // The extra passes always go first.
     // zip the extraComputePipelines and callCommands together
@@ -324,11 +325,11 @@ async function execFrame(timeMS: number) {
         const pass = encoder.beginComputePass({ label: 'extra passes' });
         pass.setBindGroup(0, pipeline.bindGroup || null);
         if (pipeline.pipeline == undefined) {
-            throw new Error("pipeline is undefined")
+            throw new Error("pipeline is undefined");
         }
         pass.setPipeline(pipeline.pipeline);
         // Determine the workgroup size based on the size of the buffer or texture.
-        let size: [number, number, number]
+        let size: [number, number, number];
         if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
                 setEditorValue(diagnosticsArea, "Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
@@ -336,7 +337,7 @@ async function execFrame(timeMS: number) {
                 return false;
             }
 
-            let resource = allocatedResources.get(command.resourceName)
+            let resource = allocatedResources.get(command.resourceName);
             if (resource instanceof GPUBuffer) {
                 size = [resource.size / 4, 1, 1];
             }
@@ -354,18 +355,18 @@ async function execFrame(timeMS: number) {
                 pass.end();
                 return false;
             }
-            size = [1, 1, 1]
+            size = [1, 1, 1];
             for (let i = 0; i < command.size.length; i++) {
-                size[i] = command.size[i]
+                size[i] = command.size[i];
             }
         } else {
             // exhaustiveness check
             let x: never = command;
-            throw new Error("Invalid state!")
+            throw new Error("Invalid state!");
         }
 
         if (pipeline.threadGroupSize == undefined) {
-            throw new Error("threadGroupSize is undefined")
+            throw new Error("threadGroupSize is undefined");
         }
 
         const blockSizeX = pipeline.threadGroupSize.x;
@@ -387,18 +388,19 @@ async function execFrame(timeMS: number) {
     if (computePipeline.pipeline == undefined)
         throw new Error("Compute pipeline is not defined.");
     pass.setPipeline(computePipeline.pipeline);
-    const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
-    const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
-    pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
-    pass.end();
 
-    if (currentMode == RENDER_MODE) {
-        var renderPassDescriptor = passThroughPipeline.createRenderPassDesc(context.getCurrentTexture().createView());
+    if (currentEntryPoint == "imageMain") {
+        const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
+        const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
+        pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
+        pass.end();
+
+        const renderPassDescriptor = passThroughPipeline.createRenderPassDesc(context.getCurrentTexture().createView());
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
         renderPass.setBindGroup(0, passThroughPipeline.bindGroup || null);
         if (passThroughPipeline.pipeline == undefined) {
-            throw new Error("Pass through pipeline is undefined!")
+            throw new Error("Pass through pipeline is undefined!");
         }
         renderPass.setPipeline(passThroughPipeline.pipeline);
         renderPass.draw(6);  // call our vertex shader 6 times.
@@ -406,14 +408,21 @@ async function execFrame(timeMS: number) {
     }
 
     // copy output buffer back in print mode
-    if (currentMode == PRINT_MODE) {
+    if (currentEntryPoint == "printMain") {
+        pass.dispatchWorkgroups(1, 1);
+        pass.end();
+
         let outputBuffer = allocatedResources.get("outputBuffer");
         if (!(outputBuffer instanceof GPUBuffer)) {
-            throw new Error("outputBuffer is incorrect type or doesn't exist")
+            throw new Error("outputBuffer is incorrect type or doesn't exist");
         }
         let outputBufferRead = allocatedResources.get("outputBufferRead");
         if (!(outputBufferRead instanceof GPUBuffer)) {
-            throw new Error("outputBufferRead is incorrect type or doesn't exist")
+            throw new Error("outputBufferRead is incorrect type or doesn't exist");
+        }
+        let g_printedBuffer = allocatedResources.get("g_printedBuffer")
+        if (!(g_printedBuffer instanceof GPUBuffer)) {
+            throw new Error("g_printedBuffer is not a buffer");
         }
         encoder.copyBufferToBuffer(
             outputBuffer,
@@ -421,6 +430,8 @@ async function execFrame(timeMS: number) {
             outputBufferRead,
             0,
             outputBuffer.size);
+        encoder.copyBufferToBuffer(
+            g_printedBuffer, 0, printfBufferRead, 0, g_printedBuffer.size);
     }
 
     // Finish encoding and submit the commands
@@ -428,6 +439,26 @@ async function execFrame(timeMS: number) {
     device.queue.submit([commandBuffer]);
 
     await device.queue.onSubmittedWorkDone();
+
+    if (currentEntryPoint == "printMain") {
+        await printfBufferRead.mapAsync(GPUMapMode.READ);
+
+        let textResult = "";
+        const formatPrint = parsePrintfBuffer(
+            hashedStrings,
+            printfBufferRead,
+            printfBufferElementSize);
+
+        if (formatPrint.length != 0)
+            textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
+
+        printfBufferRead.unmap();
+        let printResult = document.getElementById("printResult");
+        if (!(printResult instanceof HTMLTextAreaElement)) {
+            throw new Error("printResult invalid type");
+        }
+        printResult.value = textResult;
+    }
 
     const timeElapsed = performance.now() - startTime;
 
@@ -435,10 +466,10 @@ async function execFrame(timeMS: number) {
     timeAggregate += timeElapsed;
     frameCount++;
     if (frameCount == 20) {
-        var avgTime = (timeAggregate / frameCount);
+        let avgTime = (timeAggregate / frameCount);
         let performanceInfo = document.getElementById("performanceInfo");
         if (!(performanceInfo instanceof HTMLDivElement)) {
-            throw new Error("performanceInfo has an invalid type")
+            throw new Error("performanceInfo has an invalid type");
         }
         performanceInfo.innerText = avgTime.toFixed(1) + " ms ";
         timeAggregate = 0;
@@ -446,89 +477,22 @@ async function execFrame(timeMS: number) {
     }
 
     // Only request the next frame if we are in the render mode
-    if (currentMode == RENDER_MODE)
+    if (currentEntryPoint == "imageMain")
         return true;
     else
         return false;
 }
 
-async function printResult() {
-    // Encode commands to do the computation
-    const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
-    let printfBufferRead = allocatedResources.get("printfBufferRead");
-    if (!(printfBufferRead instanceof GPUBuffer)) {
-        throw new Error("printfBufferRead is not a buffer")
-    }
-    encoder.clearBuffer(printfBufferRead);
-
-    const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
-
-    pass.setBindGroup(0, computePipeline.bindGroup || null);
-    if (computePipeline.pipeline == undefined) {
-        throw new Error("Compute pipeline is undefined")
-    }
-    pass.setPipeline(computePipeline.pipeline);
-    pass.dispatchWorkgroups(1, 1);
-    pass.end();
-
-    // copy output buffer back in print mode
-    let outputBuffer = allocatedResources.get("outputBuffer")
-    if (!(outputBuffer instanceof GPUBuffer)) {
-        throw new Error("outputBuffer is not a buffer")
-    }
-    let outputBufferRead = allocatedResources.get("outputBufferRead")
-    if (!(outputBufferRead instanceof GPUBuffer)) {
-        throw new Error("outputBufferRead is not a buffer")
-    }
-    let g_printedBuffer = allocatedResources.get("g_printedBuffer")
-    if (!(g_printedBuffer instanceof GPUBuffer)) {
-        throw new Error("g_printedBuffer is not a buffer")
-    }
-    encoder.copyBufferToBuffer(
-        outputBuffer, 0, outputBufferRead, 0, outputBuffer.size);
-    encoder.copyBufferToBuffer(
-        g_printedBuffer, 0, printfBufferRead, 0, g_printedBuffer.size);
-
-    // Finish encoding and submit the commands
-    const commandBuffer = encoder.finish();
-    device.queue.submit([commandBuffer]);
-
-    await device.queue.onSubmittedWorkDone();
-
-    // Read the results once the job is done
-    await printfBufferRead.mapAsync(GPUMapMode.READ);
-
-    let textResult = "";
-    const formatPrint = parsePrintfBuffer(
-        hashedStrings,
-        printfBufferRead,
-        printfBufferElementSize);
-
-    if (formatPrint.length != 0)
-        textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
-
-    printfBufferRead.unmap();
-    let printResult = document.getElementById("printResult")
-    if (!(printResult instanceof HTMLTextAreaElement)) {
-        throw new Error("printResult invalid type")
-    }
-    printResult.value = textResult;
-}
-
 function checkShaderType(userSource: string) {
     // we did a pre-filter on the user input source code.
-    const isImageMain = userSource.match("imageMain");
-    const isPrintMain = userSource.match("printMain");
+    let shaderTypes = RUNNABLE_ENTRY_POINT_NAMES.filter((entryPoint) => userSource.includes(entryPoint));
 
     // Only one of the main function should be defined.
     // In this case, we will know that the shader is not runnable, so we can only compile it.
-    if (isImageMain == isPrintMain)
-        return SlangCompiler.NON_RUNNABLE_SHADER;
+    if (shaderTypes.length !== 1)
+        return null;
 
-    if (isImageMain)
-        return SlangCompiler.RENDER_SHADER;
-    else
-        return SlangCompiler.PRINT_SHADER;
+    return shaderTypes[0];
 }
 
 export type ParsedCommand = {
@@ -546,14 +510,14 @@ export type ParsedCommand = {
 function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: string, value: T) {
     if (map.has(key)) {
         let currentEntry = map.get(key);
-        if (currentEntry == undefined) throw new Error("Invalid state")
-        currentEntry.destroy()
+        if (currentEntry == undefined) throw new Error("Invalid state");
+        currentEntry.destroy();
     }
     map.set(key, value);
 };
 
 async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: { resourceName: string; parsedCommand: ParsedCommand; }[]) {
-    var allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
+    let allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
@@ -576,10 +540,10 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
             // Initialize the buffer with zeros.
             let zeros: BufferSource;
-            if(elementSize == 4) {
+            if (elementSize == 4) {
                 zeros = new Float32Array(parsedCommand.count);
             } else {
-                throw new Error("Element size isn't handled")
+                throw new Error("Element size isn't handled");
             }
             pipeline.device.queue.writeBuffer(buffer, 0, zeros);
         } else if (parsedCommand.type === "BLACK") {
@@ -677,7 +641,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 // Load randFloat shader code from the file.
                 const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
                 if (compiler == null) {
-                    throw new Error("Compiler is not defined!")
+                    throw new Error("Compiler is not defined!");
                 }
                 const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL");
                 if (!compiledResult) {
@@ -724,7 +688,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 pass.setBindGroup(0, randomPipeline.bindGroup || null);
 
                 if (randomPipeline.pipeline == undefined) {
-                    throw new Error("Random pipeline is undefined")
+                    throw new Error("Random pipeline is undefined");
                 }
                 pass.setPipeline(randomPipeline.pipeline);
 
@@ -740,7 +704,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
         } else {
             // exhaustiveness check
             let x: never = parsedCommand.type;
-            throw new Error("Invalid resource command type")
+            throw new Error("Invalid resource command type");
         }
     }
 
@@ -770,7 +734,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
 
-    var length = new Float32Array(8).byteLength;
+    let length = new Float32Array(8).byteLength;
     safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     return allocatedResources;
@@ -782,7 +746,7 @@ function freeAllocatedResources(resources: Map<string, GPUBuffer | GPUTexture>) 
     }
 }
 
-export var onRun = () => {
+export let onRun = () => {
     if (!device)
         return;
     if (!monacoEditor)
@@ -802,17 +766,17 @@ export var onRun = () => {
             // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
             const userSource = monacoEditor.getValue();
             const shaderType = checkShaderType(userSource);
-            if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
-                toggleDisplayMode(HIDDEN_MODE);
+            if (shaderType == null) {
+                toggleDisplayMode(null);
                 setEditorValue(codeGenArea, "");
                 throw new Error("Error: In order to run the shader, please define either imageMain or printMain function in the shader code.");
             }
 
-            const entryPointName = shaderType == SlangCompiler.RENDER_SHADER ? "imageMain" : "printMain";
+            const entryPointName = shaderType;
             const ret = compileShader(userSource, entryPointName, "WGSL");
 
             if (!ret.succ) {
-                toggleDisplayMode(HIDDEN_MODE);
+                toggleDisplayMode(null);
                 throw new Error("");
             }
 
@@ -858,14 +822,14 @@ export var onRun = () => {
                 const shaderModule = device.createShaderModule({ code: passThroughshaderCode });
                 const inputTexture = allocatedResources.get("outputTexture");
                 if (!(inputTexture instanceof GPUTexture)) {
-                    throw new Error("inputTexture is not a texture")
+                    throw new Error("inputTexture is not a texture");
                 }
                 passThroughPipeline.createPipeline(shaderModule, inputTexture);
             }
 
             let outputTexture = allocatedResources.get("outputTexture");
             if (!(outputTexture instanceof GPUTexture)) {
-                throw new Error("")
+                throw new Error("");
             }
             passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
@@ -878,20 +842,16 @@ export var onRun = () => {
                 pipeline.createBindGroup(allocatedResources);
 
             if (compiler == null) {
-                throw new Error("Could not get compiler")
+                throw new Error("Could not get compiler");
             }
             toggleDisplayMode(compiler.shaderType);
         },
         // renderFn
         async (timeMS: number) => {
             if (compiler == null) {
-                throw new Error("Could not get compiler")
+                throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType == SlangCompiler.PRINT_SHADER) {
-                await printResult();
-                return false; // Stop after one frame.
-            }
-            else if (compiler.shaderType == SlangCompiler.RENDER_SHADER) {
+            if (compiler.shaderType !== null) {
                 return await execFrame(timeMS);
             }
             return false;
@@ -906,7 +866,7 @@ export function compileOrRun() {
     const userSource = monacoEditor.getValue();
     const shaderType = checkShaderType(userSource);
 
-    if (shaderType == SlangCompiler.NON_RUNNABLE_SHADER) {
+    if (shaderType == null) {
         onCompile();
     }
     else {
@@ -926,7 +886,7 @@ export function compileOrRun() {
     }
 }
 
-var reflectionJson: any = {};
+let reflectionJson: any = {};
 
 type Shader = {
     succ: true,
@@ -938,8 +898,9 @@ type Shader = {
 } | {
     succ: false
 };
+
 function compileShader(userSource: string, entryPoint: string, compileTarget: string, includePlaygroundModule = true): Shader {
-    if (compiler == null) throw new Error("No compiler available")
+    if (compiler == null) throw new Error("No compiler available");
     const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
     setEditorValue(diagnosticsArea, compiler.diagnosticsMsg, true);
 
@@ -955,7 +916,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: st
     setEditorValue(codeGenArea, compiledCode);
     let model = codeGenArea.getModel();
     if (model == null) {
-        throw new Error("Cannot get editor model")
+        throw new Error("Cannot get editor model");
     }
     if (compileTarget == "WGSL")
         monaco.editor.setModelLanguage(model, "wgsl");
@@ -976,7 +937,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: st
 // have no way to call the user defined function, and compile engine cannot compile the source code.
 export async function onCompile() {
 
-    toggleDisplayMode(HIDDEN_MODE);
+    toggleDisplayMode(null);
     const compileTarget = targetSelect.value;
 
     await updateEntryPointOptions();
@@ -987,7 +948,7 @@ export async function onCompile() {
         return;
     }
 
-    if (compiler == null) throw new Error("Compiler doesn't exist")
+    if (compiler == null) throw new Error("Compiler doesn't exist");
 
     if (compileTarget == "SPIRV")
         await compiler.initSpirvTools();
@@ -1006,7 +967,7 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
     RequireJS.require(["vs/editor/editor.main"], function () {
         let container = document.getElementById(containerId);
         if (container == null) {
-            throw new Error("Could not find container for editor")
+            throw new Error("Could not find container for editor");
         }
         initMonaco();
         let model = readOnlyMode
@@ -1036,7 +997,7 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
         else if (containerId == "diagnostics") {
             let model = editor.getModel();
             if (model == null) {
-                throw new Error("Cannot get editor model")
+                throw new Error("Cannot get editor model");
             }
             monaco.editor.setModelLanguage(model, "text")
             diagnosticsArea = editor;
@@ -1050,11 +1011,11 @@ export function loadEditor(readOnlyMode = false, containerId: string, preloadCod
 
 
 // Event when loading the WebAssembly module
-var moduleLoadingMessage = "";
+let moduleLoadingMessage = "";
 type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
 export type ModuleType = MainModule & Omit<EmscriptenModule, "instantiateWasm"> & {
     instantiateWasm: ReplaceReturnType<EmscriptenModule["instantiateWasm"], Promise<WebAssembly.Exports>>
-}
+};
 
 declare global {
     var Module: ModuleType
@@ -1070,7 +1031,7 @@ globalThis.Module = {
     },
     instantiateWasm: async function (imports: WebAssembly.Imports, receiveInstance: (arg0: WebAssembly.Instance) => void): Promise<WebAssembly.Exports> {
         // Step 1: Fetch the compressed .wasm.gz file
-        var progressBar = document.getElementById('progress-bar');
+        let progressBar = document.getElementById('progress-bar');
         const compressedData = await fetchWithProgress('slang-wasm.wasm.gz', (loaded, total) => {
             const progress = (loaded / total) * 100;
             if (progressBar == null) progressBar = document.getElementById('progress-bar');
@@ -1086,12 +1047,12 @@ globalThis.Module = {
         return instance.exports;
     },
     onRuntimeInitialized: function () {
-        var label = document.getElementById("loadingStatusLabel");
+        let label = document.getElementById("loadingStatusLabel");
         if (label)
             label.innerText = "Initializing Slang Compiler...";
         try {
             compiler = new SlangCompiler(globalThis.Module);
-            var result = compiler.init();
+            let result = compiler.init();
             slangd = globalThis.Module.createLanguageServer();
             if (result.ret) {
                 (document.getElementById("compile-btn") as HTMLButtonElement).disabled = false;
@@ -1115,7 +1076,7 @@ globalThis.Module = {
 
 RequireJS.require(["./slang-wasm.js"]);
 
-var pageLoaded = false;
+let pageLoaded = false;
 // event when loading the page
 window.onload = async function () {
     pageLoaded = true;

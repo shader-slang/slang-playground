@@ -5,7 +5,7 @@ import { CompletionContext, CompletionItem } from './slang-wasm.js';
 
 export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";
-var languageRegistered = false;
+let languageRegistered = false;
 export function initMonaco() {
     if (languageRegistered)
         return;
@@ -17,7 +17,7 @@ export function initMonaco() {
             "try", "throw", "throws", "catch", "while", "for",
             "let", "var", "spirv_asm", "no_diff", "dynamic_uniform",
             "fwd_diff", "bwd_diff", "module", "implementing",
-            "__include", "__dispatch_kernel", 
+            "__include", "__dispatch_kernel",
             "row_major", "column_major", "nointerpolation", "snorm",
             "unorm", "globallycoherent", "extern", "layout",
             "do", "static", "const", "in", "out", "inout",
@@ -168,8 +168,8 @@ export function initMonaco() {
             "while", "for", "do", "static", "const", "in", "out", "inout",
             "ref", "class", "struct", "interface", "public", "private", "internal",
             "protected", "typedef", "uniform", "export", "groupshared",
-             "this", "namespace", "using", "enum", "break", "continue",
-            "discard", "cbuffer", "tbuffer", "true", "false", 
+            "this", "namespace", "using", "enum", "break", "continue",
+            "discard", "cbuffer", "tbuffer", "true", "false",
             "sizeof", "alignof", "layout", "buffer", "register",
             "packoffset", "nointerpolation"
         ],
@@ -383,7 +383,7 @@ export function initMonaco() {
             // Find the definition of the identifier (either a register or function)
             for (let i = 1; i <= model.getLineCount(); i++) {
                 const lineContent = model.getLineContent(i);
-                
+
                 // Check for register definitions (%register)
                 if (lineContent.includes(`${identifier} =`)) {
                     return {
@@ -407,17 +407,17 @@ export function initMonaco() {
     });
 
     monaco.languages.registerHoverProvider('spirv', {
-        provideHover: function(model, position) {
+        provideHover: function (model, position) {
             const word = model.getWordAtPosition(position);
             if (!word) return null;
-    
+
             const identifier = word.word;
             let currentFunction = null;
 
             // Check for %register or OpFunction definitions
             for (let i = 1; i <= model.getLineCount(); i++) {
                 const lineContent = model.getLineContent(i);
-    
+
                 // Detect function definitions
                 if (lineContent.includes(`OpFunction`)) {
                     const funcMatch = lineContent.match(/%?(\w+)\s+=\s+OpFunction\s+/);
@@ -433,7 +433,7 @@ export function initMonaco() {
 
                 // Hover text for register
                 if (lineContent.includes(`${identifier} =`)) {
-                    var hoverContents = [
+                    let hoverContents = [
                         { value: `**Register:** \`${identifier}\`` },
                         { value: '---' },
                         { value: `**Definition:** \n\n\`${lineContent.trim()}\`` }
@@ -447,7 +447,7 @@ export function initMonaco() {
                         contents: hoverContents
                     };
                 }
-    
+
                 // Hover text for function
                 if (lineContent.includes(`OpFunction ${identifier}`)) {
                     return {
@@ -460,11 +460,11 @@ export function initMonaco() {
                     };
                 }
             }
-    
+
             // If no match is found, return null
             return null;
         }
-    });    
+    });
 
     monaco.editor.defineTheme("slang-dark", {
         base: "vs-dark",
@@ -509,11 +509,11 @@ export function initMonaco() {
             if (result == null) {
                 return null;
             }
-            var resultArray = [];
-            for (var i = 0; i < result.size(); i++) {
+            let resultArray = [];
+            for (let i = 0; i < result.size(); i++) {
                 let lspResult = result.get(i);
-                if(lspResult == undefined) {
-                    throw new Error("Invalid state!")
+                if (lspResult == undefined) {
+                    throw new Error("Invalid state!");
                 }
                 resultArray.push({
                     uri: monaco.Uri.parse(lspResult.uri.toString()),
@@ -536,7 +536,7 @@ export function initMonaco() {
             }
             let lspContext: CompletionContext = {
                 triggerKind: context.triggerKind,
-                triggerCharacter: context.hasOwnProperty("triggerCharacter") ? (context.triggerCharacter || ""): ""
+                triggerCharacter: context.hasOwnProperty("triggerCharacter") ? (context.triggerCharacter || "") : ""
             };
             let result = slangd.completion(
                 userCodeURI,
@@ -550,18 +550,18 @@ export function initMonaco() {
             let word = model.getWordAtPosition(position);
             if (word == null)
                 word = model.getWordUntilPosition(position);
-            var curRange = {
+            let curRange = {
                 startLineNumber: position.lineNumber,
                 endLineNumber: position.lineNumber,
                 startColumn: word.startColumn,
                 endColumn: word.endColumn,
             };
-            for (var i = 0; i < result.size(); i++) {
+            for (let i = 0; i < result.size(); i++) {
                 let lspItem = result.get(i);
-                if(lspItem == undefined) {
-                    throw new Error("Invalid state!")
+                if (lspItem == undefined) {
+                    throw new Error("Invalid state!");
                 }
-                var item: monaco.languages.CompletionItem = {
+                let item: monaco.languages.CompletionItem = {
                     label: lspItem.label.toString(),
                     kind: lspItem.kind,
                     detail: lspItem.detail.toString(),
@@ -569,7 +569,7 @@ export function initMonaco() {
                     insertText: lspItem.label.toString(),
                     range: curRange
                 };
-                items.push(item)
+                items.push(item);
             }
             return { suggestions: items };
         }
@@ -587,16 +587,16 @@ export function initMonaco() {
                 return null;
             }
             let sigs: monaco.languages.SignatureInformation[] = [];
-            for (var i = 0; i < result.signatures.size(); i++) {
+            for (let i = 0; i < result.signatures.size(); i++) {
                 let lspSignature = result.signatures.get(i);
-                if(lspSignature == undefined) {
-                    throw new Error("Invalid state!")
+                if (lspSignature == undefined) {
+                    throw new Error("Invalid state!");
                 }
                 let params: monaco.languages.ParameterInformation[] = [];
-                for (var j = 0; j < lspSignature.parameters.size(); j++) {
+                for (let j = 0; j < lspSignature.parameters.size(); j++) {
                     let lspParameter = lspSignature.parameters.get(j);
-                    if(lspParameter == undefined) {
-                        throw new Error("Invalid state!")
+                    if (lspParameter == undefined) {
+                        throw new Error("Invalid state!");
                     }
                     params.push({
                         label: [lspParameter.label[0], lspParameter.label[1]],
@@ -648,38 +648,36 @@ export function initMonaco() {
                 return null;
             }
             let rawData = new Uint32Array(result.size());
-            for (var i = 0; i < result.size(); i++) {
+            for (let i = 0; i < result.size(); i++) {
                 let indexedResult = result.get(i);
-                if(indexedResult == undefined) {
-                    throw new Error("Invalid state!")
+                if (indexedResult == undefined) {
+                    throw new Error("Invalid state!");
                 }
                 rawData[i] = indexedResult;
             }
             return {
-                data: rawData
+                data: rawData,
             };
         }
     });
 }
 
 export function initLanguageServer() {
-    var text = "";
-    if (monacoEditor)
-    {
+    let text = "";
+    if (monacoEditor) {
         text = monacoEditor.getValue();
     }
-    if(slangd == null) {
-        throw new Error("Slang is undefined!")
+    if (slangd == null) {
+        throw new Error("Slang is undefined!");
     }
     slangd.didOpenTextDocument(userCodeURI, text);
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 
-var diagnosticTimeout: number | null = null;
+let diagnosticTimeout: number | null = null;
 
 function translateSeverity(severity: number) {
-    switch(severity)
-    {
+    switch (severity) {
         case 1:
             return monaco.MarkerSeverity.Error;
         case 2:
@@ -696,8 +694,8 @@ function translateSeverity(severity: number) {
 export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
     if (slangd == null)
         return;
-    if(compiler == null) {
-        throw new Error("Compiler is undefined!")
+    if (compiler == null) {
+        throw new Error("Compiler is undefined!");
     }
     let lspChanges = new compiler.slangWasmModule.TextEditList();
 
@@ -717,23 +715,23 @@ export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEve
             clearTimeout(diagnosticTimeout);
         }
         diagnosticTimeout = setTimeout(() => {
-            if(slangd == null) {
-                throw new Error("Slang is undefined!")
+            if (slangd == null) {
+                throw new Error("Slang is undefined!");
             }
             let diagnostics = slangd.getDiagnostics(userCodeURI);
             let model = monacoEditor.getModel();
-            if(model == null) {
-                throw new Error("Could not get editor model")
+            if (model == null) {
+                throw new Error("Could not get editor model");
             }
             if (diagnostics == null) {
                 monaco.editor.setModelMarkers(model, "slang", []);
                 return;
             }
-            var markers: monaco.editor.IMarkerData[] = [];
-            for (var i = 0; i < diagnostics.size(); i++) {
+            let markers: monaco.editor.IMarkerData[] = [];
+            for (let i = 0; i < diagnostics.size(); i++) {
                 let lspDiagnostic = diagnostics.get(i);
-                if(lspDiagnostic == undefined) {
-                    throw new Error("Invalid state!")
+                if (lspDiagnostic == undefined) {
+                    throw new Error("Invalid state!");
                 }
                 markers.push({
                     startLineNumber: lspDiagnostic.range.start.line + 1,
