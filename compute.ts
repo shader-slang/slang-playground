@@ -1,8 +1,7 @@
 import { Bindings } from "./compiler";
 import { ThreadGroupSize } from "./slang-wasm";
 
-export class ComputePipeline
-{
+export class ComputePipeline {
     pipeline: GPUComputePipeline | undefined;
     pipelineLayout: GPUPipelineLayout | "auto" | undefined;
 
@@ -16,28 +15,24 @@ export class ComputePipeline
     bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
-    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number} | undefined;
+    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number } | undefined;
 
     // resource name (string) -> binding descriptor 
     resourceBindings: Bindings | undefined;
 
-    constructor(device: GPUDevice)
-    {
+    constructor(device: GPUDevice) {
         this.device = device;
     }
 
-    setThreadGroupSize(size: ThreadGroupSize | { x: number, y: number, z: number})
-    {
+    setThreadGroupSize(size: ThreadGroupSize | { x: number, y: number, z: number }) {
         this.threadGroupSize = size;
     }
 
-    createPipelineLayout(resourceDescriptors: Bindings)
-    {
+    createPipelineLayout(resourceDescriptors: Bindings) {
         this.resourceBindings = resourceDescriptors;
 
         const entries: GPUBindGroupLayoutEntry[] = [];
-        for (const [name, binding] of this.resourceBindings)
-        {
+        for (const [name, binding] of this.resourceBindings) {
             entries.push(binding);
         }
         const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
@@ -46,83 +41,73 @@ export class ComputePipeline
         };
 
         const bindGroupLayout = this.device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = this.device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
+        const layout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
 
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, resources: Map<string, GPUTexture | GPUBuffer> | null)
-    {
-        if(this.pipelineLayout == undefined)
-            throw new Error("Cannot create pipeline without layout")
+    createPipeline(shaderModule: GPUShaderModule, resources: Map<string, GPUTexture | GPUBuffer> | null) {
+        if (this.pipelineLayout == undefined)
+            throw new Error("Cannot create pipeline without layout");
         const pipeline = this.device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
-            compute: {module: shaderModule},
-            });
+            compute: { module: shaderModule },
+        });
 
         this.pipeline = pipeline;
-        
+
         // If resources are provided, create the bind group right away
         if (resources)
             this.createBindGroup(resources);
     }
 
-    createBindGroup(allocatedResources: Map<string, GPUObjectBase>)
-    {
-        if(this.resourceBindings == undefined)
-            throw new Error("No resource bindings")
-        if(this.pipeline == undefined)
-            throw new Error("No pipeline")
+    createBindGroup(allocatedResources: Map<string, GPUObjectBase>) {
+        if (this.resourceBindings == undefined)
+            throw new Error("No resource bindings");
+        if (this.pipeline == undefined)
+            throw new Error("No pipeline");
 
         const entries: GPUBindGroupEntry[] = [];
-        for (const [name, resource] of allocatedResources)
-        {
+        for (const [name, resource] of allocatedResources) {
             const bindInfo = this.resourceBindings.get(name);
-            
-            if (bindInfo)
-            {
-                if (bindInfo.buffer)
-                {
-                    if(!(resource instanceof GPUBuffer)) {
-                        throw new Error("Invalid state")
+
+            if (bindInfo) {
+                if (bindInfo.buffer) {
+                    if (!(resource instanceof GPUBuffer)) {
+                        throw new Error("Invalid state");
                     }
-                    entries.push({binding: bindInfo.binding, resource: {buffer: resource}});
+                    entries.push({ binding: bindInfo.binding, resource: { buffer: resource } });
                 }
-                else if (bindInfo.storageTexture)
-                {
-                    if(!(resource instanceof GPUTexture)) {
-                        throw new Error("Invalid state")
+                else if (bindInfo.storageTexture) {
+                    if (!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state");
                     }
-                    entries.push({binding: bindInfo.binding, resource: resource.createView()});
+                    entries.push({ binding: bindInfo.binding, resource: resource.createView() });
                 }
-                else if (bindInfo.texture)
-                {
-                    if(!(resource instanceof GPUTexture)) {
-                        throw new Error("Invalid state")
+                else if (bindInfo.texture) {
+                    if (!(resource instanceof GPUTexture)) {
+                        throw new Error("Invalid state");
                     }
-                    entries.push({binding: bindInfo.binding, resource: resource.createView()});
+                    entries.push({ binding: bindInfo.binding, resource: resource.createView() });
                 }
             }
         }
 
         // Check that all resources are bound
-        if (entries.length != this.resourceBindings.size)
-        {
+        if (entries.length != this.resourceBindings.size) {
             let missingEntries = []
             // print out the names of the resources that aren't bound
-            for (const [name, resource] of this.resourceBindings)
-            {
+            for (const [name, resource] of this.resourceBindings) {
                 missingEntries = []
-                if (!entries.find(entry => entry.binding == resource.binding))
-                {
+                if (!entries.find(entry => entry.binding == resource.binding)) {
                     missingEntries.push(name);
                 }
             }
 
             throw new Error("Cannot create bind-group. The following resources are not bound: " + missingEntries.join(", "));
         }
-        
+
         this.bindGroup = this.device.createBindGroup({
             layout: this.pipeline.getBindGroupLayout(0),
             entries: entries,

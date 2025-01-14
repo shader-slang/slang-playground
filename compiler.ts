@@ -11,8 +11,8 @@ export function isWholeProgramTarget(compileTarget: string) {
 }
 
 export const RUNNABLE_ENTRY_POINT_NAMES = ['imageMain', 'printMain'] as const;
-export type RunnableShaderType = typeof RUNNABLE_ENTRY_POINT_NAMES[number]
-export type ShaderType = RunnableShaderType | null
+export type RunnableShaderType = typeof RUNNABLE_ENTRY_POINT_NAMES[number];
+export type ShaderType = RunnableShaderType | null;
 
 const RUNNABLE_ENTRY_POINT_SOURCE_MAP: { [key in RunnableShaderType]: string } = {
     'imageMain': `
@@ -56,7 +56,7 @@ void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     printMain();
 }
 `,
-}
+};
 
 type BindingDescriptor = {
     storageTexture: {
@@ -69,9 +69,9 @@ type BindingDescriptor = {
     buffer: {
         type: "uniform" | "storage"
     }
-}
+};
 
-export type Bindings = Map<string, GPUBindGroupLayoutEntry>
+export type Bindings = Map<string, GPUBindGroupLayoutEntry>;
 
 export type ReflectionJSON = {
     "entryPoints": {
@@ -88,7 +88,7 @@ export type ReflectionJSON = {
             "name": string,
         }[],
     }[],
-}
+};
 
 
 export class SlangCompiler {
@@ -97,7 +97,6 @@ export class SlangCompiler {
     static SLANG_STAGE_COMPUTE = 6;
 
     globalSlangSession: GlobalSession | null = null;
-    // slangSession = null;
 
     compileTargetMap: { name: string, value: number }[] | null = null;
 
@@ -140,7 +139,7 @@ export class SlangCompiler {
 
     findCompileTarget(compileTargetStr: string) {
         if (this.compileTargetMap == null)
-            throw new Error("No compile targets to find")
+            throw new Error("No compile targets to find");
         for (let i = 0; i < this.compileTargetMap.length; i++) {
             const target = this.compileTargetMap[i];
             if (target.name == compileTargetStr)
@@ -191,7 +190,7 @@ export class SlangCompiler {
 
     spirvDisassembly(spirvBinary: any) {
         if (!this.spirvToolsModule)
-            throw new Error("Spirv tools not initialized")
+            throw new Error("Spirv tools not initialized");
         let disAsmCode = this.spirvToolsModule.dis(
             spirvBinary,
             this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
@@ -265,7 +264,7 @@ export class SlangCompiler {
     compileEntryPointModule(slangSession: Session, moduleName: string) {
         let source = this.mainModules.get(moduleName)?.source;
         if (source == undefined) {
-            throw new Error(`Could not get module ${moduleName}`)
+            throw new Error(`Could not get module ${moduleName}`);
         }
         let module: Module | null = slangSession.loadModuleFromSource(source, moduleName, '/' + moduleName + '.slang');
 
@@ -363,7 +362,7 @@ export class SlangCompiler {
         const globalLayout = programReflection.getGlobalParamsTypeLayout();
 
         if (globalLayout == null) {
-            throw new Error("Could not get layout")
+            throw new Error("Could not get layout");
         }
 
         const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
@@ -395,7 +394,7 @@ export class SlangCompiler {
         const reflection: ProgramLayout | null = linkedProgram.getLayout(0); // assume target-index = 0
 
         if (reflection == null) {
-            throw new Error("Could not get reflection!")
+            throw new Error("Could not get reflection!");
         }
 
         const count = reflection.getParameterCount();
@@ -404,7 +403,7 @@ export class SlangCompiler {
         for (let i = 0; i < count; i++) {
             const parameter = reflection.getParameterByIndex(i);
             if (parameter == null) {
-                throw new Error("Invalid state!")
+                throw new Error("Invalid state!");
             }
             const name = parameter.getName();
             let binding = {
@@ -451,7 +450,7 @@ export class SlangCompiler {
 
         try {
             if (this.globalSlangSession == null) {
-                throw new Error("Slang session not available. Maybe the compiler hasn't been initialized yet?")
+                throw new Error("Slang session not available. Maybe the compiler hasn't been initialized yet?");
             }
             let slangSession = this.globalSlangSession.createSession(compileTarget);
             if (!slangSession) {
