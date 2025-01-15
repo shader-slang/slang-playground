@@ -1,5 +1,4 @@
-
-export var passThroughshaderCode = `
+export const passThroughshaderCode = `
 
       struct VertexShaderOutput {
         @builtin(position) position: vec4f,
@@ -49,8 +48,7 @@ export var passThroughshaderCode = `
       }
 `;
 
-export class GraphicsPipeline
-{
+export class GraphicsPipeline {
     device: GPUDevice;
     pipeline: GPURenderPipeline | undefined;
     sampler: GPUSampler | undefined;
@@ -58,46 +56,43 @@ export class GraphicsPipeline
     inputTexture: GPUTexture | undefined;
     bindGroup: GPUBindGroup | undefined;
 
-    constructor(device: GPUDevice)
-    {
+    constructor(device: GPUDevice) {
         this.device = device;
     }
 
-    createGraphicsPipelineLayout()
-    {
+    createGraphicsPipelineLayout() {
         // Passthrough shader will need an input texture to be displayed on the screen
         const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
             label: 'pass through pipeline bind group layout',
             entries: [
-                {binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {}},
-                {binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: {sampleType: 'float'}},
+                { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: {} },
+                { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
             ],
         };
 
         const bindGroupLayout = this.device.createBindGroupLayout(bindGroupLayoutDescriptor);
-        const layout = this.device.createPipelineLayout({bindGroupLayouts: [bindGroupLayout]});
+        const layout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, inputTexture: GPUTexture)
-    {
+    createPipeline(shaderModule: GPUShaderModule, inputTexture: GPUTexture) {
         this.createGraphicsPipelineLayout();
 
-        if(this.pipelineLayout == undefined) throw new Error("Pipeline layout not available")
+        if (this.pipelineLayout == undefined) throw new Error("Pipeline layout not available");
 
         const pipeline = this.device.createRenderPipeline({
             label: 'pass through pipeline',
             layout: this.pipelineLayout,
             vertex:
             {
-              module: shaderModule
+                module: shaderModule,
             },
             fragment:
             {
-              module: shaderModule,
-              targets: [{format: navigator.gpu.getPreferredCanvasFormat(),}]
+                module: shaderModule,
+                targets: [{ format: navigator.gpu.getPreferredCanvasFormat(), }],
             },
-            });
+        });
         this.pipeline = pipeline;
 
         this.sampler = this.device.createSampler();
@@ -105,36 +100,34 @@ export class GraphicsPipeline
         this.createBindGroup();
     }
 
-    createBindGroup()
-    {
-      if(this.pipeline == undefined) throw new Error("Pipeline not created yet")
-      if(this.sampler == undefined) throw new Error("Sampler not created yet")
-      if(this.inputTexture == undefined) throw new Error("Input texture not created yet")
+    createBindGroup() {
+        if (this.pipeline == undefined) throw new Error("Pipeline not created yet");
+        if (this.sampler == undefined) throw new Error("Sampler not created yet");
+        if (this.inputTexture == undefined) throw new Error("Input texture not created yet");
         const bindGroup = this.device.createBindGroup({
-          label: 'pass through pipeline bind group',
-          layout: this.pipeline.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: this.sampler },
-            { binding: 1, resource: this.inputTexture.createView() },
-          ],
+            label: 'pass through pipeline bind group',
+            layout: this.pipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: this.sampler },
+                { binding: 1, resource: this.inputTexture.createView() },
+            ],
         });
 
         this.bindGroup = bindGroup;
     }
 
-    createRenderPassDesc(view: GPUTextureView): GPURenderPassDescriptor
-    {
-      const attachment: GPURenderPassColorAttachment = {
-        view,
-        clearValue: [0.3, 0.3, 0.3, 1],
-        loadOp: 'clear',
-        storeOp: 'store',
-      };
+    createRenderPassDesc(view: GPUTextureView): GPURenderPassDescriptor {
+        const attachment: GPURenderPassColorAttachment = {
+            view,
+            clearValue: [0.3, 0.3, 0.3, 1],
+            loadOp: 'clear',
+            storeOp: 'store',
+        };
         const renderPassDescriptor = {
-          label: 'pass through renderPass',
-          colorAttachments: [
-            attachment
-          ],
+            label: 'pass through renderPass',
+            colorAttachments: [
+                attachment,
+            ],
         };
 
         return renderPassDescriptor;
