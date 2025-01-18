@@ -212,7 +212,7 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
     }
 }
 
-function startRendering() {
+function handleResize() {
     // This is a lighter-weight setup function that doesn't need to re-compile the shader code.
     const setupRenderer = async () => {
         if (!computePipeline || !passThroughPipeline)
@@ -221,8 +221,7 @@ function startRendering() {
         if (!currentWindowSize || currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
             throw new NotReadyError("window not ready");
 
-        allocatedResources = await processResourceCommands(computePipeline, resourceBindings, resourceCommands);
-
+        safeSet(allocatedResources, "outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'rgba8unorm'));
         computePipeline.createBindGroup(allocatedResources);
 
         passThroughPipeline.inputTexture = (allocatedResources.get("outputTexture") as GPUTexture);
@@ -240,7 +239,7 @@ function startRendering() {
 function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
     let needResize = resizeCanvas(entries);
     if (needResize) {
-        startRendering();
+        handleResize();
     }
 }
 
@@ -617,7 +616,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 throw new Error(`Failed to create texture from image: ${error}`);
             }
         } else if (parsedCommand.type === "RAND") {
-            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
+            const elementSize = 4; // RAND is only valid for floats
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
