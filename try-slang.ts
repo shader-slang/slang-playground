@@ -339,7 +339,8 @@ async function execFrame(timeMS: number) {
 
             let resource = allocatedResources.get(command.resourceName);
             if (resource instanceof GPUBuffer) {
-                size = [resource.size / 4, 1, 1];
+                let elementSize = command.elementSize || 4;
+                size = [resource.size / elementSize, 1, 1];
             }
             else if (resource instanceof GPUTexture) {
                 size = [resource.width, resource.height, 1];
@@ -496,7 +497,11 @@ function checkShaderType(userSource: string) {
 }
 
 export type ParsedCommand = {
-    "type": "ZEROS" | "RAND",
+    "type": "ZEROS",
+    "count": number,
+    "elementSize": number,
+} | {
+    "type": "RAND",
     "count": number,
 } | {
     "type": "BLACK",
@@ -521,7 +526,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
-            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
+            const elementSize = parsedCommand.elementSize;
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
@@ -539,12 +544,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             safeSet(allocatedResources, resourceName, buffer);
 
             // Initialize the buffer with zeros.
-            let zeros: BufferSource;
-            if (elementSize == 4) {
-                zeros = new Float32Array(parsedCommand.count);
-            } else {
-                throw new Error("Element size isn't handled");
-            }
+            let zeros: BufferSource = new Uint8Array(parsedCommand.count * elementSize);
             pipeline.device.queue.writeBuffer(buffer, 0, zeros);
         } else if (parsedCommand.type === "BLACK") {
             const size = parsedCommand.width * parsedCommand.height;
@@ -703,7 +703,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             }
         } else {
             // exhaustiveness check
-            let x: never = parsedCommand.type;
+            let x: never = parsedCommand;
             throw new Error("Invalid resource command type");
         }
     }
@@ -785,7 +785,7 @@ export let onRun = () => {
             resourceCommands = getCommandsFromAttributes(ret.reflection);
 
             try {
-                callCommands = parseCallCommands(userSource);
+                callCommands = parseCallCommands(userSource, ret.reflection);
             }
             catch (error: any) {
                 throw new Error("Error while parsing '//! CALL' commands: " + error.message);
