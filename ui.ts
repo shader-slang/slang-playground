@@ -144,6 +144,7 @@ function prepareForResize() {
         if (codeEditor.style.display == "none")
             continue;
         codeEditor.style.overflow = "hidden";
+        codeEditor.style.height = "100%";
     }
     workspaceDiv.style.overflow = "hidden";
     leftContainer.style.overflowX = "hidden";
@@ -166,7 +167,13 @@ function finishResizing() {
         let parentNode = codeEditor.parentNode;
         if (codeEditor.clientHeight < 30 && parentNode instanceof HTMLElement)
             parentNode.style.overflow = "hidden";
-        codeEditor.style.overflow = "visible";
+        
+        if (codeEditor.clientHeight == 0) {
+            codeEditor.style.height = "0px";
+            codeEditor.style.overflow = "hidden";
+        } else {
+            codeEditor.style.overflow = "visible";
+        }
     }
     reflectionTab.style.maxWidth = assertGetElementById("rightContainerDiv").clientWidth + "px";
 
