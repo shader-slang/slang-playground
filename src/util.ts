@@ -1,22 +1,33 @@
-import { ReflectionJSON, ReflectionType } from './compiler.js';
-import { ParsedCommand } from './try-slang.js';
+import type { ReflectionJSON, ReflectionType } from './compiler.js';
+import pako from "pako";
 
-export function configContext(device: GPUDevice, canvas: HTMLCanvasElement) {
-    let context = canvas.getContext('webgpu');
-
-    const canvasConfig = {
-        device: device,
-        format: navigator.gpu.getPreferredCanvasFormat(),
-        usage:
-            GPUTextureUsage.RENDER_ATTACHMENT,
-    };
-
-    if (context == null) {
-        throw new Error("Could not get webgpu context");
+export class NotReadyError extends Error {
+    constructor(message: string) {
+        super(message);
     }
+}
 
-    context.configure(canvasConfig);
-    return context;
+export function isWebGPUSupported() {
+    return 'gpu' in navigator && navigator.gpu !== null;
+}
+
+// Function to compress and decompress text, loading pako if necessary
+export async function compressToBase64URL(text: string) {
+    // Compress the text
+    const compressed = pako.deflate(text, {});
+    const base64 = btoa(String.fromCharCode(...new Uint8Array(compressed)));
+
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+export async function decompressFromBase64URL(base64: string) {
+    // Decode the base64 URL
+    base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+    const compressed = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+    // Decompress the data
+    const decompressed = pako.inflate(compressed, { to: 'string' });
+
+    return decompressed;
 }
 
 export function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
@@ -42,41 +53,42 @@ function reinterpretUint32AsFloat(uint32: number) {
     return float32View[0];
 }
 
-function roundUpToNearest(x: number, nearest: number){
+function roundUpToNearest(x: number, nearest: number) {
     return Math.ceil(x / nearest) * nearest;
 }
 
 function getSize(reflectionType: ReflectionType): number {
-    if(reflectionType.kind == "resource") {
+    if (reflectionType.kind == "resource") {
         throw new Error("unimplemented");
-    } else if(reflectionType.kind == "scalar") {
+    } else if (reflectionType.kind == "scalar") {
         const bitsMatch = reflectionType.scalarType.match(/\d+$/);
-        if(bitsMatch == null) {
+        if (bitsMatch == null) {
             throw new Error("Could not get bit count out of scalar type");
         }
         return parseInt(bitsMatch[0]) / 8;
-    } else if(reflectionType.kind == "struct") {
+    } else if (reflectionType.kind == "struct") {
         const alignment = reflectionType.fields.map((f) => {
-            if(f.binding.kind == "uniform") return f.binding.size;
+            if (f.binding.kind == "uniform") return f.binding.size;
             else throw new Error("Invalid state")
         }).reduce((a, b) => Math.max(a, b));
 
         const unalignedSize = reflectionType.fields.map((f) => {
-            if(f.binding.kind == "uniform") return f.binding.offset + f.binding.size;
+            if (f.binding.kind == "uniform") return f.binding.offset + f.binding.size;
             else throw new Error("Invalid state")
         }).reduce((a, b) => Math.max(a, b));
 
         return roundUpToNearest(unalignedSize, alignment);
-    } else if(reflectionType.kind == "vector") {
-        if(reflectionType.elementCount == 3) {
-            return 4 * getSize(reflectionType.elementType);  
+    } else if (reflectionType.kind == "vector") {
+        if (reflectionType.elementCount == 3) {
+            return 4 * getSize(reflectionType.elementType);
         }
         return reflectionType.elementCount * getSize(reflectionType.elementType);
     } else {
-        let x:never = reflectionType;
+        let x: never = reflectionType;
         throw new Error("Cannot get size of unrecognized reflection type");
     }
 }
+
 
 /**
  * Here are some patterns we support:
@@ -88,7 +100,23 @@ function getSize(reflectionType: ReflectionType): number {
  * | `[playground::URL("https://example.com/image.png")]` | Initialize a texture with image from URL
  * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
  */
-export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourceName: string; parsedCommand: ParsedCommand; }[] {
+export type ParsedCommand = {
+    "type": "ZEROS",
+    "count": number,
+    "elementSize": number,
+} | {
+    "type": "RAND",
+    "count": number,
+} | {
+    "type": "BLACK",
+    "width": number,
+    "height": number,
+} | {
+    "type": "URL",
+    "url": string,
+}
+export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
+export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): ResourceCommand[] {
     let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
 
     for (let parameter of reflection.parameters) {
@@ -100,7 +128,7 @@ export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourc
 
             let playground_attribute_name = attribute.name.slice(11);
             if (playground_attribute_name == "ZEROS") {
-                if(parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
                     throw new Error(`ZEROS attribute cannot be applied to ${parameter.name}, it only supports buffers`)
                 }
                 command = {
@@ -109,18 +137,18 @@ export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourc
                     elementSize: getSize(parameter.type.resultType),
                 };
             } else if (playground_attribute_name == "RAND") {
-                if(parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
                     throw new Error(`RAND attribute cannot be applied to ${parameter.name}, it only supports buffers`)
                 }
-                if(parameter.type.resultType.kind != "scalar" || parameter.type.resultType.scalarType != "float32") {
+                if (parameter.type.resultType.kind != "scalar" || parameter.type.resultType.scalarType != "float32") {
                     throw new Error(`RAND attribute cannot be applied to ${parameter.name}, it only supports float buffers`)
-                } 
+                }
                 command = {
                     type: playground_attribute_name,
                     count: attribute.arguments[0] as number
                 };
             } else if (playground_attribute_name == "BLACK") {
-                if(parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
                     throw new Error(`BLACK attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
                 }
                 command = {
@@ -129,7 +157,7 @@ export function getCommandsFromAttributes(reflection: ReflectionJSON): { resourc
                     height: attribute.arguments[1] as number,
                 };
             } else if (playground_attribute_name == "URL") {
-                if(parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
                     throw new Error(`URL attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
                 }
                 command = {
@@ -182,11 +210,11 @@ export function parseCallCommands(userSource: string, reflection: ReflectionJSON
             if (args[0].startsWith("SIZE_OF")) {
                 let resourceName = args[0].slice(8, -1);
                 let resourceReflection = reflection.parameters.find((param) => param.name == resourceName);
-                if(resourceReflection == undefined) {
+                if (resourceReflection == undefined) {
                     throw new Error(`Cannot find resource ${resourceName} for ${fnName} CALL command`)
                 }
                 let elementSize: number | undefined = undefined;
-                if(resourceReflection.type.kind == "resource" && resourceReflection.type.baseShape == "structuredBuffer") {
+                if (resourceReflection.type.kind == "resource" && resourceReflection.type.baseShape == "structuredBuffer") {
                     elementSize = getSize(resourceReflection.type.resultType);
                 }
                 callCommands.push({ type: "RESOURCE_BASED", fnName, resourceName, elementSize });

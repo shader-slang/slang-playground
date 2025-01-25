@@ -1,10 +1,7 @@
-import { SpirvTools, default as spirvTools } from "./spirv-tools.js";
-import { ModuleType } from './try-slang.js';
+import { type SpirvTools, default as spirvTools } from "./spirv-tools.js";
+import type { ModuleType } from './try-slang.js';
 import type { ComponentType, EmbindString, GlobalSession, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
 import { playgroundSource } from "./playgroundShader.js";
-declare let RequireJS: {
-    require: typeof require
-};
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
@@ -104,7 +101,7 @@ export type ReflectionType = {
     "access"?: "readWrite"
 };
 
-export type ReflectionParameter =  {
+export type ReflectionParameter = {
     "binding": ReflectionBinding,
     "name": string,
     "type": ReflectionType,
