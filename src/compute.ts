@@ -96,17 +96,10 @@ export class ComputePipeline {
 
         // Check that all resources are bound
         if (entries.length != this.resourceBindings.size) {
-            let missingEntries = []
+            let missingEntries: string[] = []
             // print out the names of the resources that aren't bound
             for (const [name, resource] of this.resourceBindings) {
-                missingEntries = []
                 if (!entries.find(entry => entry.binding == resource.binding)) {
-                    missingEntries.push(name);
-                }
-            }
-            for (const entry of entries) {
-                missingEntries = []
-                if (!Array.from(this.resourceBindings.values()).find(resource => entry.binding == resource.binding)) {
                     missingEntries.push(name);
                 }
             }
