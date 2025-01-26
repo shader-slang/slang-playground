@@ -1,6 +1,5 @@
 - Fix compilation visual issues with splitpane
 - Restore using compression on wasm request
-- Improve tooltip code
 
 - Test release bundle and update README
 - Fix CI

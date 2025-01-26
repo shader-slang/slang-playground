@@ -2,6 +2,7 @@
 import TabContainer from './components/ui/TabContainer.vue'
 import Tab from './components/ui/Tab.vue'
 import Selector from './components/ui/Selector.vue'
+import Tooltip from './components/ui/Tooltip.vue'
 import Help from './components/Help.vue'
 import MonacoEditor from './components/MonacoEditor.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
@@ -42,11 +43,11 @@ const codeEditor = useTemplateRef("codeEditor");
 const diagnosticsArea = useTemplateRef("diagnostics");
 const codeGenArea = useTemplateRef("codeGenArea");
 
-const shareButton = useTemplateRef('shareButton');
-const tooltip = useTemplateRef('tooltip');
-const helpModal = useTemplateRef('helpModal');
-const targetSelect = useTemplateRef('targetSelect');
-const renderCanvas = useTemplateRef('renderCanvas');
+const shareButton = useTemplateRef("shareButton");
+const tooltip = useTemplateRef("tooltip");
+const helpModal = useTemplateRef("helpModal");
+const targetSelect = useTemplateRef("targetSelect");
+const renderCanvas = useTemplateRef("renderCanvas");
 
 const selectedDemo = ref("");
 const initialized = ref(false);
@@ -63,10 +64,11 @@ const showEntrypoints = ref(false);
 const printedText = ref("");
 const device = ref<GPUDevice | null>(null);
 
+const currentDisplayMode = ref<ShaderType>("imageMain");
+
 let pageLoaded = false;
 let reflectionJson: any = {};
 
-let currentDisplayMode = ref<ShaderType>("imageMain");
 
 async function tryGetDevice() {
     if (!isWebGPUSupported()) {
@@ -163,10 +165,10 @@ async function onShare() {
         url.searchParams.set("target", compileTarget)
         url.searchParams.set("code", compressed);
         navigator.clipboard.writeText(url.href);
-        showTooltip(shareButton.value, "Link copied to clipboard.");
+        tooltip.value!.showTooltip(shareButton.value, "Link copied to clipboard.");
     }
     catch (e) {
-        showTooltip(shareButton.value, "Failed to copy link to clipboard.");
+        tooltip.value!.showTooltip(shareButton.value, "Failed to copy link to clipboard.");
     }
 }
 
@@ -211,7 +213,7 @@ function compileOrRun() {
         if (device.value == null) {
             onCompile().then(() => {
                 if (diagnosticsArea.value?.getValue() == "")
-                    diagnosticsArea.value.appendEditorValue(`The shader compiled successfully,` +
+                    diagnosticsArea.value.appendEditorValue(`The shader compiled successfully, ` +
                         `but it cannot run because your browser does not support WebGPU.\n` +
                         `WebGPU is supported in Chrome, Edge, Firefox Nightly and Safari Technology Preview. ` +
                         `On iOS, WebGPU support requires Safari 16.4 or later and must be enabled in settings. ` +
@@ -405,29 +407,13 @@ function runIfFullyInitialized() {
     }
 }
 
-function showTooltip(button: HTMLElement, text: string) {
-    tooltip.value!.textContent = text;
-    // Position the tooltip near the button
-    const rect = button.getBoundingClientRect();
-    tooltip.value!.style.top = `${rect.bottom + window.scrollY + 15}px`;
-    tooltip.value!.style.left = `${rect.left + window.scrollX}px`;
-
-    // Show the tooltip
-    tooltip.value!.classList.add('show');
-
-    // Hide the tooltip after 3 seconds
-    setTimeout(() => {
-        tooltip.value!.classList.remove('show');
-    }, 3000);
-}
-
 function logError(message: string) {
     diagnosticsArea.value?.appendEditorValue(message + "\n", true);
 }
 </script>
 
 <template>
-    <div id="tooltip" class="tooltip" ref="tooltip"></div>
+    <Tooltip ref="tooltip"></Tooltip>
     <Transition>
         <div id="loading-screen" v-if="!initialized">
             <img height="80px" src="./assets/slang-logo.svg" alt="Slang Logo" />
