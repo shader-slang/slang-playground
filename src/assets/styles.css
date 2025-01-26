@@ -414,6 +414,10 @@ label {
   /* Full 360-degree rotation */
 }
 
+.splitpanes [style*="display: none"]~.splitpanes__splitter {
+  display: none;
+}
+
 /* Narrow screen */
 @media screen and (max-width: 450px) {
   .dropdown-select {

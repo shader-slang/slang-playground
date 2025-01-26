@@ -439,7 +439,8 @@ function logError(message: string) {
                     <!-- Load Demo section -->
                     <div class="navbar-actions navbar-item">
                         <div class="navbar-group">
-                            <select class="dropdown-select" id="demo-select" name="demo" aria-label="Load Demo" v-model="selectedDemo" @change="loadDemo(selectedDemo)">
+                            <select class="dropdown-select" id="demo-select" name="demo" aria-label="Load Demo"
+                                v-model="selectedDemo" @change="loadDemo(selectedDemo)">
                                 <option value="" disabled selected>Load Demo</option>
                                 <option v-for="demo in demoList" :value="demo.url" :key="demo.url"
                                     :disabled="demo.url == ''">{{ demo.name }}
@@ -461,13 +462,15 @@ function logError(message: string) {
                         <Selector :options="compileTargets" modelValue="SPIRV" name="target" aria-label="target"
                             ref="targetSelect" @change="updateProfileOptions"></Selector>
 
-                        <select class="dropdown-select" name="profile" aria-label="profile" v-model="selectedProfile" v-show="showProfiles">
+                        <select class="dropdown-select" name="profile" aria-label="profile" v-model="selectedProfile"
+                            v-show="showProfiles">
                             <option v-for="profile in profiles" :value="profile" :key="profile">{{
                                 profile }}</option>
                         </select>
 
                         <select class="dropdown-select" name="entrypoint" aria-label="Entrypoint"
-                            :onfocus="updateEntryPointOptions" @onmousedown="updateEntryPointOptions" v-model="selectedEntrypoint" v-show="showEntrypoints">
+                            :onfocus="updateEntryPointOptions" @onmousedown="updateEntryPointOptions"
+                            v-model="selectedEntrypoint" v-show="showEntrypoints">
                             <option value="" disabled selected>Entrypoint</option>
                             <option v-for="entrypoint in entrypoints" :value="entrypoint" :key="entrypoint">{{
                                 entrypoint }}</option>
@@ -481,8 +484,7 @@ function logError(message: string) {
                     </div>
                     <!-- Share button section -->
                     <div class="navbar-standalone-button-item">
-                        <button class="svg-btn" title="Create sharable link" ref="shareButton"
-                            @click="onShare">
+                        <button class="svg-btn" title="Create sharable link" ref="shareButton" @click="onShare">
                             <svg xmlns="http://www.w3.org/2000/svg" width="28px" height="28px" viewBox="0 0 64 64"
                                 fill="currentColor">
                                 <path
@@ -505,21 +507,21 @@ function logError(message: string) {
                         </button>
                     </div>
                 </div>
-                <div class="workSpace" id="workSpaceDiv">
+                <div class="workSpace">
                     <Splitpanes horizontal>
                         <Pane size="80">
-                            <MonacoEditor class="codingSpace" id="codeEditor" ref="codeEditor"></MonacoEditor>
+                            <MonacoEditor class="codingSpace" ref="codeEditor"></MonacoEditor>
                         </Pane>
                         <Pane>
-                            <MonacoEditor class="diagnosticSpace" id="diagnostics" ref="diagnostics" readOnlyMode>
+                            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode>
                             </MonacoEditor>
                         </Pane>
                     </Splitpanes>
                 </div>
             </Pane>
-            <Pane class="rightContainer" id="rightContainerDiv">
+            <Pane class="rightContainer">
                 <Splitpanes horizontal class="resultSpace">
-                    <Pane class="outputSpace" id="output" size="69" v-if="device != null"
+                    <Pane class="outputSpace" size="69" v-if="device != null"
                         v-show="currentDisplayMode != null">
                         <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
                             <RenderCanvas :device="device" @log-error="logError"
@@ -528,7 +530,7 @@ function logError(message: string) {
                         <textarea readonly class="printSpace"
                             v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
                     </Pane>
-                    <Pane class="codeGenSpace" id="targetResultContainer">
+                    <Pane class="codeGenSpace">
                         <TabContainer>
                             <Tab name="code" label="Target Code">
                                 <MonacoEditor ref="codeGenArea" readOnlyMode />
@@ -551,6 +553,8 @@ function logError(message: string) {
     display: block;
     width: 100%;
     height: 100%;
+    position: relative;
+    overflow: hidden;
 }
 
 #loading-screen.v-leave-active {
@@ -559,5 +563,13 @@ function logError(message: string) {
 
 #loading-screen.v-leave-to {
     opacity: 0;
+}
+
+.resultSpace.splitpanes .splitpanes__pane {
+    transition: none !important;
+}
+
+.resultSpace [style*="display: none"]~.splitpanes__splitter~div {
+    height: 100% !important;
 }
 </style>

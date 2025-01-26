@@ -1,4 +1,3 @@
-- Fix compilation visual issues with splitpane
 - Restore using compression on wasm request
 
 - Test release bundle and update README
