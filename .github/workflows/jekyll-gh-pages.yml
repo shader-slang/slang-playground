@@ -47,15 +47,15 @@ jobs:
           popd
           echo "$(git -C spirv-tools rev-parse HEAD)" >> key-spirv-tool.txt
 
-      # - name: restore slang-wasm
-      #   id: cache_slang
-      #   uses: actions/cache/restore@v4
-      #   with:
-      #     path: |
-      #       ./slang-wasm.wasm.gz
-      #       ./slang-wasm.js
-      #       ./slang-wasm.d.ts
-      #     key: ${{hashFiles('key.txt')}}
+      - name: restore slang-wasm
+        id: cache_slang
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ./slang-wasm.wasm.gz
+            ./slang-wasm.js
+            ./slang-wasm.d.ts
+          key: ${{hashFiles('key.txt')}}
 
       - name: restore spirv-tools
         id: cache_spirv_tools
@@ -133,7 +133,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: site-artifact
-          path: ./dist/
+          path: ./_site/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -201,6 +201,8 @@ function updateEntryPointOptions() {
     if (!compiler)
         return;
     entrypoints.value = compiler.findDefinedEntryPoints(codeEditor.value!.getValue());
+    if((selectedEntrypoint.value == "" || !entrypoints.value.includes(selectedEntrypoint.value)) && entrypoints.value.length > 0)
+        selectedEntrypoint.value = entrypoints.value[0];
 }
 
 function compileOrRun() {
