@@ -12,7 +12,8 @@ git clone https://github.com/shader-slang/slang-playground.git
 
 * Install [Docker](https://www.docker.com/get-started/)
 * Install [Github CLI](https://cli.github.com/)
-* install [Github Act](https://github.com/nektos/gh-act) as an extension using `gh extension install https://github.com/nektos/gh-act`
+* Install [Github Act](https://github.com/nektos/gh-act) as an extension using `gh extension install https://github.com/nektos/gh-act`
+* Install [Node.js](https://nodejs.org/en/download/)
 
 ## Iterate
 
@@ -31,7 +32,7 @@ Then extract the files from `out/1/artifact/artifact.zip` to the `src` directory
 * `spirv-tools.d.ts`
 * `spirv-tools.wasm`
 
-If this method does not work, you can instead fork this repo and run the `Build Dependencies` workflow from the Actions tab. Then you can download the artifacts from the workflow run.
+If this method does not work, you can instead fork this repo and manually run the `Build Dependencies` workflow from the Actions tab. Then you can download the artifacts from the workflow run.
 
 Run `npm install` to install dependencies.
 
