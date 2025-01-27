@@ -1,5 +1,4 @@
-# Sample workflow for building and deploying a Jekyll site to GitHub Pages
-name: Deploy Jekyll with GitHub Pages dependencies preinstalled
+name: Deploy to GitHub Pages
 
 on:
   # Runs on pushes targeting the default branch
@@ -48,15 +47,15 @@ jobs:
           popd
           echo "$(git -C spirv-tools rev-parse HEAD)" >> key-spirv-tool.txt
 
-      # - name: restore slang-wasm
-      #   id: cache_slang
-      #   uses: actions/cache/restore@v4
-      #   with:
-      #     path: |
-      #       ./slang-wasm.wasm.gz
-      #       ./slang-wasm.js
-      #       ./slang-wasm.d.ts
-      #     key: ${{hashFiles('key.txt')}}
+      - name: restore slang-wasm
+        id: cache_slang
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ./slang-wasm.wasm.gz
+            ./slang-wasm.js
+            ./slang-wasm.d.ts
+          key: ${{hashFiles('key.txt')}}
 
       - name: restore spirv-tools
         id: cache_spirv_tools
@@ -102,33 +101,21 @@ jobs:
             ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
-      - name: Cleanup workspace
+      - name: Cleanup workspace, move files, and build
         run: |
           rm -rf slang-repo
           rm -rf emsdk
           rm -rf spirv-tools
-
-      - name: Build typescript
-        run: |
+          mv ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./src/
+          mv ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ./src/
           npm install
-          npx tsc
+          npm run build
 
-      - name: Build with Jekyll
-        uses: actions/jekyll-build-pages@v1
-        with:
-          source: ./
-          destination: ./_site
-
-      - name: Copy depencencies
-        run: |
-          sudo mkdir ./_site/node_modules
-          sudo cp -r node_modules/requirejs ./_site/node_modules/requirejs
-          sudo cp -r node_modules/pako ./_site/node_modules/pako
       - name: Upload export artifact
         uses: actions/upload-artifact@v4
         with:
           name: site-artifact
-          path: ./_site/
+          path: ./dist/
           compression-level: 1  
 
   # Deployment job
@@ -146,7 +133,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: site-artifact
-          path: ./_site/
+          path: ./dist/
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

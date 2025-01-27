@@ -11,8 +11,8 @@ import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderTy
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
-import { Splitpanes, Pane } from 'Splitpanes'
-import 'Splitpanes/dist/Splitpanes.css'
+import { Splitpanes, Pane } from 'splitpanes'
+import 'splitpanes/dist/splitpanes.css'
 import ReflectionView from './components/ReflectionView.vue'
 
 // MonacoEditor is a big component, so we load it asynchronously.
