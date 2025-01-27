@@ -40,7 +40,13 @@ echo "if(EMSCRIPTEN)
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
     )
     # To generate binding code
-    target_link_options(slang-wasm PUBLIC "--bind" --emit-tsd \"$<TARGET_FILE_DIR:slang-wasm>/slang-wasm.d.ts\")
+    target_link_options(slang-wasm PUBLIC
+        \"--bind\"
+        --emit-tsd \"$<TARGET_FILE_DIR:slang-wasm>/slang-wasm.d.ts\"
+        -sMODULARIZE=1
+        -sEXPORT_ES6=1
+        -sEXTRA_EXPORTED_RUNTIME_METHODS=['FS']
+    )
 endif()" > "source/slang-wasm/CMakeLists.txt"
 
 cmake --workflow --preset generators --fresh

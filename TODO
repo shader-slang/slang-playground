@@ -1,4 +1,3 @@
-- Restore using compression on wasm request
-
-- Test release bundle and update README
+- Optimize networking
 - Fix CI
+- Update README

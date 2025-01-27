@@ -1,5 +1,5 @@
 <script setup lang="ts" generic="T extends readonly string[]">
-import { ref, defineProps, defineEmits, computed } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps<{
     options: T

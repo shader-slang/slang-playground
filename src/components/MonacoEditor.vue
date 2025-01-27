@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTemplateRef, onMounted, ref, shallowRef, onUnmounted } from 'vue'
 import * as monaco from 'monaco-editor';
-import { initMonaco, translateSeverity, userCodeURI } from '@/language-server';
+import { initLanguageServer, initMonaco, translateSeverity, userCodeURI } from '@/language-server';
 import { compiler, slangd } from '@/try-slang';
 
 const container = useTemplateRef('container')
@@ -139,6 +139,8 @@ function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
 			diagnosticTimeout = null;
 		}, 500);
 
+	} catch (e) {
+		console.error(e);
 	}
 	finally {
 		lspChanges.delete();

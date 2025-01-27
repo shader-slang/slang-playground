@@ -4,18 +4,19 @@ import Tab from './components/ui/Tab.vue'
 import Selector from './components/ui/Selector.vue'
 import Tooltip from './components/ui/Tooltip.vue'
 import Help from './components/Help.vue'
-import MonacoEditor from './components/MonacoEditor.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
-import { onBeforeMount, onMounted, ref, useTemplateRef } from 'vue'
+import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'Splitpanes'
 import 'Splitpanes/dist/Splitpanes.css'
-import { initLanguageServer } from './language-server'
 import ReflectionView from './components/ReflectionView.vue'
+
+// MonacoEditor is a big component, so we load it asynchronously.
+const MonacoEditor = defineAsyncComponent(() => import('./components/MonacoEditor.vue'))
 
 // target -> profile mappings
 const defaultShaderURL = "circle.slang";
@@ -254,7 +255,7 @@ function doRun() {
 
     if (!ret.succ) {
         toggleDisplayMode(null);
-        throw new Error("");
+        return;
     }
 
     let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
@@ -389,9 +390,9 @@ function restoreDemoSelectionFromURL() {
     return false;
 }
 
-function runIfFullyInitialized() {
+async function runIfFullyInitialized() {
     if (compiler && slangd && pageLoaded) {
-        initLanguageServer();
+        (await import("./language-server")).initLanguageServer();
 
         initialized.value = true;
 
@@ -422,7 +423,7 @@ function logError(message: string) {
                 <p class="loading-status" id="loadingStatusLabel">Loading Playground...</p>
             </div>
             <div id="progress-bar-container">
-                <div id="progress-bar"></div>
+                <div class="progress-bar" id="progress-bar"></div>
             </div>
         </div>
     </Transition>

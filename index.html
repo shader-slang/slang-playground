@@ -14,22 +14,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png" />
   <link href="./src/assets/styles.css" rel="stylesheet" />
   <link rel="stylesheet" href="jsontree/jsontree.js.css">
-  <script src="https://unpkg.com/split-grid/dist/split-grid.js"></script>
-  <script src="node_modules/requirejs/require.js"></script>
   <script src="jsontree/jsontree.min.js"></script>
-  <script>
-    let RequireJS = {};
-    RequireJS.require = require;
-  </script>
   <script type="module" src="/src/main.ts"></script>
-  <script type="module" src="/src/util.ts"></script>
-  <script type="module" src="/src/playgroundShader.ts"></script>
-  <script type="module" src="/src/demo-list.ts"></script>
-  <script type="module" src="/src/pass_through.ts"></script>
-  <script type="module" src="/src/compute.ts"></script>
-  <script type="module" src="/src/compiler.ts"></script>
-  <script type="module" src="/src/try-slang.ts"></script>
-  <script type="module" src="/src/language-server.ts"></script>
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-TMTZVLLMBP"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
@@ -48,7 +34,7 @@
             <p class="loading-status" id="loadingStatusLabel">Loading Playground...</p>
         </div>
         <div id="progress-bar-container">
-            <div id="progress-bar"></div>
+            <div class="progress-bar"></div>
         </div>
     </div>
   </div>

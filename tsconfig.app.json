@@ -13,7 +13,7 @@
     "playgroundShader.ts",
     "try-slang.ts",
     "util.ts"
-  ],
+, "public/jsontree"  ],
   "exclude": [
     "src/**/__tests__/*"
   ],
@@ -28,7 +28,6 @@
       "@webgpu/types",
       "jjsontree.js",
       "./src/spirv-tools",
-      "requirejs",
       "@types/emscripten"
     ]
   }
