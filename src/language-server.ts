@@ -1,12 +1,37 @@
-/// <reference path="node_modules/monaco-editor/monaco.d.ts" />
-import { slangd, monacoEditor, compiler } from './try-slang.js';
+import { slangd } from './try-slang.js';
 import { playgroundSource } from './playgroundShader.js';
-import { CompletionContext, CompletionItem } from './slang-wasm.js';
+import type { CompletionContext } from './slang-wasm.js';
+
+import * as monaco from "monaco-editor";
+    
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
+import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
+import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
+import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";
 let languageRegistered = false;
 export function initMonaco() {
+    self.MonacoEnvironment = {
+        getWorker(_: any, label: string) {
+            if (label === 'json') {
+                return new jsonWorker();
+            }
+            if (label === 'css' || label === 'scss' || label === 'less') {
+                return new cssWorker();
+            }
+            if (label === 'html' || label === 'handlebars' || label === 'razor') {
+                return new htmlWorker();
+            }
+            if (label === 'typescript' || label === 'javascript') {
+                return new tsWorker();
+            }
+            return new editorWorker();
+        }
+    };
+    monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
     if (languageRegistered)
         return;
     languageRegistered = true;
@@ -663,20 +688,14 @@ export function initMonaco() {
 }
 
 export function initLanguageServer() {
-    let text = "";
-    if (monacoEditor) {
-        text = monacoEditor.getValue();
-    }
     if (slangd == null) {
         throw new Error("Slang is undefined!");
     }
-    slangd.didOpenTextDocument(userCodeURI, text);
+    slangd.didOpenTextDocument(userCodeURI, "");
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 
-let diagnosticTimeout: number | null = null;
-
-function translateSeverity(severity: number) {
+export function translateSeverity(severity: number) {
     switch (severity) {
         case 1:
             return monaco.MarkerSeverity.Error;
@@ -689,67 +708,4 @@ function translateSeverity(severity: number) {
         default:
             return monaco.MarkerSeverity.Error;
     }
-}
-
-export function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
-    if (slangd == null)
-        return;
-    if (compiler == null) {
-        throw new Error("Compiler is undefined!");
-    }
-    let lspChanges = new compiler.slangWasmModule.TextEditList();
-
-    e.changes.forEach(change =>
-        lspChanges.push_back(
-            {
-                range: {
-                    start: { line: change.range.startLineNumber - 1, character: change.range.startColumn - 1 },
-                    end: { line: change.range.endLineNumber - 1, character: change.range.endColumn - 1 }
-                },
-                text: change.text
-            }
-        ));
-    try {
-        slangd.didChangeTextDocument(userCodeURI, lspChanges);
-        if (diagnosticTimeout != null) {
-            clearTimeout(diagnosticTimeout);
-        }
-        diagnosticTimeout = setTimeout(() => {
-            if (slangd == null) {
-                throw new Error("Slang is undefined!");
-            }
-            let diagnostics = slangd.getDiagnostics(userCodeURI);
-            let model = monacoEditor.getModel();
-            if (model == null) {
-                throw new Error("Could not get editor model");
-            }
-            if (diagnostics == null) {
-                monaco.editor.setModelMarkers(model, "slang", []);
-                return;
-            }
-            let markers: monaco.editor.IMarkerData[] = [];
-            for (let i = 0; i < diagnostics.size(); i++) {
-                let lspDiagnostic = diagnostics.get(i);
-                if (lspDiagnostic == undefined) {
-                    throw new Error("Invalid state!");
-                }
-                markers.push({
-                    startLineNumber: lspDiagnostic.range.start.line + 1,
-                    startColumn: lspDiagnostic.range.start.character + 1,
-                    endLineNumber: lspDiagnostic.range.end.line + 1,
-                    endColumn: lspDiagnostic.range.end.character + 1,
-                    message: lspDiagnostic.message.toString(),
-                    severity: translateSeverity(lspDiagnostic.severity),
-                    code: lspDiagnostic.code.toString()
-                });
-            }
-            monaco.editor.setModelMarkers(model, "slang", markers);
-            diagnosticTimeout = null;
-        }, 500);
-
-    }
-    finally {
-        lspChanges.delete();
-    }
-
 }

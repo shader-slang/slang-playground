@@ -1,10 +1,6 @@
-import { SpirvTools, default as spirvTools } from "./spirv-tools.js";
-import { ModuleType } from './try-slang.js';
-import type { ComponentType, EmbindString, GlobalSession, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
+import { type SpirvTools, default as spirvTools } from "./spirv-tools.js";
+import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
 import { playgroundSource } from "./playgroundShader.js";
-declare let RequireJS: {
-    require: typeof require
-};
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV";
@@ -104,7 +100,7 @@ export type ReflectionType = {
     "access"?: "readWrite"
 };
 
-export type ReflectionParameter =  {
+export type ReflectionParameter = {
     "binding": ReflectionBinding,
     "name": string,
     "type": ReflectionType,
@@ -133,7 +129,7 @@ export class SlangCompiler {
 
     compileTargetMap: { name: string, value: number }[] | null = null;
 
-    slangWasmModule;
+    slangWasmModule: MainModule;
     diagnosticsMsg;
     shaderType: ShaderType;
 
@@ -141,15 +137,16 @@ export class SlangCompiler {
 
     mainModules: Map<string, { source: EmbindString }> = new Map();
 
-    constructor(module: ModuleType) {
+    constructor(module: MainModule) {
         this.slangWasmModule = module;
         this.diagnosticsMsg = "";
         this.shaderType = null;
         for (let runnableEntryPoint of RUNNABLE_ENTRY_POINT_NAMES) {
             this.mainModules.set(runnableEntryPoint, { source: RUNNABLE_ENTRY_POINT_SOURCE_MAP[runnableEntryPoint] });
         }
-        FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer(0)), true, true, false);
-        FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer(0)), true, true, false);
+
+        module.FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer(0)), true, true, false);
+        module.FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer(0)), true, true, false);
     }
 
     init() {
