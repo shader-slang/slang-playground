@@ -126,7 +126,7 @@ onMounted(async () => {
     const code = urlParams.get('code');
     if (code) {
         decompressFromBase64URL(code).then((decompressed) => {
-            codeEditor.value?.setEditorValue(decompressed);
+            codeEditor.value!.setEditorValue(decompressed);
         });
     }
 
@@ -393,7 +393,7 @@ function restoreDemoSelectionFromURL() {
 }
 
 async function runIfFullyInitialized() {
-    if (compiler && slangd && pageLoaded) {
+    if (compiler && slangd && pageLoaded && codeEditor.value) {
         (await import("./language-server")).initLanguageServer();
 
         initialized.value = true;
@@ -401,7 +401,7 @@ async function runIfFullyInitialized() {
         restoreSelectedTargetFromURL();
 
         if (restoreDemoSelectionFromURL()) { }
-        else if (codeEditor.value?.getValue() == "") {
+        else if (codeEditor.value.getValue() == "") {
             loadDemo(defaultShaderURL);
         }
         else {
@@ -513,11 +513,10 @@ function logError(message: string) {
                 <div class="workSpace">
                     <Splitpanes horizontal>
                         <Pane size="80">
-                            <MonacoEditor class="codingSpace" ref="codeEditor"></MonacoEditor>
+                            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()"/>
                         </Pane>
                         <Pane>
-                            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode>
-                            </MonacoEditor>
+                            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode />
                         </Pane>
                     </Splitpanes>
                 </div>
