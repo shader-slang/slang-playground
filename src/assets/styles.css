@@ -126,7 +126,7 @@ div.json-tree-js div.title-bar {
 
 .reflectionView {
   background-color: var(--code-editor-background);
-  flex: 1 1 0;
+  max-height: 100%;
   display: block;
   overflow: auto;
 }
