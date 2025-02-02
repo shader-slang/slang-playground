@@ -1,5 +1,5 @@
-import { Bindings } from "./compiler";
-import { ThreadGroupSize } from "./slang-wasm";
+import type { Bindings } from "./compiler";
+import type { ThreadGroupSize } from "./slang-wasm";
 
 export class ComputePipeline {
     pipeline: GPUComputePipeline | undefined;
@@ -96,10 +96,9 @@ export class ComputePipeline {
 
         // Check that all resources are bound
         if (entries.length != this.resourceBindings.size) {
-            let missingEntries = []
+            let missingEntries: string[] = []
             // print out the names of the resources that aren't bound
             for (const [name, resource] of this.resourceBindings) {
-                missingEntries = []
                 if (!entries.find(entry => entry.binding == resource.binding)) {
                     missingEntries.push(name);
                 }
