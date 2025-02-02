@@ -432,6 +432,7 @@ label {
 .splitpanes.slang-theme {
   .splitpanes__pane {
     background-color: #0d0d0d;
+    overflow: visible; /* Make sure tooltips can overflow */
   }
 
   .splitpanes__splitter {
