@@ -569,6 +569,7 @@ function logError(message: string) {
 
 .resultSpace.splitpanes .splitpanes__pane {
     transition: none !important;
+    overflow: hidden;
 }
 
 .resultSpace [style*="display: none"]~.splitpanes__splitter~div {
