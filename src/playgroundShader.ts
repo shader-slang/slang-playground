@@ -137,4 +137,12 @@ public struct playground_SLIDERAttribute
     float max;
 };
 
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_COLOR_PICKAttribute
+{
+    float defaultRed;
+    float defaultGreen;
+    float defaultBlue;
+};
+
 `;

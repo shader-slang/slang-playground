@@ -3,17 +3,19 @@ import TabContainer from './components/ui/TabContainer.vue'
 import Tab from './components/ui/Tab.vue'
 import Selector from './components/ui/Selector.vue'
 import Tooltip from './components/ui/Tooltip.vue'
+import Slider from './components/ui/Slider.vue'
 import Help from './components/Help.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
-import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef } from 'vue'
+import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, type Ref } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
-import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand } from './util'
+import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import ReflectionView from './components/ReflectionView.vue'
+import Colorpick from './components/ui/Colorpick.vue'
 
 // MonacoEditor is a big component, so we load it asynchronously.
 const MonacoEditor = defineAsyncComponent(() => import('./components/MonacoEditor.vue'))
@@ -66,6 +68,7 @@ const printedText = ref("");
 const device = ref<GPUDevice | null>(null);
 
 const currentDisplayMode = ref<ShaderType>("imageMain");
+const uniformComponents = ref<UniformController[]>([])
 
 let pageLoaded = false;
 let reflectionJson: any = {};
@@ -193,7 +196,7 @@ function updateEntryPointOptions() {
     if (!compiler)
         return;
     entrypoints.value = compiler.findDefinedEntryPoints(codeEditor.value!.getValue());
-    if((selectedEntrypoint.value == "" || !entrypoints.value.includes(selectedEntrypoint.value)) && entrypoints.value.length > 0)
+    if ((selectedEntrypoint.value == "" || !entrypoints.value.includes(selectedEntrypoint.value)) && entrypoints.value.length > 0)
         selectedEntrypoint.value = entrypoints.value[0];
 }
 
@@ -228,6 +231,7 @@ export type CompiledPlayground = {
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
     uniformSize: number,
+    uniformComponents: Ref<UniformController[]>,
 }
 
 function doRun() {
@@ -255,6 +259,7 @@ function doRun() {
 
     let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
     let uniformSize = getUniformSize(ret.reflection)
+    uniformComponents.value = getUniformSliders(resourceCommands)
 
     let callCommands: CallCommand[] | null = null;
     try {
@@ -287,6 +292,7 @@ function doRun() {
         resourceCommands,
         callCommands,
         uniformSize,
+        uniformComponents: uniformComponents,
     });
 }
 
@@ -517,7 +523,7 @@ function logError(message: string) {
                 <div class="workSpace">
                     <Splitpanes horizontal>
                         <Pane size="80">
-                            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()"/>
+                            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
                         </Pane>
                         <Pane>
                             <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode />
@@ -527,8 +533,7 @@ function logError(message: string) {
             </Pane>
             <Pane class="rightContainer">
                 <Splitpanes horizontal class="resultSpace">
-                    <Pane class="outputSpace" size="69" v-if="device != null"
-                        v-show="currentDisplayMode != null">
+                    <Pane class="outputSpace" size="69" v-if="device != null" v-show="currentDisplayMode != null">
                         <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
                             <RenderCanvas :device="device" @log-error="logError"
                                 @log-output="(log) => { printedText = log }" ref="renderCanvas"></RenderCanvas>
@@ -544,6 +549,19 @@ function logError(message: string) {
 
                             <Tab name="reflection" label="Reflection">
                                 <ReflectionView />
+                            </Tab>
+
+                            <Tab name="uniform" label="Uniforms"
+                                v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
+                                <div class="uniformPanel">
+                                    <div v-for="uniformComponent in uniformComponents">
+                                        <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
+                                            v-model:value="uniformComponent.value" :min="uniformComponent.min"
+                                            :max="uniformComponent.max"/>
+                                        <Colorpick v-if="uniformComponent.type == 'color pick'" :name="uniformComponent.name"
+                                            v-model:value="uniformComponent.value"/>
+                                    </div>
+                                </div>
                             </Tab>
                         </TabContainer>
                     </Pane>
@@ -578,5 +596,10 @@ function logError(message: string) {
 
 .resultSpace [style*="display: none"]~.splitpanes__splitter~div {
     height: 100% !important;
+}
+
+.uniformPanel {
+    background-color: var(--code-editor-background);
+    height: 100%
 }
 </style>

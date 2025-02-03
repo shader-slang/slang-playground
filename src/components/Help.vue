@@ -60,7 +60,9 @@ defineExpose({
         <li><code>[playground::RAND(1000)]</code></li>
         Initialize a float buffer with uniform random floats between 0 and 1.
         <li><code>[playground::SLIDER(0.3, 0.0, 1.0)]</code></li>
-        Control a float uniform with a provided default, min, and max.
+        Control a float uniform with a provided default, minimum, and maximum.
+        <li><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></li>
+        Control a float3 color uniform with a provided default color.
         <li><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></li>
         Dispatch a compute pass with the given function name and using the resource size to determine the work-group
         size.
