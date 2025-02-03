@@ -435,8 +435,10 @@ function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: str
     map.set(key, value);
 };
 
-async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: ResourceCommand[]) {
+async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
     let allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
+
+    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
@@ -615,6 +617,18 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 pipeline.device.queue.submit([commandBuffer]);
                 await pipeline.device.queue.onSubmittedWorkDone();
             }
+        } else if (parsedCommand.type == "SLIDER") {
+            const elementSize = parsedCommand.elementSize;
+
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource
+            if(elementSize == 4) {
+                bufferDefault = new Float32Array([parsedCommand.default]);
+            } else
+                throw new Error("Unsupported float size for slider")
+            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
             let x: never = parsedCommand;
@@ -647,9 +661,6 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
         size: printfBufferSize,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
-
-    let length = new Float32Array(8).byteLength;
-    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     return allocatedResources;
 }
@@ -686,7 +697,7 @@ function onRun(compiledCode: CompiledPlayground) {
                 extraComputePipelines.push(pipeline);
             }
 
-            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, compiledCode.resourceCommands);
+            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, compiledCode.resourceCommands, compiledCode.uniformSize);
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);

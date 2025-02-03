@@ -91,14 +91,7 @@ function getSize(reflectionType: ReflectionType): number {
 
 
 /**
- * Here are some patterns we support:
- * 
- * | Attribute                                | Result                        
- * | :--------------------------------------- | :-
- * | `[playground::ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
- * | `[playground::BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
- * | `[playground::URL("https://example.com/image.png")]` | Initialize a texture with image from URL
- * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
+ * See help panel for details on commands
  */
 export type ParsedCommand = {
     "type": "ZEROS",
@@ -114,6 +107,13 @@ export type ParsedCommand = {
 } | {
     "type": "URL",
     "url": string,
+} | {
+    "type": "SLIDER",
+    "default": number, 
+    "min": number, 
+    "max": number,
+    "elementSize": number,
+    "offset": number,
 }
 export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
 export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): ResourceCommand[] {
@@ -164,6 +164,18 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     type: playground_attribute_name,
                     url: attribute.arguments[0] as string,
                 };
+            } else if (playground_attribute_name == "SLIDER") {
+                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
+                    throw new Error(`SLIDER attribute cannot be applied to ${parameter.name}, it only supports floats`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    default: attribute.arguments[0] as number,
+                    min: attribute.arguments[1] as number,
+                    max: attribute.arguments[2] as number,
+                    elementSize: parameter.binding.size,
+                    offset: parameter.binding.offset,
+                };
             }
 
             if (command != null) {
@@ -176,6 +188,17 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
     }
 
     return commands
+}
+
+export function getUniformSize(reflection: ReflectionJSON): number {
+    let size = 0;
+
+    for (let parameter of reflection.parameters) {
+        if(parameter.binding.kind != "uniform") continue;
+        size = Math.max(size, parameter.binding.offset + parameter.binding.size)
+    }
+
+    return roundUpToNearest(size, 16)
 }
 
 export type CallCommand = {

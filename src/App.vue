@@ -9,7 +9,7 @@ import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-s
 import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
-import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand } from './util'
+import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
@@ -122,14 +122,6 @@ function updateProfileOptions() {
 onMounted(async () => {
     updateProfileOptions();
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    if (code) {
-        decompressFromBase64URL(code).then((decompressed) => {
-            codeEditor.value!.setEditorValue(decompressed);
-        });
-    }
-
     pageLoaded = true;
     if (!device) {
         logError(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
@@ -235,6 +227,7 @@ export type CompiledPlayground = {
     callCommandShaders: Shader[],
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
+    uniformSize: number,
 }
 
 function doRun() {
@@ -261,6 +254,7 @@ function doRun() {
     }
 
     let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
+    let uniformSize = getUniformSize(ret.reflection)
 
     let callCommands: CallCommand[] | null = null;
     try {
@@ -289,9 +283,10 @@ function doRun() {
     renderCanvas.value.onRun({
         slangSource: userSource,
         mainShader: ret,
-        callCommandShaders: callCommandShaders,
-        resourceCommands: resourceCommands,
-        callCommands: callCommands,
+        callCommandShaders,
+        resourceCommands,
+        callCommands,
+        uniformSize,
     });
 }
 
@@ -335,7 +330,7 @@ export type Shader = {
     layout: Bindings,
     hashedStrings: any,
     reflection: ReflectionJSON,
-    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number }
+    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number },
 };
 
 export type MaybeShader = Shader | {
@@ -379,7 +374,7 @@ function restoreSelectedTargetFromURL() {
     }
 }
 
-function restoreDemoSelectionFromURL() {
+function restoreDemoOrCodeFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     let demo = urlParams.get('demo');
     if (demo) {
@@ -387,6 +382,15 @@ function restoreDemoSelectionFromURL() {
             demo += ".slang";
         selectedDemo.value = demo;
         loadDemo(demo);
+        return true;
+    }
+    const code = urlParams.get('code');
+    if (code) {
+        decompressFromBase64URL(code).then((decompressed) => {
+            codeEditor.value!.setEditorValue(decompressed);
+            updateEntryPointOptions();
+            compileOrRun();
+        });
         return true;
     }
     return false;
@@ -400,7 +404,7 @@ async function runIfFullyInitialized() {
 
         restoreSelectedTargetFromURL();
 
-        if (restoreDemoSelectionFromURL()) { }
+        if (restoreDemoOrCodeFromURL()) { }
         else if (codeEditor.value.getValue() == "") {
             loadDemo(defaultShaderURL);
         }

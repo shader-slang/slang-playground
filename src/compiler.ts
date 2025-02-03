@@ -523,6 +523,20 @@ export class SlangCompiler {
 
             let bindings = this.getResourceBindings(linkedProgram);
 
+            let reflectionJson: ReflectionJSON = linkedProgram.getLayout(0)?.toJsonObject();
+
+            // remove incorrect uniform bindings
+            let has_uniform_been_binded = false;
+            for(let parameterReflection of reflectionJson.parameters) {
+                if (parameterReflection.binding.kind != "uniform") continue;
+                
+                if(!has_uniform_been_binded) {
+                    has_uniform_been_binded = true;
+                } else {
+                    bindings.delete(parameterReflection.name);
+                }
+            }
+
             // Also read the shader work-group size.
             const entryPointReflection = linkedProgram.getLayout(0)?.findEntryPointByName(entryPointName);
             let threadGroupSize = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
@@ -534,8 +548,6 @@ export class SlangCompiler {
                 this.diagnosticsMsg += (error.type + " error: " + error.message);
                 return null;
             }
-
-            let reflectionJson = linkedProgram.getLayout(0)?.toJsonObject();
 
             if (slangSession)
                 slangSession.delete();

@@ -59,6 +59,8 @@ defineExpose({
         Initialize a texture with image from URL.
         <li><code>[playground::RAND(1000)]</code></li>
         Initialize a float buffer with uniform random floats between 0 and 1.
+        <li><code>[playground::SLIDER(0.3, 0.0, 1.0)]</code></li>
+        Control a float uniform with a provided default, min, and max.
         <li><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></li>
         Dispatch a compute pass with the given function name and using the resource size to determine the work-group
         size.

@@ -129,4 +129,12 @@ public struct playground_RANDAttribute
     int count;
 };
 
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_SLIDERAttribute
+{
+    float default;
+    float min;
+    float max;
+};
+
 `;
