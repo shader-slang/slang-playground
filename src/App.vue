@@ -470,7 +470,9 @@ function logError(message: string) {
             <div id="small-screen-navbar"></div>
             <div id="small-screen-display" v-show="currentDisplayMode != null"></div>
             <div id="small-screen-code-gen"></div>
+            <div class="editorSeperator"></div>
             <div id="small-screen-editor"></div>
+            <div class="editorSeperator"></div>
             <div id="small-screen-diagnostic"></div>
         </div>
         <Teleport v-if="pageLoaded" defer :to="isSmallScreen?'#small-screen-navbar':'#big-screen-navbar'">
@@ -615,6 +617,11 @@ function logError(message: string) {
 
 #small-screen-diagnostic {
     height: 250px;
+}
+
+.editorSeperator {
+    height: 10px;
+    color: black;
 }
 
 #renderOutput {
