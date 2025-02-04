@@ -600,6 +600,7 @@ function logError(message: string) {
 
 .uniformPanel {
     background-color: var(--code-editor-background);
-    height: 100%
+    height: 100%;
+    overflow-y: scroll;
 }
 </style>
