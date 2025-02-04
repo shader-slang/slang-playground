@@ -7,7 +7,7 @@ import Slider from './components/ui/Slider.vue'
 import Help from './components/Help.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
-import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, type Ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, type Ref } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
@@ -16,6 +16,7 @@ import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import ReflectionView from './components/ReflectionView.vue'
 import Colorpick from './components/ui/Colorpick.vue'
+import { useWindowSize } from '@vueuse/core'
 
 // MonacoEditor is a big component, so we load it asynchronously.
 const MonacoEditor = defineAsyncComponent(() => import('./components/MonacoEditor.vue'))
@@ -70,7 +71,11 @@ const device = ref<GPUDevice | null>(null);
 const currentDisplayMode = ref<ShaderType>("imageMain");
 const uniformComponents = ref<UniformController[]>([])
 
-let pageLoaded = false;
+const { width } = useWindowSize()
+
+const isSmallScreen = computed(() => width.value < 768)
+
+const pageLoaded = ref(false);
 let reflectionJson: any = {};
 
 
@@ -123,9 +128,7 @@ function updateProfileOptions() {
 }
 
 onMounted(async () => {
-    updateProfileOptions();
-
-    pageLoaded = true;
+    pageLoaded.value = true;
     if (!device) {
         logError(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
     }
@@ -375,9 +378,10 @@ function restoreFromURL(): boolean {
             diagnosticsArea.value?.setEditorValue("Invalid target specified in URL: " + target);
         } else {
             targetSelect.value!.setValue(target as any);
-            updateProfileOptions();
         }
     }
+    
+    updateProfileOptions();
 
     let gotCodeFromUrl = false;
 
@@ -441,9 +445,36 @@ function logError(message: string) {
         </div>
     </Transition>
     <div class="mainContainer" v-show="initialized">
-        <Splitpanes class="slang-theme">
+        <Splitpanes class="slang-theme" v-show="!isSmallScreen">
             <Pane class="leftContainer" size="62">
-                <div class="navbar">
+                <div id="big-screen-navbar"></div>
+                <div class="workSpace">
+                    <Splitpanes horizontal>
+                        <Pane size="80" id="big-screen-editor">
+                        </Pane>
+                        <Pane id="big-screen-diagnostic">
+                        </Pane>
+                    </Splitpanes>
+                </div>
+            </Pane>
+            <Pane class="rightContainer">
+                    <Splitpanes horizontal class="resultSpace">
+                        <Pane class="outputSpace" size="69" v-if="device != null" v-show="currentDisplayMode != null">
+                        </Pane>
+                        <Pane class="codeGenSpace">
+                        </Pane>
+                    </Splitpanes>
+            </Pane>
+        </Splitpanes>
+        <div id="small-screen-container" v-show="isSmallScreen">
+            <div id="small-screen-navbar"></div>
+            <div id="small-screen-display"></div>
+            <div id="small-screen-code-gen"></div>
+            <div id="small-screen-editor"></div>
+            <div id="small-screen-diagnostic"></div>
+        </div>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen?'#small-screen-navbar':'#big-screen-navbar'">
+            <div class="navbar">
                     <!-- Logo section -->
                     <div class="navbar-logo">
                         <a href="/" title="Return to home page."><img src="./assets/slang-logo.svg" alt="Logo"
@@ -521,59 +552,71 @@ function logError(message: string) {
                         </button>
                     </div>
                 </div>
-                <div class="workSpace">
-                    <Splitpanes horizontal>
-                        <Pane size="80">
-                            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
-                        </Pane>
-                        <Pane>
-                            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode />
-                        </Pane>
-                    </Splitpanes>
-                </div>
-            </Pane>
-            <Pane class="rightContainer">
-                <Splitpanes horizontal class="resultSpace">
-                    <Pane class="outputSpace" size="69" v-if="device != null" v-show="currentDisplayMode != null">
-                        <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
-                            <RenderCanvas :device="device" @log-error="logError"
-                                @log-output="(log) => { printedText = log }" ref="renderCanvas"></RenderCanvas>
+        </Teleport>
+        <Teleport defer :to="isSmallScreen?'#small-screen-display':'.outputSpace'" v-if="device != null">
+            <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
+                <RenderCanvas :device="device" @log-error="logError"
+                    @log-output="(log) => { printedText = log }" ref="renderCanvas"></RenderCanvas>
+            </div>
+            <textarea readonly class="printSpace"
+                v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
+        </Teleport>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen?'#small-screen-code-gen':'.codeGenSpace'">
+            <TabContainer>
+                <Tab name="code" label="Target Code">
+                    <MonacoEditor ref="codeGenArea" readOnlyMode />
+                </Tab>
+
+                <Tab name="reflection" label="Reflection">
+                    <ReflectionView />
+                </Tab>
+
+                <Tab name="uniform" label="Uniforms"
+                    v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
+                    <div class="uniformPanel">
+                        <div v-for="uniformComponent in uniformComponents">
+                            <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
+                                v-model:value="uniformComponent.value" :min="uniformComponent.min"
+                                :max="uniformComponent.max" />
+                            <Colorpick v-if="uniformComponent.type == 'color pick'"
+                                :name="uniformComponent.name" v-model:value="uniformComponent.value" />
                         </div>
-                        <textarea readonly class="printSpace"
-                            v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
-                    </Pane>
-                    <Pane class="codeGenSpace">
-                        <TabContainer>
-                            <Tab name="code" label="Target Code">
-                                <MonacoEditor ref="codeGenArea" readOnlyMode />
-                            </Tab>
-
-                            <Tab name="reflection" label="Reflection">
-                                <ReflectionView />
-                            </Tab>
-
-                            <Tab name="uniform" label="Uniforms"
-                                v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
-                                <div class="uniformPanel">
-                                    <div v-for="uniformComponent in uniformComponents">
-                                        <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
-                                            v-model:value="uniformComponent.value" :min="uniformComponent.min"
-                                            :max="uniformComponent.max" />
-                                        <Colorpick v-if="uniformComponent.type == 'color pick'"
-                                            :name="uniformComponent.name" v-model:value="uniformComponent.value" />
-                                    </div>
-                                </div>
-                            </Tab>
-                        </TabContainer>
-                    </Pane>
-                </Splitpanes>
-            </Pane>
-        </Splitpanes>
+                    </div>
+                </Tab>
+            </TabContainer>
+        </Teleport>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen?'#small-screen-editor':'#big-screen-editor'">
+            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
+        </Teleport>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen?'#small-screen-diagnostic':'#big-screen-diagnostic'">
+            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode />
+        </Teleport>
     </div>
     <Help v-show="showHelp" ref="helpModal"></Help>
 </template>
 
 <style scoped>
+#small-screen-container {
+    overflow-y: auto;
+    height: 100vh;
+}
+
+#small-screen-display {
+    height: 500px;
+}
+
+#small-screen-code-gen {
+    height: 500px;
+}
+
+#small-screen-editor {
+    height: 500px;
+}
+
+#small-screen-diagnostic {
+    height: 250px;
+}
+
 #renderOutput {
     display: block;
     width: 100%;
