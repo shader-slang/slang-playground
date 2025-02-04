@@ -367,29 +367,29 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
 }
 
-function restoreSelectedTargetFromURL() {
+function restoreFromURL(): boolean {
     const urlParams = new URLSearchParams(window.location.search);
     const target = urlParams.get('target');
     if (target) {
         if (!compileTargets.includes(target as any)) {
             diagnosticsArea.value?.setEditorValue("Invalid target specified in URL: " + target);
-            return;
+        } else {
+            targetSelect.value!.setValue(target as any);
+            updateProfileOptions();
         }
-        targetSelect.value!.setValue(target as any);
-        updateProfileOptions();
     }
-}
 
-function restoreDemoOrCodeFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
+    let gotCodeFromUrl = false;
+
     let demo = urlParams.get('demo');
     if (demo) {
         if (!demo.endsWith(".slang"))
             demo += ".slang";
         selectedDemo.value = demo;
         loadDemo(demo);
-        return true;
+        gotCodeFromUrl = true;
     }
+
     const code = urlParams.get('code');
     if (code) {
         decompressFromBase64URL(code).then((decompressed) => {
@@ -397,9 +397,10 @@ function restoreDemoOrCodeFromURL() {
             updateEntryPointOptions();
             compileOrRun();
         });
-        return true;
+        gotCodeFromUrl = true;
     }
-    return false;
+
+    return gotCodeFromUrl;
 }
 
 async function runIfFullyInitialized() {
@@ -408,13 +409,13 @@ async function runIfFullyInitialized() {
 
         initialized.value = true;
 
-        restoreSelectedTargetFromURL();
+        let gotCodeFromUrl = restoreFromURL();
 
-        if (restoreDemoOrCodeFromURL()) { }
-        else if (codeEditor.value.getValue() == "") {
+        if (gotCodeFromUrl) {
+            // do nothing: code already set
+        } else if (codeEditor.value.getValue() == "") {
             loadDemo(defaultShaderURL);
-        }
-        else {
+        } else {
             compileOrRun();
         }
     }
@@ -557,9 +558,9 @@ function logError(message: string) {
                                     <div v-for="uniformComponent in uniformComponents">
                                         <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
                                             v-model:value="uniformComponent.value" :min="uniformComponent.min"
-                                            :max="uniformComponent.max"/>
-                                        <Colorpick v-if="uniformComponent.type == 'color pick'" :name="uniformComponent.name"
-                                            v-model:value="uniformComponent.value"/>
+                                            :max="uniformComponent.max" />
+                                        <Colorpick v-if="uniformComponent.type == 'color pick'"
+                                            :name="uniformComponent.name" v-model:value="uniformComponent.value" />
                                     </div>
                                 </div>
                             </Tab>
