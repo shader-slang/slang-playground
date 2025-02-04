@@ -468,7 +468,7 @@ function logError(message: string) {
         </Splitpanes>
         <div id="small-screen-container" v-show="isSmallScreen">
             <div id="small-screen-navbar"></div>
-            <div id="small-screen-display"></div>
+            <div id="small-screen-display" v-show="currentDisplayMode != null"></div>
             <div id="small-screen-code-gen"></div>
             <div id="small-screen-editor"></div>
             <div id="small-screen-diagnostic"></div>
