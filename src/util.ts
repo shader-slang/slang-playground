@@ -91,14 +91,7 @@ function getSize(reflectionType: ReflectionType): number {
 
 
 /**
- * Here are some patterns we support:
- * 
- * | Attribute                                | Result                        
- * | :--------------------------------------- | :-
- * | `[playground::ZEROS(512)]`                           | Initialize a buffer with zeros of the provided size.
- * | `[playground::BLACK(512, 512)]`                      | Initialize a texture with black of the provided size.
- * | `[playground::URL("https://example.com/image.png")]` | Initialize a texture with image from URL
- * | `[playground::RAND(1000)]`                           | Initialize a float buffer with uniform random floats between 0 and 1.
+ * See help panel for details on commands
  */
 export type ParsedCommand = {
     "type": "ZEROS",
@@ -114,6 +107,18 @@ export type ParsedCommand = {
 } | {
     "type": "URL",
     "url": string,
+} | {
+    "type": "SLIDER",
+    "default": number,
+    "min": number,
+    "max": number,
+    "elementSize": number,
+    "offset": number,
+} | {
+    "type": "COLOR_PICK",
+    "default": [number, number, number],
+    "elementSize": number,
+    "offset": number,
 }
 export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
 export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): ResourceCommand[] {
@@ -129,7 +134,7 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
             let playground_attribute_name = attribute.name.slice(11);
             if (playground_attribute_name == "ZEROS") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
-                    throw new Error(`ZEROS attribute cannot be applied to ${parameter.name}, it only supports buffers`)
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports buffers`)
                 }
                 command = {
                     type: playground_attribute_name,
@@ -138,10 +143,10 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                 };
             } else if (playground_attribute_name == "RAND") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
-                    throw new Error(`RAND attribute cannot be applied to ${parameter.name}, it only supports buffers`)
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports buffers`)
                 }
                 if (parameter.type.resultType.kind != "scalar" || parameter.type.resultType.scalarType != "float32") {
-                    throw new Error(`RAND attribute cannot be applied to ${parameter.name}, it only supports float buffers`)
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports float buffers`)
                 }
                 command = {
                     type: playground_attribute_name,
@@ -149,7 +154,7 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                 };
             } else if (playground_attribute_name == "BLACK") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
-                    throw new Error(`BLACK attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
                 }
                 command = {
                     type: playground_attribute_name,
@@ -158,11 +163,33 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                 };
             } else if (playground_attribute_name == "URL") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
-                    throw new Error(`URL attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
                 }
                 command = {
                     type: playground_attribute_name,
                     url: attribute.arguments[0] as string,
+                };
+            } else if (playground_attribute_name == "SLIDER") {
+                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    default: attribute.arguments[0] as number,
+                    min: attribute.arguments[1] as number,
+                    max: attribute.arguments[2] as number,
+                    elementSize: parameter.binding.size,
+                    offset: parameter.binding.offset,
+                };
+            } else if (playground_attribute_name == "COLOR_PICK") {
+                if (parameter.type.kind != "vector" || parameter.type.elementCount <= 2 || parameter.type.elementType.kind != "scalar" || !parameter.type.elementType.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports float vectors`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    default: attribute.arguments as [number, number, number],
+                    elementSize: parseInt(parameter.type.elementType.scalarType.slice(5)) / 8,
+                    offset: parameter.binding.offset,
                 };
             }
 
@@ -176,6 +203,55 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
     }
 
     return commands
+}
+
+export function getUniformSize(reflection: ReflectionJSON): number {
+    let size = 0;
+
+    for (let parameter of reflection.parameters) {
+        if (parameter.binding.kind != "uniform") continue;
+        size = Math.max(size, parameter.binding.offset + parameter.binding.size)
+    }
+
+    return roundUpToNearest(size, 16)
+}
+
+export type UniformController = {
+    type: "slider",
+    name: string,
+    value: number,
+    min: number,
+    max: number,
+    buffer_offset: number,
+} | {
+    type: "color pick",
+    name: string,
+    value: [number, number, number],
+    buffer_offset: number,
+}
+
+export function getUniformSliders(resourceCommands: ResourceCommand[]): UniformController[] {
+    let controllers: UniformController[] = [];
+    for (let resourceCommand of resourceCommands) {
+        if (resourceCommand.parsedCommand.type == 'SLIDER') {
+            controllers.push({
+                type: "slider",
+                name: resourceCommand.resourceName,
+                value: resourceCommand.parsedCommand.default,
+                min: resourceCommand.parsedCommand.min,
+                max: resourceCommand.parsedCommand.max,
+                buffer_offset: resourceCommand.parsedCommand.offset,
+            })
+        } else if (resourceCommand.parsedCommand.type == 'COLOR_PICK') {
+            controllers.push({
+                type: "color pick",
+                name: resourceCommand.resourceName,
+                value: resourceCommand.parsedCommand.default,
+                buffer_offset: resourceCommand.parsedCommand.offset,
+            })
+        }
+    }
+    return controllers;
 }
 
 export type CallCommand = {

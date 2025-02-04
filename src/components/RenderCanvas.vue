@@ -234,7 +234,7 @@ function resetMouse() {
 let timeAggregate = 0;
 let frameCount = 0;
 
-async function execFrame(timeMS: number, currentDisplayMode: ShaderType, callCommands: CallCommand[]) {
+async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgroundData: CompiledPlayground) {
     if (currentDisplayMode == null)
         return false;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
@@ -258,6 +258,20 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, callCom
     }
     computePipeline.device.queue.writeBuffer(uniformInput, 0, timeArray);
 
+    for (let uniformComponent of playgroundData.uniformComponents.value) {
+        if (uniformComponent.type == "slider") {
+            let sliderArray = new Float32Array([uniformComponent.value]);
+            computePipeline.device.queue.writeBuffer(uniformInput, uniformComponent.buffer_offset, sliderArray);
+        } else if (uniformComponent.type == "color pick") {
+            let sliderArray = new Float32Array(uniformComponent.value);
+            computePipeline.device.queue.writeBuffer(uniformInput, uniformComponent.buffer_offset, sliderArray);
+        } else {
+            // exhaustiveness check
+            let _:never = uniformComponent;
+            throw new Error("Invalid state"); 
+        }
+    }
+
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
 
@@ -271,7 +285,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, callCom
 
     // The extra passes always go first.
     // zip the extraComputePipelines and callCommands together
-    for (const [pipeline, command] of callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
+    for (const [pipeline, command] of playgroundData.callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
         const pass = encoder.beginComputePass({ label: 'extra passes' });
         pass.setBindGroup(0, pipeline.bindGroup || null);
         if (pipeline.pipeline == undefined) {
@@ -435,8 +449,10 @@ function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: str
     map.set(key, value);
 };
 
-async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: ResourceCommand[]) {
+async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
     let allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
+
+    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
@@ -615,6 +631,30 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 pipeline.device.queue.submit([commandBuffer]);
                 await pipeline.device.queue.onSubmittedWorkDone();
             }
+        } else if (parsedCommand.type == "SLIDER") {
+            const elementSize = parsedCommand.elementSize;
+
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource
+            if (elementSize == 4) {
+                bufferDefault = new Float32Array([parsedCommand.default]);
+            } else
+                throw new Error("Unsupported float size for slider")
+            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "COLOR_PICK") {
+            const elementSize = parsedCommand.elementSize;
+
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource
+            if (elementSize == 4) {
+                bufferDefault = new Float32Array(parsedCommand.default);
+            } else
+                throw new Error("Unsupported float size for color pick")
+            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
             let x: never = parsedCommand;
@@ -647,9 +687,6 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
         size: printfBufferSize,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
-
-    let length = new Float32Array(8).byteLength;
-    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: length, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     return allocatedResources;
 }
@@ -686,7 +723,7 @@ function onRun(compiledCode: CompiledPlayground) {
                 extraComputePipelines.push(pipeline);
             }
 
-            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, compiledCode.resourceCommands);
+            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, compiledCode.resourceCommands, compiledCode.uniformSize);
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);
@@ -718,7 +755,7 @@ function onRun(compiledCode: CompiledPlayground) {
                 throw new Error("Could not get compiler");
             }
             if (compiler.shaderType !== null) {
-                return await execFrame(timeMS, compiler?.shaderType || null, compiledCode.callCommands);
+                return await execFrame(timeMS, compiler?.shaderType || null, compiledCode);
             }
             return false;
         });
@@ -754,6 +791,7 @@ function onRun(compiledCode: CompiledPlayground) {
     -moz-user-select: -moz-none;
     -khtml-user-select: none;
     -webkit-user-select: none;
-    -ms-user-select: none;user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }
 </style>

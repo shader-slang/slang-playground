@@ -68,6 +68,8 @@ provide(tabInjectKey, {
 .tabs-container {
   width: 100%;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-headers {
@@ -96,6 +98,7 @@ provide(tabInjectKey, {
 }
 
 .tab-content {
-  height: 100%;
+  min-height: 0;
+  flex-grow: 1;
 }
 </style>
