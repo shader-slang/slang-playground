@@ -45,6 +45,10 @@ provide(tabInjectKey, {
   registerTab,
   unregisterTab
 })
+
+defineExpose({
+  setActiveTab
+})
 </script>
 
 <template>

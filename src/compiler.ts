@@ -465,7 +465,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, ReflectionJSON, ThreadGroupSize | { x: number, y: number, z: number }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, any, ReflectionJSON, ThreadGroupSize | { x: number, y: number, z: number }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -521,7 +521,7 @@ export class SlangCompiler {
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
-            let bindings = this.getResourceBindings(linkedProgram);
+            let bindings = noWebGPU?new Map():this.getResourceBindings(linkedProgram);
 
             let reflectionJson: ReflectionJSON = linkedProgram.getLayout(0)?.toJsonObject();
 
