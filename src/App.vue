@@ -346,9 +346,9 @@ export type MaybeShader = Shader | {
     succ: false
 };
 
-function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number], includePlaygroundModule = true): MaybeShader {
+function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number]): MaybeShader {
     if (compiler == null) throw new Error("No compiler available");
-    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
+    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, device.value == null);
     diagnosticsArea.value?.setEditorValue(compiler.diagnosticsMsg, true);
 
     // If compile is failed, we just clear the codeGenArea

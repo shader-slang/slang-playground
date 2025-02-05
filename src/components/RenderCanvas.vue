@@ -573,7 +573,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 if (compiler == null) {
                     throw new Error("Compiler is not defined!");
                 }
-                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL");
+                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL", false);
                 if (!compiledResult) {
                     throw new Error("[Internal] Failed to compile randFloat shader");
                 }
