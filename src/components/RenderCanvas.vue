@@ -578,7 +578,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                     throw new Error("[Internal] Failed to compile randFloat shader");
                 }
 
-                let [code, layout, hashedStrings] = compiledResult;
+                let [code, layout] = compiledResult;
                 const module = pipeline.device.createShaderModule({ code: code });
 
                 randomPipeline.createPipelineLayout(layout);
