@@ -197,10 +197,17 @@ button:disabled:hover {
   transition: color 0.2s ease-in-out;
 }
 
+.svg-btn:hover {
+  background: none;
+}
+
+.svg-btn:active {
+  color: var(--orange);
+}
+
 @media(hover: hover) {
   .svg-btn:hover {
     color: var(--orange);
-    background: none;
   }
 }
 
