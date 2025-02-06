@@ -69,7 +69,7 @@ const showEntrypoints = ref(false);
 const printedText = ref("");
 const diagnosticsText = ref("");
 watch(diagnosticsText, (newText, _) => {
-    if(newText != "") {
+    if (newText != "") {
         tabContainer.value?.setActiveTab("diagnostics")
     }
 })
@@ -81,6 +81,7 @@ const uniformComponents = ref<UniformController[]>([])
 const { width } = useWindowSize()
 
 const isSmallScreen = computed(() => width.value < 768)
+const smallScreenEditorVisible = ref(false);
 
 const pageLoaded = ref(false);
 let reflectionJson: any = {};
@@ -468,10 +469,22 @@ function logError(message: string) {
         </Splitpanes>
         <div id="small-screen-container" v-show="isSmallScreen">
             <div id="small-screen-navbar"></div>
-            <div id="small-screen-display" v-show="currentDisplayMode != null"></div>
-            <div id="small-screen-code-gen"></div>
-            <div class="editorSeperator"></div>
-            <div id="small-screen-editor"></div>
+            <Splitpanes horizontal class="resultSpace slang-theme" v-show="!smallScreenEditorVisible">
+                <Pane id="small-screen-display" size="69" v-if="device != null" v-show="currentDisplayMode != null">
+                </Pane>
+                <Pane id="small-screen-code-gen"></Pane>
+            </Splitpanes>
+            <div id="small-screen-editor" v-show="smallScreenEditorVisible"></div>
+        </div>
+        <div class="navbar-standalone-button-item small-screen-editor-toggle" v-show="isSmallScreen">
+            <button class="svg-btn" title="Toggle editor" @click="smallScreenEditorVisible = !smallScreenEditorVisible">
+                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="28" height="28" viewBox="0 0 64 64"
+                    fill="currentColor">
+                    <path
+                        d="M7.2 54.5c-.6 1.5.9 3 2.4 2.4L14 55l-5-5L7.2 54.5zM13 42c1.5 1.5 1 4 1 4l1.3.4c1.1.4 1.9 1.2 2.3 2.3L18 50c0 0 3 0 4 1l24-24-8-10L13 42zM54.7 9.3c-3.5-3.5-7-2-7-2L43 12l9 9 4.7-4.7C56.7 16.3 58.2 12.8 54.7 9.3z">
+                    </path>
+                </svg>
+            </button>
         </div>
         <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-navbar' : '#big-screen-navbar'">
             <div class="navbar">
@@ -597,21 +610,20 @@ function logError(message: string) {
 </template>
 
 <style scoped>
+.small-screen-editor-toggle {
+    position: fixed;
+    right: 10px;
+    bottom: 10px;
+}
+
 #small-screen-container {
-    overflow-y: auto;
     height: 100vh;
-}
-
-#small-screen-display {
-    height: 500px;
-}
-
-#small-screen-code-gen {
-    height: 500px;
+    display: flex;
+    flex-direction: column;
 }
 
 #small-screen-editor {
-    height: 500px;
+    flex-grow: 1;
 }
 
 #small-screen-diagnostic {
@@ -621,6 +633,11 @@ function logError(message: string) {
 .editorSeperator {
     height: 10px;
     color: black;
+}
+
+.editorLabel {
+    color: white;
+    text-align: center;
 }
 
 #renderOutput {
