@@ -197,9 +197,11 @@ button:disabled:hover {
   transition: color 0.2s ease-in-out;
 }
 
-.svg-btn:hover {
-  color: var(--orange);
-  background: none;
+@media(hover: hover) {
+  .svg-btn:hover {
+    color: var(--orange);
+    background: none;
+  }
 }
 
 .navbar-logo {
