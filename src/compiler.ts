@@ -3,7 +3,7 @@ import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Pr
 import { playgroundSource } from "./playgroundShader.js";
 
 export function isWholeProgramTarget(compileTarget: string) {
-    return compileTarget == "METAL" || compileTarget == "SPIRV";
+    return compileTarget == "METAL" || compileTarget == "SPIRV" || compileTarget == "WGSL";
 }
 
 export const RUNNABLE_ENTRY_POINT_NAMES = ['imageMain', 'printMain'] as const;

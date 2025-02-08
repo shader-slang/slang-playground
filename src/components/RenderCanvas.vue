@@ -584,7 +584,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 randomPipeline.createPipelineLayout(layout);
 
                 // Create the pipeline (without resource bindings for now)
-                randomPipeline.createPipeline(module, null);
+                randomPipeline.createPipeline(module, "computeMain", null);
 
                 randFloatPipeline = randomPipeline;
             }
@@ -718,7 +718,7 @@ function onRun(compiledCode: CompiledPlayground) {
                 const module = device.createShaderModule({ code: callShader.code });
                 const pipeline = new ComputePipeline(device);
                 pipeline.createPipelineLayout(callShader.layout);
-                pipeline.createPipeline(module, null);
+                pipeline.createPipeline(module, callShader.entryPoint, null);
                 pipeline.setThreadGroupSize(callShader.threadGroupSize);
                 extraComputePipelines.push(pipeline);
             }
@@ -743,7 +743,7 @@ function onRun(compiledCode: CompiledPlayground) {
             passThroughPipeline.createBindGroup();
 
             const module = device.createShaderModule({ code: compiledCode.mainShader.code });
-            computePipeline.createPipeline(module, allocatedResources);
+            computePipeline.createPipeline(module, compiledCode.mainShader.entryPoint, allocatedResources);
 
             // Create bind groups for the extra pipelines
             for (const pipeline of extraComputePipelines)

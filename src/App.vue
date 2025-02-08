@@ -337,6 +337,7 @@ export type Shader = {
     hashedStrings: any,
     reflection: ReflectionJSON,
     threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number },
+    entryPoint: string,
 };
 
 export type MaybeShader = Shader | {
@@ -364,7 +365,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
     window.$jsontree.refreshAll();
 
-    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
+    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize, entryPoint };
 }
 
 function restoreSelectedTargetFromURL() {
