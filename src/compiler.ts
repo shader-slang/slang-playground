@@ -243,9 +243,10 @@ export class SlangCompiler {
     // we will also add them to the dropdown list.
     findDefinedEntryPoints(shaderSource: string): string[] {
         let result: string[] = [];
+        let runnable: string[] = [];
         for (let entryPointName of RUNNABLE_ENTRY_POINT_NAMES) {
             if (shaderSource.match(entryPointName)) {
-                result.push(entryPointName);
+                runnable.push(entryPointName);
             }
         }
         let slangSession: Session | null | undefined;
@@ -256,7 +257,7 @@ export class SlangCompiler {
                 return [];
             }
             let module: Module | null = null;
-            if (result.length > 0) {
+            if (runnable.length > 0) {
                 slangSession.loadModuleFromSource(playgroundSource, "playground", "/playground.slang");
             }
             module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
@@ -278,6 +279,7 @@ export class SlangCompiler {
             if (slangSession)
                 slangSession.delete();
         }
+        result.push(...runnable);
         return result;
     }
 
@@ -342,7 +344,7 @@ export class SlangCompiler {
 
         // If entry point is provided, we know for sure this is not a whole program compilation,
         // so we will just go to find the correct module to include in the compilation.
-        if (entryPointName != "") {
+        if (entryPointName != "" && !isWholeProgram) {
             if (this.isRunnableEntryPoint(entryPointName)) {
                 // we use the same entry point name as module name
                 const mainProgram = this.getPrecompiledProgram(slangSession, entryPointName);
