@@ -467,7 +467,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, ReflectionJSON, ThreadGroupSize | { x: number, y: number, z: number }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string): null | [string, Bindings, any, ReflectionJSON, { [key: string]: ThreadGroupSize }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -539,10 +539,17 @@ export class SlangCompiler {
                 }
             }
 
-            // Also read the shader work-group size.
-            const entryPointReflection = linkedProgram.getLayout(0)?.findEntryPointByName(entryPointName);
-            let threadGroupSize = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
-                { x: 1, y: 1, z: 1 };
+            // Also read the shader work-group sizes.
+            let threadGroupSize: { [key: string]: ThreadGroupSize } = {};
+            const layout = linkedProgram.getLayout(0);
+            if (layout) {
+                const entryPoints = this.findDefinedEntryPoints(shaderSource);
+                for (const name of entryPoints) {
+                    const entryPointReflection = layout.findEntryPointByName(name);
+                    threadGroupSize[name] = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
+                        { x: 1, y: 1, z: 1 } as ThreadGroupSize;
+                }
+            }
 
             if (outCode == "") {
                 let error = this.slangWasmModule.getLastError();

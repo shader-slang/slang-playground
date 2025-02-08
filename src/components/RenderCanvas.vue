@@ -714,12 +714,13 @@ function onRun(compiledCode: CompiledPlayground) {
             if (extraComputePipelines.length > 0)
                 extraComputePipelines = []; // This should release the resources of the extra pipelines.
 
-            for (const callShader of compiledCode.callCommandShaders) {
-                const module = device.createShaderModule({ code: callShader.code });
+            const module = device.createShaderModule({ code: compiledCode.mainShader.code });
+
+            for (const entryPoint of compiledCode.callCommandEntryPoints) {
                 const pipeline = new ComputePipeline(device);
-                pipeline.createPipelineLayout(callShader.layout);
-                pipeline.createPipeline(module, callShader.entryPoint, null);
-                pipeline.setThreadGroupSize(callShader.threadGroupSize);
+                pipeline.createPipelineLayout(compiledCode.mainShader.layout);
+                pipeline.createPipeline(module, entryPoint, null);
+                pipeline.setThreadGroupSize(compiledCode.mainShader.threadGroupSize[entryPoint]);
                 extraComputePipelines.push(pipeline);
             }
 
@@ -742,7 +743,6 @@ function onRun(compiledCode: CompiledPlayground) {
             passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
 
-            const module = device.createShaderModule({ code: compiledCode.mainShader.code });
             computePipeline.createPipeline(module, compiledCode.mainShader.entryPoint, allocatedResources);
 
             // Create bind groups for the extra pipelines

@@ -227,7 +227,7 @@ function compileOrRun() {
 export type CompiledPlayground = {
     slangSource: string,
     mainShader: Shader,
-    callCommandShaders: Shader[],
+    callCommandEntryPoints: string[],
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
     uniformSize: number,
@@ -269,14 +269,10 @@ function doRun() {
         throw new Error("Error while parsing '//! CALL' commands: " + error.message);
     }
 
-    let callCommandShaders: Shader[] = [];
+    let callCommandEntryPoints: string[] = [];
     if (callCommands && (callCommands.length > 0)) {
         for (const command of callCommands) {
-            const compiledResult = compileShader(userSource, command.fnName, "WGSL");
-            if (!compiledResult.succ) {
-                throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
-            }
-            callCommandShaders.push(compiledResult);
+            callCommandEntryPoints.push(command.fnName);
         }
     }
 
@@ -288,7 +284,7 @@ function doRun() {
     renderCanvas.value.onRun({
         slangSource: userSource,
         mainShader: ret,
-        callCommandShaders,
+        callCommandEntryPoints,
         resourceCommands,
         callCommands,
         uniformSize,
@@ -336,7 +332,7 @@ export type Shader = {
     layout: Bindings,
     hashedStrings: any,
     reflection: ReflectionJSON,
-    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number },
+    threadGroupSize: { [key: string]: ThreadGroupSize },
     entryPoint: string,
 };
 
