@@ -8,7 +8,7 @@ import Help from './components/Help.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
 import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, type Ref } from 'vue'
-import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
+import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
@@ -227,7 +227,7 @@ function compileOrRun() {
 export type CompiledPlayground = {
     slangSource: string,
     shader: Shader,
-    mainEntryPoint: "imageMain" | "printMain",
+    mainEntryPoint: RunnableShaderType,
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
     uniformSize: number,
