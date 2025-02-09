@@ -226,8 +226,8 @@ function compileOrRun() {
 
 export type CompiledPlayground = {
     slangSource: string,
-    mainShader: Shader,
-    callCommandEntryPoints: string[],
+    shader: Shader,
+    mainEntryPoint: "imageMain" | "printMain",
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
     uniformSize: number,
@@ -269,13 +269,6 @@ function doRun() {
         throw new Error("Error while parsing '//! CALL' commands: " + error.message);
     }
 
-    let callCommandEntryPoints: string[] = [];
-    if (callCommands && (callCommands.length > 0)) {
-        for (const command of callCommands) {
-            callCommandEntryPoints.push(command.fnName);
-        }
-    }
-
     if (compiler == null) {
         throw new Error("Could not get compiler");
     }
@@ -283,8 +276,8 @@ function doRun() {
 
     renderCanvas.value.onRun({
         slangSource: userSource,
-        mainShader: ret,
-        callCommandEntryPoints,
+        shader: ret,
+        mainEntryPoint: entryPointName,
         resourceCommands,
         callCommands,
         uniformSize,
@@ -333,7 +326,6 @@ export type Shader = {
     hashedStrings: any,
     reflection: ReflectionJSON,
     threadGroupSize: { [key: string]: ThreadGroupSize },
-    entryPoint: string,
 };
 
 export type MaybeShader = Shader | {
@@ -361,7 +353,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
     window.$jsontree.refreshAll();
 
-    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize, entryPoint };
+    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
 }
 
 function restoreSelectedTargetFromURL() {

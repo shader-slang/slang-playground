@@ -705,22 +705,23 @@ function onRun(compiledCode: CompiledPlayground) {
     withRenderLock(
         // setupFn
         async () => {
-            hashedStrings = compiledCode.mainShader.hashedStrings;
+            hashedStrings = compiledCode.shader.hashedStrings;
 
-            resourceBindings = compiledCode.mainShader.layout;
+            resourceBindings = compiledCode.shader.layout;
             // create a pipeline resource 'signature' based on the bindings found in the program.
             computePipeline.createPipelineLayout(resourceBindings);
 
             if (extraComputePipelines.length > 0)
                 extraComputePipelines = []; // This should release the resources of the extra pipelines.
 
-            const module = device.createShaderModule({ code: compiledCode.mainShader.code });
+            const module = device.createShaderModule({ code: compiledCode.shader.code });
 
-            for (const entryPoint of compiledCode.callCommandEntryPoints) {
+            for (const callCommand of compiledCode.callCommands) {
+                const entryPoint = callCommand.fnName;
                 const pipeline = new ComputePipeline(device);
-                pipeline.createPipelineLayout(compiledCode.mainShader.layout);
+                pipeline.createPipelineLayout(compiledCode.shader.layout);
                 pipeline.createPipeline(module, entryPoint, null);
-                pipeline.setThreadGroupSize(compiledCode.mainShader.threadGroupSize[entryPoint]);
+                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSize[entryPoint]);
                 extraComputePipelines.push(pipeline);
             }
 
@@ -743,7 +744,7 @@ function onRun(compiledCode: CompiledPlayground) {
             passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
 
-            computePipeline.createPipeline(module, compiledCode.mainShader.entryPoint, allocatedResources);
+            computePipeline.createPipeline(module, compiledCode.mainEntryPoint, allocatedResources);
 
             // Create bind groups for the extra pipelines
             for (const pipeline of extraComputePipelines)
