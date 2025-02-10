@@ -274,6 +274,10 @@ function doRun() {
     let uniformSize = getUniformSize(ret.reflection)
     uniformComponents.value = getUniformSliders(resourceCommands)
 
+    if(uniformComponents.value.length > 0) {
+        tabContainer.value?.setActiveTab("uniforms")
+    }
+
     let callCommands: CallCommand[] | null = null;
     try {
         callCommands = parseCallCommands(userSource, ret.reflection);
@@ -588,7 +592,7 @@ function logError(message: string) {
                     <ReflectionView />
                 </Tab>
 
-                <Tab name="uniform" label="Uniforms"
+                <Tab name="uniforms" label="Uniforms"
                     v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
                     <div class="uniformPanel">
                         <div v-for="uniformComponent in uniformComponents">
