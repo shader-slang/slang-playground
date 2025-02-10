@@ -246,6 +246,8 @@ export type CompiledPlayground = {
 }
 
 function doRun() {
+    smallScreenEditorVisible.value = false;
+
     if (!renderCanvas.value) {
         throw new Error("WebGPU is not supported in this browser");
     }
@@ -311,6 +313,8 @@ function doRun() {
 // But if it doesn't define any of them, then user code has to define a entry point function name. Because our built-in shader
 // have no way to call the user defined function, and compile engine cannot compile the source code.
 async function onCompile() {
+    smallScreenEditorVisible.value = false;
+    
     toggleDisplayMode(null);
     const compileTarget = targetSelect.value!.getValue();
 
