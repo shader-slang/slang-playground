@@ -274,7 +274,7 @@ function doRun() {
     let uniformSize = getUniformSize(ret.reflection)
     uniformComponents.value = getUniformSliders(resourceCommands)
 
-    if(uniformComponents.value.length > 0) {
+    if (uniformComponents.value.length > 0) {
         tabContainer.value?.setActiveTab("uniforms")
     }
 
@@ -318,7 +318,7 @@ function doRun() {
 // have no way to call the user defined function, and compile engine cannot compile the source code.
 async function onCompile() {
     smallScreenEditorVisible.value = false;
-    
+
     toggleDisplayMode(null);
     const compileTarget = targetSelect.value!.getValue();
 
@@ -484,16 +484,6 @@ function logError(message: string) {
             </Splitpanes>
             <div id="small-screen-editor" v-show="smallScreenEditorVisible"></div>
         </div>
-        <div class="navbar-standalone-button-item small-screen-editor-toggle" v-show="isSmallScreen">
-            <button class="svg-btn" title="Toggle editor" @click="smallScreenEditorVisible = !smallScreenEditorVisible">
-                <svg xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="28" height="28" viewBox="0 0 64 64"
-                    fill="currentColor">
-                    <path
-                        d="M7.2 54.5c-.6 1.5.9 3 2.4 2.4L14 55l-5-5L7.2 54.5zM13 42c1.5 1.5 1 4 1 4l1.3.4c1.1.4 1.9 1.2 2.3 2.3L18 50c0 0 3 0 4 1l24-24-8-10L13 42zM54.7 9.3c-3.5-3.5-7-2-7-2L43 12l9 9 4.7-4.7C56.7 16.3 58.2 12.8 54.7 9.3z">
-                    </path>
-                </svg>
-            </button>
-        </div>
         <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-navbar' : '#big-screen-navbar'">
             <div class="navbar">
                 <!-- Logo section -->
@@ -572,6 +562,11 @@ function logError(message: string) {
                         </svg>
                     </button>
                 </div>
+                <div class="navbar-standalone-button-item" v-show="isSmallScreen">
+                    <button title="Toggle editor" @click="smallScreenEditorVisible = !smallScreenEditorVisible">
+                        {{ smallScreenEditorVisible ? "Hide Source" : "View Source" }}
+                    </button>
+                </div>
             </div>
         </Teleport>
         <Teleport defer :to="isSmallScreen ? '#small-screen-display' : '.outputSpace'" v-if="device != null">
@@ -618,12 +613,6 @@ function logError(message: string) {
 </template>
 
 <style scoped>
-.small-screen-editor-toggle {
-    position: fixed;
-    right: 10px;
-    bottom: 10px;
-}
-
 #small-screen-container {
     height: 100vh;
     display: flex;
@@ -636,16 +625,6 @@ function logError(message: string) {
 
 #small-screen-diagnostic {
     height: 250px;
-}
-
-.editorSeperator {
-    height: 10px;
-    color: black;
-}
-
-.editorLabel {
-    color: white;
-    text-align: center;
 }
 
 #renderOutput {
