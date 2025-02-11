@@ -564,7 +564,7 @@ function logError(message: string) {
                 </div>
                 <div class="navbar-standalone-button-item" v-show="isSmallScreen">
                     <button title="Toggle editor" @click="smallScreenEditorVisible = !smallScreenEditorVisible">
-                        {{ smallScreenEditorVisible ? "Hide Source" : "View Source" }}
+                        {{ smallScreenEditorVisible ? "View Results" : "View Source" }}
                     </button>
                 </div>
             </div>
