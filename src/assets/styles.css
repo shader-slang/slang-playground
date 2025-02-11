@@ -157,8 +157,14 @@ button:disabled {
   background-color: var(--button-face-disabled);
 }
 
-button:hover {
+button:active {
   background-color: var(--orange);
+}
+
+@media(hover: hover) {
+  button:hover {
+    background-color: var(--orange);
+  }
 }
 
 button:disabled:hover {
@@ -197,16 +203,14 @@ button:disabled:hover {
   transition: color 0.2s ease-in-out;
 }
 
-.svg-btn:hover {
-  background: none;
-}
-
 .svg-btn:active {
+  background: none;
   color: var(--orange);
 }
 
 @media(hover: hover) {
   .svg-btn:hover {
+    background: none;
     color: var(--orange);
   }
 }
