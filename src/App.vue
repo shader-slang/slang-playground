@@ -7,7 +7,7 @@ import Slider from './components/ui/Slider.vue'
 import Help from './components/Help.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
-import { defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, type Ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, watch, type Ref } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
@@ -16,6 +16,7 @@ import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import ReflectionView from './components/ReflectionView.vue'
 import Colorpick from './components/ui/Colorpick.vue'
+import { useWindowSize } from '@vueuse/core'
 
 // MonacoEditor is a big component, so we load it asynchronously.
 const MonacoEditor = defineAsyncComponent(() => import('./components/MonacoEditor.vue'))
@@ -43,8 +44,9 @@ const targetLanguageMap: { [target in typeof compileTargets[number]]: string } =
 };
 
 const codeEditor = useTemplateRef("codeEditor");
-const diagnosticsArea = useTemplateRef("diagnostics");
 const codeGenArea = useTemplateRef("codeGenArea");
+
+const tabContainer = useTemplateRef("tabContainer");
 
 const shareButton = useTemplateRef("shareButton");
 const tooltip = useTemplateRef("tooltip");
@@ -65,12 +67,23 @@ const entrypoints = ref<string[]>([]);
 const showEntrypoints = ref(false);
 
 const printedText = ref("");
+const diagnosticsText = ref("");
+watch(diagnosticsText, (newText, _) => {
+    if (newText != "") {
+        tabContainer.value?.setActiveTab("diagnostics")
+    }
+})
 const device = ref<GPUDevice | null>(null);
 
 const currentDisplayMode = ref<ShaderType>("imageMain");
 const uniformComponents = ref<UniformController[]>([])
 
-let pageLoaded = false;
+const { width } = useWindowSize()
+
+const isSmallScreen = computed(() => width.value < 768)
+const smallScreenEditorVisible = ref(false);
+
+const pageLoaded = ref(false);
 let reflectionJson: any = {};
 
 
@@ -123,9 +136,7 @@ function updateProfileOptions() {
 }
 
 onMounted(async () => {
-    updateProfileOptions();
-
-    pageLoaded = true;
+    pageLoaded.value = true;
     if (!device) {
         logError(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
     }
@@ -210,12 +221,12 @@ function compileOrRun() {
     else {
         if (device.value == null) {
             onCompile().then(() => {
-                if (diagnosticsArea.value?.getValue() == "")
-                    diagnosticsArea.value.appendEditorValue(`The shader compiled successfully, ` +
+                if (diagnosticsText.value == "")
+                    diagnosticsText.value += `The shader compiled successfully, ` +
                         `but it cannot run because your browser does not support WebGPU.\n` +
                         `WebGPU is supported in Chrome, Edge, Firefox Nightly and Safari Technology Preview. ` +
                         `On iOS, WebGPU support requires Safari 16.4 or later and must be enabled in settings. ` +
-                        `Please check your browser version and enable WebGPU if possible.`);
+                        `Please check your browser version and enable WebGPU if possible.`;
             });
         }
         else {
@@ -235,6 +246,8 @@ export type CompiledPlayground = {
 }
 
 function doRun() {
+    smallScreenEditorVisible.value = false;
+
     if (!renderCanvas.value) {
         throw new Error("WebGPU is not supported in this browser");
     }
@@ -260,6 +273,10 @@ function doRun() {
     let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
     let uniformSize = getUniformSize(ret.reflection)
     uniformComponents.value = getUniformSliders(resourceCommands)
+
+    if (uniformComponents.value.length > 0) {
+        tabContainer.value?.setActiveTab("uniforms")
+    }
 
     let callCommands: CallCommand[] | null = null;
     try {
@@ -289,6 +306,7 @@ function doRun() {
 // But if it doesn't define any of them, then user code has to define a entry point function name. Because our built-in shader
 // have no way to call the user defined function, and compile engine cannot compile the source code.
 async function onCompile() {
+    smallScreenEditorVisible.value = false;
 
     toggleDisplayMode(null);
     const compileTarget = targetSelect.value!.getValue();
@@ -296,7 +314,7 @@ async function onCompile() {
     await updateEntryPointOptions();
 
     if (selectedEntrypoint.value == "" && !isWholeProgramTarget(compileTarget)) {
-        diagnosticsArea.value?.setEditorValue("Please select the entry point name");
+        diagnosticsText.value = "Please select the entry point name";
         return;
     }
 
@@ -310,7 +328,7 @@ async function onCompile() {
     compileShader(userSource, selectedEntrypoint.value, compileTarget);
 
     if (compiler.diagnosticsMsg.length > 0) {
-        diagnosticsArea.value?.setEditorValue(compiler.diagnosticsMsg);
+        diagnosticsText.value = compiler.diagnosticsMsg;
         return;
     }
 }
@@ -332,10 +350,10 @@ export type MaybeShader = Shader | {
     succ: false
 };
 
-function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number], includePlaygroundModule = true): MaybeShader {
+function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number]): MaybeShader {
     if (compiler == null) throw new Error("No compiler available");
-    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget);
-    diagnosticsArea.value?.setEditorValue(compiler.diagnosticsMsg, true);
+    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, device.value == null);
+    diagnosticsText.value = compiler.diagnosticsMsg;
 
     // If compile is failed, we just clear the codeGenArea
     if (!compiledResult) {
@@ -356,29 +374,30 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
 }
 
-function restoreSelectedTargetFromURL() {
+function restoreFromURL(): boolean {
     const urlParams = new URLSearchParams(window.location.search);
     const target = urlParams.get('target');
     if (target) {
         if (!compileTargets.includes(target as any)) {
-            diagnosticsArea.value?.setEditorValue("Invalid target specified in URL: " + target);
-            return;
+            diagnosticsText.value = "Invalid target specified in URL: " + target;
+        } else {
+            targetSelect.value!.setValue(target as any);
         }
-        targetSelect.value!.setValue(target as any);
-        updateProfileOptions();
     }
-}
 
-function restoreDemoOrCodeFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
+    updateProfileOptions();
+
+    let gotCodeFromUrl = false;
+
     let demo = urlParams.get('demo');
     if (demo) {
         if (!demo.endsWith(".slang"))
             demo += ".slang";
         selectedDemo.value = demo;
         loadDemo(demo);
-        return true;
+        gotCodeFromUrl = true;
     }
+
     const code = urlParams.get('code');
     if (code) {
         decompressFromBase64URL(code).then((decompressed) => {
@@ -386,9 +405,10 @@ function restoreDemoOrCodeFromURL() {
             updateEntryPointOptions();
             compileOrRun();
         });
-        return true;
+        gotCodeFromUrl = true;
     }
-    return false;
+
+    return gotCodeFromUrl;
 }
 
 async function runIfFullyInitialized() {
@@ -397,20 +417,20 @@ async function runIfFullyInitialized() {
 
         initialized.value = true;
 
-        restoreSelectedTargetFromURL();
+        let gotCodeFromUrl = restoreFromURL();
 
-        if (restoreDemoOrCodeFromURL()) { }
-        else if (codeEditor.value.getValue() == "") {
+        if (gotCodeFromUrl) {
+            // do nothing: code already set
+        } else if (codeEditor.value.getValue() == "") {
             loadDemo(defaultShaderURL);
-        }
-        else {
+        } else {
             compileOrRun();
         }
     }
 }
 
 function logError(message: string) {
-    diagnosticsArea.value?.appendEditorValue(message + "\n", true);
+    diagnosticsText.value += message + "\n";
 }
 </script>
 
@@ -429,139 +449,173 @@ function logError(message: string) {
         </div>
     </Transition>
     <div class="mainContainer" v-show="initialized">
-        <Splitpanes class="slang-theme">
+        <Splitpanes class="slang-theme" v-show="!isSmallScreen">
             <Pane class="leftContainer" size="62">
-                <div class="navbar">
-                    <!-- Logo section -->
-                    <div class="navbar-logo">
-                        <a href="/" title="Return to home page."><img src="./assets/slang-logo.svg" alt="Logo"
-                                class="logo-img" /></a>
-                    </div>
-
-                    <!-- Load Demo section -->
-                    <div class="navbar-actions navbar-item">
-                        <div class="navbar-group">
-                            <select class="dropdown-select" id="demo-select" name="demo" aria-label="Load Demo"
-                                v-model="selectedDemo" @change="loadDemo(selectedDemo)">
-                                <option value="" disabled selected>Load Demo</option>
-                                <option v-for="demo in demoList" :value="demo.url" :key="demo.url"
-                                    :disabled="demo.url == ''">{{ demo.name }}
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Run section -->
-                    <div class="navbar-run navbar-item">
-                        <button :disabled="device == null"
-                            :title="device == null ? `Run shader feature is disabled because the current browser does not support WebGPU.` : `(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.);`"
-                            @click="doRun()">&#9658;
-                            Run</button>
-                    </div>
-
-                    <!-- Entry/Compile section -->
-                    <div class="navbar-compile navbar-item">
-                        <Selector :options="compileTargets" modelValue="SPIRV" name="target" aria-label="target"
-                            ref="targetSelect" @change="updateProfileOptions"></Selector>
-
-                        <select class="dropdown-select" name="profile" aria-label="profile" v-model="selectedProfile"
-                            v-show="showProfiles">
-                            <option v-for="profile in profiles" :value="profile" :key="profile">{{
-                                profile }}</option>
-                        </select>
-
-                        <select class="dropdown-select" name="entrypoint" aria-label="Entrypoint"
-                            :onfocus="updateEntryPointOptions" @onmousedown="updateEntryPointOptions"
-                            v-model="selectedEntrypoint" v-show="showEntrypoints">
-                            <option value="" disabled selected>Entrypoint</option>
-                            <option v-for="entrypoint in entrypoints" :value="entrypoint" :key="entrypoint">{{
-                                entrypoint }}</option>
-                        </select>
-
-                        <button id="compile-btn"
-                            title='(Ctrl+B) Compile the shader to the selected target. Entrypoints needs to be marked with the `[shader("stage")]` attribute.'
-                            @click="onCompile()">
-                            Compile
-                        </button>
-                    </div>
-                    <!-- Share button section -->
-                    <div class="navbar-standalone-button-item">
-                        <button class="svg-btn" title="Create sharable link" ref="shareButton" @click="onShare">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28px" height="28px" viewBox="0 0 64 64"
-                                fill="currentColor">
-                                <path
-                                    d="M 9 9 L 9 14 L 9 54 L 51 54 L 56 54 L 55 42 L 51 42 L 51 49.095703 L 13 50 L 13.900391 14 L 21 14 L 21 10 L 9 9 z M 44 9 L 44 17.072266 C 29.919275 17.731863 19 23.439669 19 44 L 23 44 C 23 32.732824 29.174448 25.875825 44 25.080078 L 44 33 L 56 20.5 L 44 9 z">
-                                </path>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Help button section -->
-                    <div class="navbar-standalone-button-item">
-                        <button class="svg-btn" title="Show Help" @click="helpModal!.openHelp()">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="28px" height="28px" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" class="feather feather-help-circle">
-                                <circle cx="12" cy="12" r="10" />
-                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                                <line x1="12" y1="17" x2="12" y2="17" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="workSpace">
-                    <Splitpanes horizontal>
-                        <Pane size="80">
-                            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
-                        </Pane>
-                        <Pane>
-                            <MonacoEditor class="diagnosticSpace" ref="diagnostics" readOnlyMode />
-                        </Pane>
-                    </Splitpanes>
+                <div id="big-screen-navbar"></div>
+                <div class="workSpace" id="big-screen-editor">
                 </div>
             </Pane>
             <Pane class="rightContainer">
                 <Splitpanes horizontal class="resultSpace">
                     <Pane class="outputSpace" size="69" v-if="device != null" v-show="currentDisplayMode != null">
-                        <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
-                            <RenderCanvas :device="device" @log-error="logError"
-                                @log-output="(log) => { printedText = log }" ref="renderCanvas"></RenderCanvas>
-                        </div>
-                        <textarea readonly class="printSpace"
-                            v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
                     </Pane>
                     <Pane class="codeGenSpace">
-                        <TabContainer>
-                            <Tab name="code" label="Target Code">
-                                <MonacoEditor ref="codeGenArea" readOnlyMode />
-                            </Tab>
-
-                            <Tab name="reflection" label="Reflection">
-                                <ReflectionView />
-                            </Tab>
-
-                            <Tab name="uniform" label="Uniforms"
-                                v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
-                                <div class="uniformPanel">
-                                    <div v-for="uniformComponent in uniformComponents">
-                                        <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
-                                            v-model:value="uniformComponent.value" :min="uniformComponent.min"
-                                            :max="uniformComponent.max"/>
-                                        <Colorpick v-if="uniformComponent.type == 'color pick'" :name="uniformComponent.name"
-                                            v-model:value="uniformComponent.value"/>
-                                    </div>
-                                </div>
-                            </Tab>
-                        </TabContainer>
                     </Pane>
                 </Splitpanes>
             </Pane>
         </Splitpanes>
+        <div id="small-screen-container" v-show="isSmallScreen">
+            <div id="small-screen-navbar"></div>
+            <Splitpanes horizontal class="resultSpace slang-theme" v-show="!smallScreenEditorVisible">
+                <Pane id="small-screen-display" size="69" v-if="device != null" v-show="currentDisplayMode != null">
+                </Pane>
+                <Pane id="small-screen-code-gen"></Pane>
+            </Splitpanes>
+            <div id="small-screen-editor" v-show="smallScreenEditorVisible"></div>
+        </div>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-navbar' : '#big-screen-navbar'">
+            <div class="navbar">
+                <!-- Logo section -->
+                <div class="navbar-logo">
+                    <a href="/" title="Return to home page."><img src="./assets/slang-logo.svg" alt="Logo"
+                            class="logo-img" /></a>
+                </div>
+
+                <!-- Load Demo section -->
+                <div class="navbar-actions navbar-item">
+                    <div class="navbar-group">
+                        <select class="dropdown-select" id="demo-select" name="demo" aria-label="Load Demo"
+                            v-model="selectedDemo" @change="loadDemo(selectedDemo)">
+                            <option value="" disabled selected>Load Demo</option>
+                            <option v-for="demo in demoList" :value="demo.url" :key="demo.url"
+                                :disabled="demo.url == ''">{{ demo.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Run section -->
+                <div class="navbar-run navbar-item">
+                    <button :disabled="device == null"
+                        :title="device == null ? `Run shader feature is disabled because the current browser does not support WebGPU.` : `(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.);`"
+                        @click="doRun()">&#9658;
+                        Run</button>
+                </div>
+
+                <!-- Entry/Compile section -->
+                <div class="navbar-compile navbar-item">
+                    <Selector :options="compileTargets" modelValue="SPIRV" name="target" aria-label="target"
+                        ref="targetSelect" @change="updateProfileOptions"></Selector>
+
+                    <select class="dropdown-select" name="profile" aria-label="profile" v-model="selectedProfile"
+                        v-show="showProfiles">
+                        <option v-for="profile in profiles" :value="profile" :key="profile">{{
+                            profile }}</option>
+                    </select>
+
+                    <select class="dropdown-select" name="entrypoint" aria-label="Entrypoint"
+                        :onfocus="updateEntryPointOptions" @onmousedown="updateEntryPointOptions"
+                        v-model="selectedEntrypoint" v-show="showEntrypoints">
+                        <option value="" disabled selected>Entrypoint</option>
+                        <option v-for="entrypoint in entrypoints" :value="entrypoint" :key="entrypoint">{{
+                            entrypoint }}</option>
+                    </select>
+
+                    <button id="compile-btn"
+                        title='(Ctrl+B) Compile the shader to the selected target. Entrypoints needs to be marked with the `[shader("stage")]` attribute.'
+                        @click="onCompile()">
+                        Compile
+                    </button>
+                </div>
+                <!-- Share button section -->
+                <div class="navbar-standalone-button-item">
+                    <button class="svg-btn" title="Create sharable link" ref="shareButton" @click="onShare">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28px" height="28px" viewBox="0 0 64 64"
+                            fill="currentColor">
+                            <path
+                                d="M 9 9 L 9 14 L 9 54 L 51 54 L 56 54 L 55 42 L 51 42 L 51 49.095703 L 13 50 L 13.900391 14 L 21 14 L 21 10 L 9 9 z M 44 9 L 44 17.072266 C 29.919275 17.731863 19 23.439669 19 44 L 23 44 C 23 32.732824 29.174448 25.875825 44 25.080078 L 44 33 L 56 20.5 L 44 9 z">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Help button section -->
+                <div class="navbar-standalone-button-item">
+                    <button class="svg-btn" title="Show Help" @click="helpModal!.openHelp()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="28px" height="28px" viewBox="0 0 24 24"
+                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" class="feather feather-help-circle">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                            <line x1="12" y1="17" x2="12" y2="17" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="navbar-standalone-button-item" v-show="isSmallScreen">
+                    <button title="Toggle editor" @click="smallScreenEditorVisible = !smallScreenEditorVisible">
+                        {{ smallScreenEditorVisible ? "View Results" : "View Source" }}
+                    </button>
+                </div>
+            </div>
+        </Teleport>
+        <Teleport defer :to="isSmallScreen ? '#small-screen-display' : '.outputSpace'" v-if="device != null">
+            <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
+                <RenderCanvas :device="device" @log-error="logError" @log-output="(log) => { printedText = log }"
+                    ref="renderCanvas"></RenderCanvas>
+            </div>
+            <textarea readonly class="printSpace outputSpace"
+                v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
+        </Teleport>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-code-gen' : '.codeGenSpace'">
+            <TabContainer ref="tabContainer">
+                <Tab name="code" label="Target Code">
+                    <MonacoEditor ref="codeGenArea" readOnlyMode />
+                </Tab>
+
+                <Tab name="reflection" label="Reflection">
+                    <ReflectionView />
+                </Tab>
+
+                <Tab name="uniforms" label="Uniforms"
+                    v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
+                    <div class="uniformPanel">
+                        <div v-for="uniformComponent in uniformComponents">
+                            <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
+                                v-model:value="uniformComponent.value" :min="uniformComponent.min"
+                                :max="uniformComponent.max" />
+                            <Colorpick v-if="uniformComponent.type == 'color pick'" :name="uniformComponent.name"
+                                v-model:value="uniformComponent.value" />
+                        </div>
+                    </div>
+                </Tab>
+
+                <Tab name="diagnostics" label="Diagnostics" v-if="diagnosticsText != ''">
+                    <textarea readonly class="diagnosticSpace outputSpace">{{ diagnosticsText }}</textarea>
+                </Tab>
+            </TabContainer>
+        </Teleport>
+        <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-editor' : '#big-screen-editor'">
+            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
+        </Teleport>
     </div>
     <Help v-show="showHelp" ref="helpModal"></Help>
 </template>
 
 <style scoped>
+#small-screen-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#small-screen-editor {
+    flex-grow: 1;
+}
+
+#small-screen-diagnostic {
+    height: 250px;
+}
+
 #renderOutput {
     display: block;
     width: 100%;
@@ -578,6 +632,26 @@ function logError(message: string) {
     opacity: 0;
 }
 
+.printSpace {
+    margin-top: 10px;
+}
+
+.diagnosticSpace {
+    padding-left: 10px;
+}
+
+.outputSpace {
+    background-color: var(--code-editor-background);
+    border: none;
+    color: white;
+    width: 100%;
+    height: 100%;
+}
+
+.outputSpace:focus {
+    outline: none;
+}
+
 .resultSpace.splitpanes .splitpanes__pane {
     transition: none !important;
     overflow: hidden;
@@ -589,6 +663,7 @@ function logError(message: string) {
 
 .uniformPanel {
     background-color: var(--code-editor-background);
-    height: 100%
+    height: 100%;
+    overflow-y: scroll;
 }
 </style>
