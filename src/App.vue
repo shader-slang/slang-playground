@@ -8,7 +8,7 @@ import Help from './components/Help.vue'
 import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
 import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, watch, type Ref } from 'vue'
-import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type ShaderType } from './compiler'
+import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
@@ -237,8 +237,8 @@ function compileOrRun() {
 
 export type CompiledPlayground = {
     slangSource: string,
-    mainShader: Shader,
-    callCommandShaders: Shader[],
+    shader: Shader,
+    mainEntryPoint: RunnableShaderType,
     resourceCommands: ResourceCommand[],
     callCommands: CallCommand[],
     uniformSize: number,
@@ -286,17 +286,6 @@ function doRun() {
         throw new Error("Error while parsing '//! CALL' commands: " + error.message);
     }
 
-    let callCommandShaders: Shader[] = [];
-    if (callCommands && (callCommands.length > 0)) {
-        for (const command of callCommands) {
-            const compiledResult = compileShader(userSource, command.fnName, "WGSL");
-            if (!compiledResult.succ) {
-                throw new Error("Failed to compile shader for requested entry-point: " + command.fnName);
-            }
-            callCommandShaders.push(compiledResult);
-        }
-    }
-
     if (compiler == null) {
         throw new Error("Could not get compiler");
     }
@@ -304,8 +293,8 @@ function doRun() {
 
     renderCanvas.value.onRun({
         slangSource: userSource,
-        mainShader: ret,
-        callCommandShaders,
+        shader: ret,
+        mainEntryPoint: entryPointName,
         resourceCommands,
         callCommands,
         uniformSize,
@@ -354,7 +343,7 @@ export type Shader = {
     layout: Bindings,
     hashedStrings: any,
     reflection: ReflectionJSON,
-    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number },
+    threadGroupSize: { [key: string]: ThreadGroupSize },
 };
 
 export type MaybeShader = Shader | {

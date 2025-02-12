@@ -584,7 +584,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 randomPipeline.createPipelineLayout(layout);
 
                 // Create the pipeline (without resource bindings for now)
-                randomPipeline.createPipeline(module, null);
+                randomPipeline.createPipeline(module, "computeMain", null);
 
                 randFloatPipeline = randomPipeline;
             }
@@ -705,21 +705,23 @@ function onRun(compiledCode: CompiledPlayground) {
     withRenderLock(
         // setupFn
         async () => {
-            hashedStrings = compiledCode.mainShader.hashedStrings;
+            hashedStrings = compiledCode.shader.hashedStrings;
 
-            resourceBindings = compiledCode.mainShader.layout;
+            resourceBindings = compiledCode.shader.layout;
             // create a pipeline resource 'signature' based on the bindings found in the program.
             computePipeline.createPipelineLayout(resourceBindings);
 
             if (extraComputePipelines.length > 0)
                 extraComputePipelines = []; // This should release the resources of the extra pipelines.
 
-            for (const callShader of compiledCode.callCommandShaders) {
-                const module = device.createShaderModule({ code: callShader.code });
+            const module = device.createShaderModule({ code: compiledCode.shader.code });
+
+            for (const callCommand of compiledCode.callCommands) {
+                const entryPoint = callCommand.fnName;
                 const pipeline = new ComputePipeline(device);
-                pipeline.createPipelineLayout(callShader.layout);
-                pipeline.createPipeline(module, null);
-                pipeline.setThreadGroupSize(callShader.threadGroupSize);
+                pipeline.createPipelineLayout(compiledCode.shader.layout);
+                pipeline.createPipeline(module, entryPoint, null);
+                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSize[entryPoint]);
                 extraComputePipelines.push(pipeline);
             }
 
@@ -742,8 +744,7 @@ function onRun(compiledCode: CompiledPlayground) {
             passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
 
-            const module = device.createShaderModule({ code: compiledCode.mainShader.code });
-            computePipeline.createPipeline(module, allocatedResources);
+            computePipeline.createPipeline(module, compiledCode.mainEntryPoint, allocatedResources);
 
             // Create bind groups for the extra pipelines
             for (const pipeline of extraComputePipelines)

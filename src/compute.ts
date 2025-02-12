@@ -46,13 +46,13 @@ export class ComputePipeline {
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, resources: Map<string, GPUTexture | GPUBuffer> | null) {
+    createPipeline(shaderModule: GPUShaderModule, entryPoint: string, resources: Map<string, GPUTexture | GPUBuffer> | null) {
         if (this.pipelineLayout == undefined)
             throw new Error("Cannot create pipeline without layout");
         const pipeline = this.device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
-            compute: { module: shaderModule },
+            compute: { module: shaderModule, entryPoint },
         });
 
         this.pipeline = pipeline;

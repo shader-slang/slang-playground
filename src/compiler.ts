@@ -3,7 +3,7 @@ import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Pr
 import { playgroundSource } from "./playgroundShader.js";
 
 export function isWholeProgramTarget(compileTarget: string) {
-    return compileTarget == "METAL" || compileTarget == "SPIRV";
+    return compileTarget == "METAL" || compileTarget == "SPIRV" || compileTarget == "WGSL";
 }
 
 export const RUNNABLE_ENTRY_POINT_NAMES = ['imageMain', 'printMain'] as const;
@@ -243,9 +243,10 @@ export class SlangCompiler {
     // we will also add them to the dropdown list.
     findDefinedEntryPoints(shaderSource: string): string[] {
         let result: string[] = [];
+        let runnable: string[] = [];
         for (let entryPointName of RUNNABLE_ENTRY_POINT_NAMES) {
             if (shaderSource.match(entryPointName)) {
-                result.push(entryPointName);
+                runnable.push(entryPointName);
             }
         }
         let slangSession: Session | null | undefined;
@@ -256,7 +257,7 @@ export class SlangCompiler {
                 return [];
             }
             let module: Module | null = null;
-            if (result.length > 0) {
+            if (runnable.length > 0) {
                 slangSession.loadModuleFromSource(playgroundSource, "playground", "/playground.slang");
             }
             module = slangSession.loadModuleFromSource(shaderSource, "user", "/user.slang");
@@ -278,6 +279,7 @@ export class SlangCompiler {
             if (slangSession)
                 slangSession.delete();
         }
+        result.push(...runnable);
         return result;
     }
 
@@ -342,7 +344,7 @@ export class SlangCompiler {
 
         // If entry point is provided, we know for sure this is not a whole program compilation,
         // so we will just go to find the correct module to include in the compilation.
-        if (entryPointName != "") {
+        if (entryPointName != "" && !isWholeProgram) {
             if (this.isRunnableEntryPoint(entryPointName)) {
                 // we use the same entry point name as module name
                 const mainProgram = this.getPrecompiledProgram(slangSession, entryPointName);
@@ -465,7 +467,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, any, ReflectionJSON, ThreadGroupSize | { x: number, y: number, z: number }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, any, ReflectionJSON, { [key: string]: ThreadGroupSize }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -537,10 +539,17 @@ export class SlangCompiler {
                 }
             }
 
-            // Also read the shader work-group size.
-            const entryPointReflection = linkedProgram.getLayout(0)?.findEntryPointByName(entryPointName);
-            let threadGroupSize = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
-                { x: 1, y: 1, z: 1 };
+            // Also read the shader work-group sizes.
+            let threadGroupSize: { [key: string]: ThreadGroupSize } = {};
+            const layout = linkedProgram.getLayout(0);
+            if (layout) {
+                const entryPoints = this.findDefinedEntryPoints(shaderSource);
+                for (const name of entryPoints) {
+                    const entryPointReflection = layout.findEntryPointByName(name);
+                    threadGroupSize[name] = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
+                        { x: 1, y: 1, z: 1 } as ThreadGroupSize;
+                }
+            }
 
             if (outCode == "") {
                 let error = this.slangWasmModule.getLastError();
