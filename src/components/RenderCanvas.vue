@@ -4,7 +4,7 @@ import type { Bindings, ShaderType } from '../compiler';
 import { ComputePipeline } from '../compute';
 import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
-import { type CallCommand, createOutputTexture, NotReadyError, parsePrintfBuffer, type ResourceCommand } from '../util';
+import { type CallCommand, createOutputTexture, type HashedStringData, NotReadyError, parsePrintfBuffer, type ResourceCommand } from '../util';
 import { onMounted, ref, useTemplateRef } from 'vue';
 
 let context: GPUCanvasContext;
@@ -16,7 +16,7 @@ let passThroughPipeline: GraphicsPipeline;
 let resourceBindings: Bindings;
 let allocatedResources: Map<string, GPUTexture | GPUBuffer>;
 let randFloatResources: Map<string, GPUObjectBase>;
-let hashedStrings: any;
+let hashedStrings: HashedStringData[];
 
 let renderThread: Promise<void> | null = null;
 let abortRender = false;

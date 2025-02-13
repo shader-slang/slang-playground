@@ -331,7 +331,7 @@ function parsePrintfFormat(formatString: string): FormatSpecifier[] {
         }
 
         let precision_text = precision ? precision.slice(1) : null; // remove leading '.'
-        let precision_number = precision_text ? parseInt(precision) : null;
+        let precision_number = precision_text ? parseInt(precision_text) : null;
 
         let width_number = width ? parseInt(width) : null;
 
@@ -375,12 +375,16 @@ function formatPrintfString(parsedTokens: FormatSpecifier[], data: any[]) {
 // Helper function to format each specifier
 function formatSpecifier(value: string, { flags, width, precision, specifierType }: FormatSpecifier & { type: 'specifier' }) {
     let formattedValue;
+    let specifiedPrecision = precision != null;
     if (precision == null)
         precision = 6; //eww magic number
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
-            formattedValue = parseInt(value).toString();
+            if(typeof value !== "number") throw new Error("Invalid state");
+            
+            let valueAsSignedInteger = value | 0;
+            formattedValue = valueAsSignedInteger.toString();
             break;
         case 'u': // Unsigned integer
             formattedValue = Math.abs(parseInt(value)).toString();
@@ -413,7 +417,7 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
             break;
         case 's': // String
             formattedValue = String(value);
-            if (precision) {
+            if (specifiedPrecision) {
                 formattedValue = formattedValue.slice(0, precision);
             }
             break;
@@ -463,14 +467,21 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 //     uint32_t high = 0;
 // };
 //
-function hashToString(hashedStrings: any[], hash: number) {
+
+export type HashedStringData = {
+    hash: number,
+    string: string,
+}
+
+function hashToString(hashedStrings: HashedStringData[], hash: number): string {
     for (let i = 0; i < hashedStrings.length; i++) {
         if (hashedStrings[i].hash == hash) {
             return hashedStrings[i].string;
         }
     }
+    throw new Error("Could not find matching string hash")
 }
-export function parsePrintfBuffer(hashedString: any, printfValueResource: GPUBuffer, bufferElementSize: number) {
+export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValueResource: GPUBuffer, bufferElementSize: number) {
 
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
@@ -489,10 +500,10 @@ export function parsePrintfBuffer(hashedString: any, printfValueResource: GPUBuf
         const type = printfBufferArray[offset];
         switch (type) {
             case 1: // format string
-                formatString = hashToString(hashedString, (printfBufferArray[offset + 1] << 0));  // low field
+                formatString = hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0));  // low field
                 break;
             case 2: // normal string
-                dataArray.push(hashToString(hashedString, (printfBufferArray[offset + 1] << 0)));  // low field
+                dataArray.push(hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0)));  // low field
                 break;
             case 3: // integer
                 dataArray.push(printfBufferArray[offset + 1]);  // low field

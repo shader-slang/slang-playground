@@ -1,6 +1,7 @@
 import { type SpirvTools, default as spirvTools } from "./spirv-tools.js";
 import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
 import { playgroundSource } from "./playgroundShader.js";
+import type { HashedStringData } from "./util.js";
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV" || compileTarget == "WGSL";
@@ -467,7 +468,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, any, ReflectionJSON, { [key: string]: ThreadGroupSize }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, HashedStringData[], ReflectionJSON, { [key: string]: ThreadGroupSize }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -506,7 +507,7 @@ export class SlangCompiler {
                 return null;
             let program: ComponentType = slangSession.createCompositeComponentType(components);
             let linkedProgram: ComponentType = program.link();
-            let hashedStrings = linkedProgram.loadStrings();
+            let hashedStrings: HashedStringData[] = linkedProgram.loadStrings();
 
             let outCode: string;
             if (compileTargetStr == "SPIRV") {
