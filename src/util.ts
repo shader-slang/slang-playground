@@ -259,18 +259,23 @@ export type CallCommand = {
     fnName: string,
     resourceName: string,
     elementSize?: number,
+    callOnce?: boolean,
 } | {
     type: "FIXED_SIZE",
     fnName: string,
     size: number[],
+    callOnce?: boolean,
 };
 
 export function parseCallCommands(reflection: ReflectionJSON): CallCommand[] {
     const callCommands: CallCommand[] = [];
 
     for (let entryPoint of reflection.entryPoints) {
-        const fnName = entryPoint.name;
         if (!entryPoint.userAttribs) continue;
+
+        const fnName = entryPoint.name;
+        let callCommand: CallCommand | null = null;
+        let callOnce: boolean = false;
 
         for (let attribute of entryPoint.userAttribs) {
             if (attribute.name === "playground_CALL_SIZE_OF") {
@@ -286,19 +291,28 @@ export function parseCallCommands(reflection: ReflectionJSON): CallCommand[] {
                     elementSize = getSize(resourceReflection.type.resultType);
                 }
 
-                callCommands.push({
+                callCommand = {
                     type: "RESOURCE_BASED",
                     fnName,
                     resourceName,
                     elementSize
-                });
+                };
             } else if (attribute.name === "playground_CALL") {
-                callCommands.push({
+                callCommand = {
                     type: "FIXED_SIZE",
                     fnName,
                     size: attribute.arguments as number[]
-                });
+                };
+            } else if (attribute.name === "playground_CALL_ONCE") {
+                callOnce = true;
             }
+        }
+
+        if (callCommand != null) {
+            callCommands.push({
+                ...callCommand,
+                callOnce
+            });
         }
     }
 

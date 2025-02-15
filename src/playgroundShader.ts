@@ -159,4 +159,9 @@ public struct playground_CALL_SIZE_OFAttribute
     string resourceName;
 };
 
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_CALL_ONCEAttribute
+{
+};
+
 `;

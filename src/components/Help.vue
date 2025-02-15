@@ -67,6 +67,8 @@ defineExpose({
         Dispatch a compute pass using the resource size to determine the work-group size.
         <li><code>[playground::CALL(512, 512, 1)]</code></li>
         Dispatch a compute pass with the given work-group size.
+        <li><code>[playground::CALL::ONCE]</code></li>
+        Only dispatch the compute pass once at the start of rendering.
       </ul>
       <p>Dispatch a compute pass with the given function name and the provided work-group size.</p>
       <h4>Playground functions</h4>
