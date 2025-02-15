@@ -4,6 +4,7 @@ import playground;
 RWStructuredBuffer<float> buf;
 
 // Fills buffer with a sine wave
+[playground::CALL::SIZE_OF("buf")]
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void fillBuffer(uint2 dispatchThreadId : SV_DispatchThreadID)
@@ -11,8 +12,6 @@ void fillBuffer(uint2 dispatchThreadId : SV_DispatchThreadID)
     uint idx = dispatchThreadId.x;
     buf[idx] = sin(float(idx) / 1000.0);
 }
-
-//! CALL(fillBuffer, SIZE_OF(buf))
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {

@@ -104,19 +104,22 @@ export type ReflectionParameter = {
     "binding": ReflectionBinding,
     "name": string,
     "type": ReflectionType,
-    "userAttribs"?: {
-        "arguments": any[],
-        "name": string,
-    }[],
+    "userAttribs"?: ReflectionUserAttribute[],
 }
 
 export type ReflectionJSON = {
     "entryPoints": {
         "name": string,
         "semanticName": string,
-        "type": unknown
+        "type": unknown,
+        "userAttribs"?: ReflectionUserAttribute[],
     }[],
     "parameters": ReflectionParameter[],
+};
+
+export type ReflectionUserAttribute = {
+    "arguments": (number | string)[],
+    "name": string,
 };
 
 

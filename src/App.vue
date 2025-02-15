@@ -280,10 +280,10 @@ function doRun() {
 
     let callCommands: CallCommand[] | null = null;
     try {
-        callCommands = parseCallCommands(userSource, ret.reflection);
+        callCommands = parseCallCommands(ret.reflection);
     }
     catch (error: any) {
-        throw new Error("Error while parsing '//! CALL' commands: " + error.message);
+        throw new Error("Error while parsing CALL commands: " + error.message);
     }
 
     if (compiler == null) {
