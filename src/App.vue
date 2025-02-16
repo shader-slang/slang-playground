@@ -246,6 +246,14 @@ export type CompiledPlayground = {
 }
 
 function doRun() {
+    try {
+        tryRun();
+    } catch (e: any) {
+        diagnosticsText.value = e.message;
+    }
+}
+
+function tryRun() {
     smallScreenEditorVisible.value = false;
 
     if (!renderCanvas.value) {

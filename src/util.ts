@@ -291,6 +291,9 @@ export function parseCallCommands(reflection: ReflectionJSON): CallCommand[] {
                     elementSize = getSize(resourceReflection.type.resultType);
                 }
 
+                if (callCommand != null) {
+                    throw new Error(`Multiple CALL commands found for ${fnName}`);
+                }
                 callCommand = {
                     type: "RESOURCE_BASED",
                     fnName,
@@ -298,12 +301,18 @@ export function parseCallCommands(reflection: ReflectionJSON): CallCommand[] {
                     elementSize
                 };
             } else if (attribute.name === "playground_CALL") {
+                if (callCommand != null) {
+                    throw new Error(`Multiple CALL commands found for ${fnName}`);
+                }
                 callCommand = {
                     type: "FIXED_SIZE",
                     fnName,
                     size: attribute.arguments as number[]
                 };
             } else if (attribute.name === "playground_CALL_ONCE") {
+                if (callOnce) {
+                    throw new Error(`Multiple CALL ONCE commands found for ${fnName}`);
+                }
                 callOnce = true;
             }
         }

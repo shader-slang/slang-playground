@@ -868,7 +868,7 @@ float loss(uint2 dispatchThreadID, int2 imageSize)
 /*
 * clearDerivativesMain() is a kernel that resets the derivative buffer to all 0s
 */
-[playground::CALL::SIZE_OF("derivBuffer")]
+[playground::CALL(BLOB_BUFFER_SIZE, 1, 1)]
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void clearDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
@@ -914,7 +914,7 @@ void computeDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
 * persists across iterations to help stabilize the optimization process.
 *
 */
-[playground::CALL::SIZE_OF("blobsBuffer")]
+[playground::CALL(BLOB_BUFFER_SIZE, 1, 1)]
 [shader("compute")]
 [numthreads(256, 1, 1)]
 void updateBlobsMain(uint2 dispatchThreadID: SV_DispatchThreadID)
