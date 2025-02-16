@@ -1,6 +1,8 @@
 import { type SpirvTools, default as spirvTools } from "./spirv-tools.js";
 import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, ProgramLayout, Session, ThreadGroupSize, VariableLayoutReflection } from './slang-wasm.js';
-import { playgroundSource } from "./playgroundShader.js";
+import playgroundSource from "./slang/playground.slang?raw";
+import imageMainSource from "./slang/imageMain.slang?raw";
+import printMainSource from "./slang/printMain.slang?raw";
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV" || compileTarget == "WGSL";
@@ -11,47 +13,8 @@ export type RunnableShaderType = typeof RUNNABLE_ENTRY_POINT_NAMES[number];
 export type ShaderType = RunnableShaderType | null;
 
 const RUNNABLE_ENTRY_POINT_SOURCE_MAP: { [key in RunnableShaderType]: string } = {
-    'imageMain': `
-import user;
-import playground;
-
-RWStructuredBuffer<int>             outputBuffer;
-
-[format("rgba8")]
-WTexture2D                          outputTexture;
-
-[shader("compute")]
-[numthreads(16, 16, 1)]
-void imageMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    uint width = 0;
-    uint height = 0;
-    outputTexture.GetDimensions(width, height);
-
-    float4 color = imageMain(dispatchThreadID.xy, int2(width, height));
-
-    if (dispatchThreadID.x >= width || dispatchThreadID.y >= height)
-        return;
-
-    outputTexture.Store(dispatchThreadID.xy, color);
-}
-`,
-    'printMain': `
-import user;
-import playground;
-
-RWStructuredBuffer<int>               outputBuffer;
-
-[format("rgba8")]
-WTexture2D                          outputTexture;
-
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void printMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-{
-    printMain();
-}
-`,
+    'imageMain': imageMainSource,
+    'printMain': printMainSource,
 };
 
 type BindingDescriptor = {

@@ -1,4 +1,3 @@
-export const playgroundSource = `
 internal struct UniformInput
 {
     float4 mousePosition;
@@ -163,5 +162,3 @@ public struct playground_CALL_SIZE_OFAttribute
 public struct playground_CALL_ONCEAttribute
 {
 };
-
-`;

@@ -6,6 +6,7 @@ import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
 import { type CallCommand, createOutputTexture, NotReadyError, parsePrintfBuffer, type ResourceCommand } from '../util';
 import { onMounted, ref, useTemplateRef } from 'vue';
+import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
 let context: GPUCanvasContext;
 let randFloatPipeline: ComputePipeline;
@@ -572,8 +573,6 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             if (!randFloatPipeline) {
                 const randomPipeline = new ComputePipeline(pipeline.device);
 
-                // Load randFloat shader code from the file.
-                const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
                 if (compiler == null) {
                     throw new Error("Compiler is not defined!");
                 }
