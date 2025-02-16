@@ -259,45 +259,69 @@ export type CallCommand = {
     fnName: string,
     resourceName: string,
     elementSize?: number,
+    callOnce?: boolean,
 } | {
     type: "FIXED_SIZE",
     fnName: string,
     size: number[],
+    callOnce?: boolean,
 };
 
-export function parseCallCommands(userSource: string, reflection: ReflectionJSON): CallCommand[] {
-    // Look for commands of the form:
-    //
-    // 1. //! CALL(fn-name, SIZE_OF(<resource-name>)) ==> Dispatch a compute pass with the given 
-    //                                                    function name and using the resource size
-    //                                                    to determine the work-group size.
-    // 2. //! CALL(fn-name, 512, 512) ==> Dispatch a compute pass with the given function name and
-    //                                    the provided work-group size.
-    //
-
+export function parseCallCommands(reflection: ReflectionJSON): CallCommand[] {
     const callCommands: CallCommand[] = [];
-    const lines = userSource.split('\n');
-    for (let line of lines) {
-        const match = line.match(/\/\/!\s+CALL\((\w+),\s*(.*)\)/);
-        if (match) {
-            const fnName = match[1];
-            const args = match[2].split(',').map(arg => arg.trim());
 
-            if (args[0].startsWith("SIZE_OF")) {
-                let resourceName = args[0].slice(8, -1);
-                let resourceReflection = reflection.parameters.find((param) => param.name == resourceName);
-                if (resourceReflection == undefined) {
+    for (let entryPoint of reflection.entryPoints) {
+        if (!entryPoint.userAttribs) continue;
+
+        const fnName = entryPoint.name;
+        let callCommand: CallCommand | null = null;
+        let callOnce: boolean = false;
+
+        for (let attribute of entryPoint.userAttribs) {
+            if (attribute.name === "playground_CALL_SIZE_OF") {
+                const resourceName = attribute.arguments[0] as string;
+                const resourceReflection = reflection.parameters.find((param) => param.name === resourceName);
+
+                if (!resourceReflection) {
                     throw new Error(`Cannot find resource ${resourceName} for ${fnName} CALL command`)
                 }
+
                 let elementSize: number | undefined = undefined;
-                if (resourceReflection.type.kind == "resource" && resourceReflection.type.baseShape == "structuredBuffer") {
+                if (resourceReflection.type.kind === "resource" && resourceReflection.type.baseShape === "structuredBuffer") {
                     elementSize = getSize(resourceReflection.type.resultType);
                 }
-                callCommands.push({ type: "RESOURCE_BASED", fnName, resourceName, elementSize });
+
+                if (callCommand != null) {
+                    throw new Error(`Multiple CALL commands found for ${fnName}`);
+                }
+                callCommand = {
+                    type: "RESOURCE_BASED",
+                    fnName,
+                    resourceName,
+                    elementSize
+                };
+            } else if (attribute.name === "playground_CALL") {
+                if (callCommand != null) {
+                    throw new Error(`Multiple CALL commands found for ${fnName}`);
+                }
+                callCommand = {
+                    type: "FIXED_SIZE",
+                    fnName,
+                    size: attribute.arguments as number[]
+                };
+            } else if (attribute.name === "playground_CALL_ONCE") {
+                if (callOnce) {
+                    throw new Error(`Multiple CALL ONCE commands found for ${fnName}`);
+                }
+                callOnce = true;
             }
-            else {
-                callCommands.push({ type: "FIXED_SIZE", fnName, size: args.map(Number) });
-            }
+        }
+
+        if (callCommand != null) {
+            callCommands.push({
+                ...callCommand,
+                callOnce
+            });
         }
     }
 
