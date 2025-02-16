@@ -108,13 +108,16 @@ export type ReflectionParameter = {
 }
 
 export type ReflectionJSON = {
-    "entryPoints": {
-        "name": string,
-        "semanticName": string,
-        "type": unknown,
-        "userAttribs"?: ReflectionUserAttribute[],
-    }[],
+    "entryPoints": ReflectionEntryPoint[],
     "parameters": ReflectionParameter[],
+};
+
+export type ReflectionEntryPoint = {
+    "name": string,
+    "parameters": ReflectionParameter[],
+    "stage": string,
+    "threadGroupSize": number[],
+    "userAttribs"?: ReflectionUserAttribute[],
 };
 
 export type ReflectionUserAttribute = {
