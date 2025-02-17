@@ -10,7 +10,7 @@ import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-s
 import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, watch, type Ref } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
-import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type ResourceCommand, type UniformController } from './util'
+import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
@@ -341,7 +341,7 @@ export type Shader = {
     succ: true,
     code: string,
     layout: Bindings,
-    hashedStrings: any,
+    hashedStrings: HashedStringData[],
     reflection: ReflectionJSON,
     threadGroupSize: { [key: string]: ThreadGroupSize },
 };
