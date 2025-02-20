@@ -49,39 +49,38 @@ defineExpose({
           A print shader must define a printMain function, see the "Simple Print" demo for an example.</li>
       </ul>
       <h4>Shader Commands</h4>
-      <p>WebGPU shaders in browser can use certain commands to specify how they will run.</p>
-      <ul>
-        <li><code>[playground::ZEROS(512)]</code></li>
-        Initialize a float buffer with zeros of the provided size.
-        <li><code>[playground::BLACK(512, 512)]</code></li>
-        Initialize a float texture with zeros of the provided size.
-        <li><code>[playground::URL("https://example.com/image.png")]</code></li>
+      <p>WebGPU shaders in browser can use certain commands to specify how they will run. Requires <code>import playground;</code>.</p>
+        <h4 class="doc-header"><code>[playground::ZEROS(512)]</code></h4>
+        Initialize a <code>float</code> buffer with zeros of the provided size.
+        <h4 class="doc-header"><code>[playground::BLACK(512, 512)]</code></h4>
+        Initialize a <code>float</code> texture with zeros of the provided size.
+        <h4 class="doc-header"><code>[playground::URL("https://example.com/image.png")]</code></h4>
         Initialize a texture with image from URL.
-        <li><code>[playground::RAND(1000)]</code></li>
-        Initialize a float buffer with uniform random floats between 0 and 1.
-        <li><code>[playground::SLIDER(0.3, 0.0, 1.0)]</code></li>
-        Control a float uniform with a provided default, minimum, and maximum.
-        <li><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></li>
-        Control a float3 color uniform with a provided default color.
-        <li><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></li>
+        <h4 class="doc-header"><code>[playground::RAND(1000)]</code></h4>
+        Initialize a <code>float</code> buffer with uniform random floats between 0 and 1.
+        <h4 class="doc-header"><code>[playground::TIME]</code></h4>
+        Gives a <code>float</code> uniform the current time in milliseconds.
+        <h4 class="doc-header"><code>[playground::MOUSE_POSITION]</code></h4>
+        Gives a <code>float4</code> uniform mouse data.
+        <ul>
+          <li><code>xy</code>: mouse position (in pixels) during last button down.</br></li>
+          <li><code>abs(zw)</code>: mouse position during last button click.</br></li>
+          <li><code>sign(mouze.z)</code>: button is down</br></li>
+          <li><code>sign(mouze.w)</code>: button is clicked</br></li>
+        </ul>
+        <h4 class="doc-header"><code>[playground::SLIDER(0.3, 0.0, 1.0)]</code></h4>
+        Control a <code>float</code> uniform with a provided default, minimum, and maximum.
+        <h4 class="doc-header"><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></h4>
+        Control a <code>float3</code> color uniform with a provided default color.
+        <h4 class="doc-header"><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></h4>
         Dispatch a compute pass with the given function name and using the resource size to determine the work-group
         size.
-        <li><code>//! CALL(fn-name, 512, 512)</code></li>
-      </ul>
+        <h4 class="doc-header"><code>//! CALL(fn-name, 512, 512)</code></h4>
       <p>Dispatch a compute pass with the given function name and the provided work-group size.</p>
       <h4>Playground functions</h4>
-      <p>By importing the playground shader you gain access to a few helpful functions.</p>
-      <ul>
-        <li><code>float4 getMousePosition()</code></li>
-        <code>xy</code>: mouse position (in pixels) during last button down.</br>
-        <code>abs(zw)</code>: mouse position during last button click.</br>
-        <code>sign(mouze.z)</code>: button is down</br>
-        <code>sign(mouze.w)</code>: button is clicked</br>
-        <li><code>float getTime()</code></li>
-        Returns the current time in milliseconds.
-        <li><code>void printf&lteach T&gt(String format, expand each T values) where T : IPrintf</code></li>
-        Prints the values formatted according to the format. Only available in print shaders.
-      </ul>
+      <p>The playground shader also provides the following functions:</p>
+      <h4 class="doc-header"><code>void printf&lteach T&gt(String format, expand each T values) where T : IPrintf</code></h4>
+      Prints the values formatted according to the format. Only available in print shaders.
     </div>
   </div>
 </template>
@@ -104,7 +103,7 @@ defineExpose({
   padding: 20px;
   border-radius: 10px;
   width: 80%;
-  max-width: 500px;
+  max-width: 600px;
   max-height: 100%;
   overflow-y: auto;
 }
@@ -121,5 +120,9 @@ defineExpose({
   color: #000;
   text-decoration: none;
   cursor: pointer;
+}
+
+.doc-header {
+  margin-bottom: 0.5em;
 }
 </style>

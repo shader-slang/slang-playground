@@ -10,7 +10,7 @@ import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-s
 import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, watch, type Ref } from 'vue'
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
-import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformSliders, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController } from './util'
+import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformControllers, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController, isControllerRendered } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
@@ -77,6 +77,7 @@ const device = ref<GPUDevice | null>(null);
 
 const currentDisplayMode = ref<ShaderType>("imageMain");
 const uniformComponents = ref<UniformController[]>([])
+const areAnyUniformsRendered = computed(() => uniformComponents.value.filter(isControllerRendered).length > 0);
 
 const { width } = useWindowSize()
 
@@ -272,9 +273,9 @@ function doRun() {
 
     let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
     let uniformSize = getUniformSize(ret.reflection)
-    uniformComponents.value = getUniformSliders(resourceCommands)
+    uniformComponents.value = getUniformControllers(resourceCommands)
 
-    if (uniformComponents.value.length > 0) {
+    if (areAnyUniformsRendered.value) {
         tabContainer.value?.setActiveTab("uniforms")
     }
 
@@ -577,13 +578,13 @@ function logError(message: string) {
                 </Tab>
 
                 <Tab name="uniforms" label="Uniforms"
-                    v-if="currentDisplayMode == 'imageMain' && uniformComponents.length > 0">
+                    v-if="currentDisplayMode == 'imageMain' && areAnyUniformsRendered">
                     <div class="uniformPanel">
                         <div v-for="uniformComponent in uniformComponents">
-                            <Slider v-if="uniformComponent.type == 'slider'" :name="uniformComponent.name"
+                            <Slider v-if="uniformComponent.type == 'SLIDER'" :name="uniformComponent.name"
                                 v-model:value="uniformComponent.value" :min="uniformComponent.min"
                                 :max="uniformComponent.max" />
-                            <Colorpick v-if="uniformComponent.type == 'color pick'" :name="uniformComponent.name"
+                            <Colorpick v-if="uniformComponent.type == 'COLOR_PICK'" :name="uniformComponent.name"
                                 v-model:value="uniformComponent.value" />
                         </div>
                     </div>

@@ -524,20 +524,25 @@ export class SlangCompiler {
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
-            let bindings = noWebGPU?new Map():this.getResourceBindings(linkedProgram);
+            let bindings: Bindings = noWebGPU ? new Map() : this.getResourceBindings(linkedProgram);
 
             let reflectionJson: ReflectionJSON = linkedProgram.getLayout(0)?.toJsonObject();
 
             // remove incorrect uniform bindings
             let has_uniform_been_binded = false;
-            for(let parameterReflection of reflectionJson.parameters) {
+            for (let parameterReflection of reflectionJson.parameters) {
                 if (parameterReflection.binding.kind != "uniform") continue;
-                
-                if(!has_uniform_been_binded) {
-                    has_uniform_been_binded = true;
-                } else {
-                    bindings.delete(parameterReflection.name);
-                }
+
+                has_uniform_been_binded = true;
+                bindings.delete(parameterReflection.name);
+            }
+
+            if (has_uniform_been_binded) {
+                bindings.set("uniformInput", {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: "uniform" }
+                });
             }
 
             // Also read the shader work-group sizes.

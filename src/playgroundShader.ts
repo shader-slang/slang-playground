@@ -1,26 +1,4 @@
 export const playgroundSource = `
-internal struct UniformInput
-{
-    float4 mousePosition;
-    float time;
-}
-
-internal uniform UniformInput uniformInput;
-
-// Returns the current time in milliseconds.
-public float getTime()
-{
-    return uniformInput.time;
-}
-
-// Returns mouse position info.
-// xy: mouse position (in pixels) during last button down.
-// abs(zw): mouse position during last button click.
-// sign(mouze.z): button is down
-// sign(mouze.w): button is clicked
-//
-public float4 getMousePosition() { return uniformInput.mousePosition; }
-
 // type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double, 
 struct FormattedStruct
 {
@@ -104,12 +82,14 @@ public void printf<each T>(String format, expand each T values) where T : IPrint
     print(format, expand each values);
 }
 
+// Initialize a \`float\` buffer with zeros of the provided size.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_ZEROSAttribute
 {
     int count;
 };
 
+// Initialize a \`float\` texture with zeros of the provided size.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_BLACKAttribute
 {
@@ -117,18 +97,35 @@ public struct playground_BLACKAttribute
     int height;
 };
 
+// Initialize a texture with image from URL.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_URLAttribute
 {
     string url;
 };
 
+// Initialize a \`float\` buffer with uniform random floats between 0 and 1.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_RANDAttribute
 {
     int count;
 };
 
+// Gives the current time in milliseconds.
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_TIMEAttribute
+{};
+
+// Gives mouse position info.
+// \`xy\`: mouse position (in pixels) during last button down.
+// \`abs(zw)\`: mouse position during last button click.
+// \`sign(mouze.z)\`: button is down
+// \`sign(mouze.w)\`: button is clicked
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_MOUSE_POSITIONAttribute
+{};
+
+// Control a \`float\` uniform with a provided default, minimum, and maximum.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_SLIDERAttribute
 {
@@ -137,6 +134,7 @@ public struct playground_SLIDERAttribute
     float max;
 };
 
+// Control a \`float3\` color uniform with a provided default color.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_COLOR_PICKAttribute
 {
