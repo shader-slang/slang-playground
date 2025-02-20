@@ -1,5 +1,5 @@
 import { slangd } from './try-slang.js';
-import { playgroundSource } from './playgroundShader.js';
+import playgroundSource from "./slang/playground.slang?raw";
 import type { CompletionContext } from './slang-wasm.js';
 
 import * as monaco from "monaco-editor";

@@ -63,10 +63,13 @@ defineExpose({
         Control a float uniform with a provided default, minimum, and maximum.
         <li><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></li>
         Control a float3 color uniform with a provided default color.
-        <li><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></li>
-        Dispatch a compute pass with the given function name and using the resource size to determine the work-group
-        size.
-        <li><code>//! CALL(fn-name, 512, 512)</code></li>
+        <li><code>[playground::CALL::SIZE_OF("RESOURCE-NAME")]</code></li>
+        Dispatch a compute pass using the resource size to determine the work-group size.
+        <li><code>[playground::CALL(512, 512, 1)]</code></li>
+        Dispatch a compute pass with the given grid of threads.
+        The number of work-groups will be determined by dividing by the number of threads per work-group and rounding up.
+        <li><code>[playground::CALL::ONCE]</code></li>
+        Only dispatch the compute pass once at the start of rendering.
       </ul>
       <p>Dispatch a compute pass with the given function name and the provided work-group size.</p>
       <h4>Playground functions</h4>

@@ -246,6 +246,14 @@ export type CompiledPlayground = {
 }
 
 function doRun() {
+    try {
+        tryRun();
+    } catch (e: any) {
+        diagnosticsText.value = e.message;
+    }
+}
+
+function tryRun() {
     smallScreenEditorVisible.value = false;
 
     if (!renderCanvas.value) {
@@ -280,10 +288,10 @@ function doRun() {
 
     let callCommands: CallCommand[] | null = null;
     try {
-        callCommands = parseCallCommands(userSource, ret.reflection);
+        callCommands = parseCallCommands(ret.reflection);
     }
     catch (error: any) {
-        throw new Error("Error while parsing '//! CALL' commands: " + error.message);
+        throw new Error("Error while parsing CALL commands: " + error.message);
     }
 
     if (compiler == null) {
