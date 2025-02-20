@@ -40,7 +40,7 @@ static const float ADAM_EPSILON = 1e-8;
 
 // ------ Global buffers and textures --------
 
-// The "//!" directives instruct slang-playground to allocate and initialize the buffers 
+// The playground attributes instruct slang-playground to allocate and initialize the buffers 
 // with the appropriate data. 
 //
 // When using this sample code locally, your own engine is responsible for allocating, 
@@ -857,9 +857,18 @@ float loss(uint2 dispatchThreadID, int2 imageSize)
     return 0.f;
 }
 
+// Sequence of additional kernel calls to be performed before imageMain
+// By default, imageMain is always the last kernel to be dispatched
+//
+// playground::CALL is a slang-playground directive that helps us queue up additional kernels.
+// Note that if this sample code is outside the playground, your engine is responsible for
+// dispatching these kernels in this order.
+//
+
 /*
 * clearDerivativesMain() is a kernel that resets the derivative buffer to all 0s
 */
+[playground::CALL(BLOB_BUFFER_SIZE, 1, 1)]
 [shader("compute")]
 [numthreads(64, 1, 1)]
 void clearDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
@@ -876,6 +885,7 @@ void clearDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
 * It uses Slang's auto-diff capabilities by simply calling `bwd_diff()` on the loss function to generate a new function
 * that is the derivative of the loss function.
 */
+[playground::CALL::SIZE_OF("targetTexture")]
 [shader("compute")]
 [numthreads(16, 16, 1)]
 void computeDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
@@ -904,6 +914,7 @@ void computeDerivativesMain(uint2 dispatchThreadID : SV_DispatchThreadID)
 * persists across iterations to help stabilize the optimization process.
 *
 */
+[playground::CALL(BLOB_BUFFER_SIZE, 1, 1)]
 [shader("compute")]
 [numthreads(256, 1, 1)]
 void updateBlobsMain(uint2 dispatchThreadID: SV_DispatchThreadID)
@@ -938,18 +949,6 @@ void updateBlobsMain(uint2 dispatchThreadID: SV_DispatchThreadID)
 
     blobsBuffer[globalID] -= update;
 }
-
-// Sequence of additional kernel calls to be performed before imageMain
-// By default, imageMain is always the last kernel to be dispatched
-// 
-// "//! CALL" is a slang-playground directive that helps us queue up additional kernels.
-// Note that if this sample code is outside the playground, your engine is responsible for
-// dispatching these kernels in this order.
-//
-//! CALL(clearDerivativesMain, SIZE_OF(blobsBuffer))
-//! CALL(computeDerivativesMain, SIZE_OF(targetTexture))
-//! CALL(updateBlobsMain, SIZE_OF(blobsBuffer))
-//
 
 float4 imageMain(uint2 dispatchThreadID, uint2 screenSize)
 {

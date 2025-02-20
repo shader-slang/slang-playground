@@ -1,4 +1,3 @@
-export const playgroundSource = `
 // type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double, 
 struct FormattedStruct
 {
@@ -143,4 +142,25 @@ public struct playground_COLOR_PICKAttribute
     float defaultBlue;
 };
 
-`;
+// Dispatch a compute pass with the given grid of threads.
+// The number of work - groups will be determined by dividing by the number of threads per work - group and rounding up.
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_CALLAttribute
+{
+    int x;
+    int y;
+    int z;
+};
+
+// Dispatch a compute pass using the resource size to determine the work-group size.
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_CALL_SIZE_OFAttribute
+{
+    string resourceName;
+};
+
+// Only dispatch the compute pass once at the start of rendering.
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_CALL_ONCEAttribute
+{
+};

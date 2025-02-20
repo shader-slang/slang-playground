@@ -72,11 +72,13 @@ defineExpose({
         Control a <code>float</code> uniform with a provided default, minimum, and maximum.
         <h4 class="doc-header"><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></h4>
         Control a <code>float3</code> color uniform with a provided default color.
-        <h4 class="doc-header"><code>//! CALL(fn-name, SIZE_OF(RESOURCE-NAME))</code></h4>
-        Dispatch a compute pass with the given function name and using the resource size to determine the work-group
-        size.
-        <h4 class="doc-header"><code>//! CALL(fn-name, 512, 512)</code></h4>
-      <p>Dispatch a compute pass with the given function name and the provided work-group size.</p>
+        <h4 class="doc-header"><code>[playground::CALL::SIZE_OF("RESOURCE-NAME")]</code></h4>
+        Dispatch a compute pass using the resource size to determine the work-group size.
+        <h4 class="doc-header"><code>[playground::CALL(512, 512, 1)]</code></h4>
+        Dispatch a compute pass with the given grid of threads.
+        The number of work-groups will be determined by dividing by the number of threads per work-group and rounding up.
+        <h4 class="doc-header"><code>[playground::CALL::ONCE]</code></h4>
+        Only dispatch the compute pass once at the start of rendering.
       <h4>Playground functions</h4>
       <p>The playground shader also provides the following functions:</p>
       <h4 class="doc-header"><code>void printf&lteach T&gt(String format, expand each T values) where T : IPrintf</code></h4>

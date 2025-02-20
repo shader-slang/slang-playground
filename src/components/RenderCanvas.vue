@@ -6,6 +6,7 @@ import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
 import { type CallCommand, createOutputTexture, type HashedStringData, NotReadyError, parsePrintfBuffer, type ResourceCommand } from '../util';
 import { onMounted, ref, useTemplateRef } from 'vue';
+import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
 let context: GPUCanvasContext;
 let randFloatPipeline: ComputePipeline;
@@ -234,7 +235,7 @@ function resetMouse() {
 let timeAggregate = 0;
 let frameCount = 0;
 
-async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgroundData: CompiledPlayground) {
+async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgroundData: CompiledPlayground, firstFrame: boolean) {
     if (currentDisplayMode == null)
         return false;
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
@@ -286,6 +287,10 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
     // The extra passes always go first.
     // zip the extraComputePipelines and callCommands together
     for (const [pipeline, command] of playgroundData.callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
+        if (command.callOnce && !firstFrame) {
+            // If the command is marked as callOnce and it's not the first frame, skip it.
+            continue;
+        }
         const pass = encoder.beginComputePass({ label: 'extra passes' });
         pass.setBindGroup(0, pipeline.bindGroup || null);
         if (pipeline.pipeline == undefined) {
@@ -568,8 +573,6 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             if (!randFloatPipeline) {
                 const randomPipeline = new ComputePipeline(pipeline.device);
 
-                // Load randFloat shader code from the file.
-                const randFloatShaderCode = await (await fetch('demos/rand_float.slang')).text();
                 if (compiler == null) {
                     throw new Error("Compiler is not defined!");
                 }
@@ -714,6 +717,8 @@ function onRun(compiledCode: CompiledPlayground) {
         computePipeline = new ComputePipeline(device);
     }
 
+    let firstFrame = true;
+
     withRenderLock(
         // setupFn
         async () => {
@@ -768,7 +773,9 @@ function onRun(compiledCode: CompiledPlayground) {
                 throw new Error("Could not get compiler");
             }
             if (compiler.shaderType !== null) {
-                return await execFrame(timeMS, compiler?.shaderType || null, compiledCode);
+                const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
+                firstFrame = false;
+                return keepRendering;
             }
             return false;
         });
