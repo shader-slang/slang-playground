@@ -9,6 +9,12 @@
 
 import playground;
 
+[playground::TIME]
+uniform float time;
+
+[playground::MOUSE_POSITION]
+uniform float4 mousePosition;
+
 static const float DRAG_MULT = 0.38; // changes how much waves pull on the water
 static const float WATER_DEPTH = 1.0; // how deep is the water
 static const float CAMERA_HEIGHT = 1.5; // how high the camera should be
@@ -43,11 +49,7 @@ float getwaves<int iterations>(float2 position) {
     float2 p = float2(sin(iter), cos(iter));
     
     // calculate wave data
-
-    // Since we don't need to propagate gradient through time and `getTime()` is a non-differentiable
-    // function, we need to use `no_diff` here to express our intention that we don't need gradients
-    // to propagate through the call.
-    float2 res = wavedx(position, p, frequency, no_diff getTime() * timeMultiplier + wavePhaseShift);
+    float2 res = wavedx(position, p, frequency, time * timeMultiplier + wavePhaseShift);
 
     // shift position around according to wave drag and derivative of the wave
     position += p * res.y * weight * DRAG_MULT;
@@ -116,7 +118,7 @@ float3 getRay(float2 fragCoord, float2 resolution) {
   if (resolution.x < 40.0 || resolution.y < 40.0) {
     return proj;
   }
-  var normalizedMouse = getMousePosition().xy / float2(resolution);
+  var normalizedMouse = mousePosition.xy / float2(resolution);
   float3x3 mat = mul(createRotationMatrixAxisAngle(float3(0.0, -1.0, 0.0), 3.0 * ((1.0-normalizedMouse.x + 0.5) * 2.0 - 1.0)) ,
                      createRotationMatrixAxisAngle(float3(1.0, 0.0, 0.0), 0.5 + 1.5 * (((normalizedMouse.y == 0.0 ? 0.35 : normalizedMouse.y) * 1.0) * 2.0 - 1.0)));
   return mul(mat, proj);
@@ -144,7 +146,6 @@ float3 extra_cheap_atmosphere(float3 raydir, float3 sundir) {
 
 // Calculate where the sun should be, it will be moving around the sky
 float3 getSunDirection() {
-  float time = getTime();
   return normalize(float3(sin(time), 1.0, cos(time)));
 }
 
@@ -197,7 +198,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
   float3 waterPlaneLow = float3(0.0, -WATER_DEPTH, 0.0);
 
   // define ray origin, moving around
-  float3 origin = float3(getTime() * 2.0, CAMERA_HEIGHT, 1);
+  float3 origin = float3(time * 2.0, CAMERA_HEIGHT, 1);
 
   // calculate intersections and reconstruct positions
   float highPlaneHit = intersectPlane(origin, ray, waterPlaneHigh, float3(0.0, 1.0, 0.0));
