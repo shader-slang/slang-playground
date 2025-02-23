@@ -8,8 +8,6 @@ export class ComputePipeline {
     // TODO: We should make this field optional, and only when user select a "Debug" mode will this option be available,
     // and we will output this buffer to the output area.
 
-    // outputBuffer;
-    // outputBufferRead;
     // outputTexture;
     device;
     bindGroup: GPUBindGroup | undefined;

@@ -117,6 +117,13 @@ public struct playground_BLACKAttribute
 };
 
 [__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_BLACK_SCREENAttribute
+{
+    float widthScale;
+    float heightScale;
+};
+
+[__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_URLAttribute
 {
     string url;

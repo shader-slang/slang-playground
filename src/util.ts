@@ -30,18 +30,46 @@ export async function decompressFromBase64URL(base64: string) {
     return decompressed;
 }
 
-export function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
-    const textureDesc = {
-        label: 'output storage texture',
-        size: { width: width, height: height },
-        format: format,
-        usage: GPUTextureUsage.COPY_SRC |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.TEXTURE_BINDING,
-    };
-
-    let storageTexture = device.createTexture(textureDesc);
-    return storageTexture;
+export function sizeFromFormat(format: GPUTextureFormat) {
+    if (format === "r8unorm") return 1;
+    else if (format === "r8snorm") return 1;
+    else if (format === "r8uint") return 1;
+    else if (format === "r8sint") return 1;
+    else if (format === "r16uint") return 2;
+    else if (format === "r16sint") return 2;
+    else if (format === "r16float") return 2;
+    else if (format === "rg8unorm") return 2;
+    else if (format === "rg8snorm") return 2;
+    else if (format === "rg8uint") return 2;
+    else if (format === "rg8sint") return 2;
+    else if (format === "r32uint") return 4;
+    else if (format === "r32sint") return 4;
+    else if (format === "r32float") return 4;
+    else if (format === "rg16uint") return 4;
+    else if (format === "rg16sint") return 4;
+    else if (format === "rg16float") return 4;
+    else if (format === "rgba8unorm") return 4;
+    else if (format === "rgba8unorm-srgb") return 4;
+    else if (format === "rgba8snorm") return 4;
+    else if (format === "rgba8uint") return 4;
+    else if (format === "rgba8sint") return 4;
+    else if (format === "bgra8unorm") return 4;
+    else if (format === "bgra8unorm-srgb") return 4;
+    else if (format === "rgb10a2unorm") return 4;
+    else if (format === "rg11b10ufloat") return 4;
+    else if (format === "rgb9e5ufloat") return 4;
+    else if (format === "rg32uint") return 8;
+    else if (format === "rg32sint") return 8;
+    else if (format === "rg32float") return 8;
+    else if (format === "rgba16uint") return 8;
+    else if (format === "rgba16sint") return 8;
+    else if (format === "rgba16float") return 8;
+    else if (format === "rgba32uint") return 16;
+    else if (format === "rgba32sint") return 16;
+    else if (format === "rgba32float") return 16;
+    else {
+        throw new Error("Unrecognized format")
+    }
 }
 
 function reinterpretUint32AsFloat(uint32: number) {
@@ -105,6 +133,10 @@ export type ParsedCommand = {
     "width": number,
     "height": number,
 } | {
+    "type": "BLACK_SCREEN",
+    "width_scale": number,
+    "height_scale": number,
+} | {
     "type": "URL",
     "url": string,
 } | {
@@ -160,6 +192,15 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     type: playground_attribute_name,
                     width: attribute.arguments[0] as number,
                     height: attribute.arguments[1] as number,
+                };
+            } else if (playground_attribute_name == "BLACK_SCREEN") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    width_scale: attribute.arguments[0] as number,
+                    height_scale: attribute.arguments[1] as number,
                 };
             } else if (playground_attribute_name == "URL") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
@@ -405,8 +446,8 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
-            if(typeof value !== "number") throw new Error("Invalid state");
-            
+            if (typeof value !== "number") throw new Error("Invalid state");
+
             let valueAsSignedInteger = value | 0;
             formattedValue = valueAsSignedInteger.toString();
             break;
