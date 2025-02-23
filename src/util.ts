@@ -547,7 +547,6 @@ function hashToString(hashedStrings: HashedStringData[], hash: number): string {
     throw new Error("Could not find matching string hash")
 }
 export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValueResource: GPUBuffer, bufferElementSize: number) {
-
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
 

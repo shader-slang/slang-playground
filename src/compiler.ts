@@ -18,18 +18,10 @@ const RUNNABLE_ENTRY_POINT_SOURCE_MAP: { [key in RunnableShaderType]: string } =
     'printMain': printMainSource,
 };
 
-type BindingDescriptor = {
-    storageTexture: {
-        access: "write-only" | "read-write",
-        format: GPUTextureFormat,
-    }
-} | {
-    texture: {}
-} | {
-    buffer: {
-        type: "uniform" | "storage"
-    }
-};
+const ACCESS_MAP = {
+    "readWrite": "read-write",
+    "write": "write-only"
+} as const;
 
 export type Bindings = Map<string, GPUBindGroupLayoutEntry>;
 
@@ -61,7 +53,7 @@ export type ReflectionType = {
 } | {
     "kind": "resource",
     "baseShape": "texture2D",
-    "access"?: "readWrite"
+    "access"?: "readWrite" | "write"
 };
 
 export type ReflectionParameter = {
@@ -80,7 +72,7 @@ export type ReflectionEntryPoint = {
     "name": string,
     "parameters": ReflectionParameter[],
     "stage": string,
-    "threadGroupSize": number[],
+    "threadGroupSize": [number, number, number],
     "userAttribs"?: ReflectionUserAttribute[],
 };
 
@@ -360,64 +352,54 @@ export class SlangCompiler {
         return true;
     }
 
-    getBindingDescriptor(index: number, programReflection: ProgramLayout, parameter: VariableLayoutReflection): BindingDescriptor | null {
-        const globalLayout = programReflection.getGlobalParamsTypeLayout();
+    getBindingDescriptor(name: string, parameterReflection: ReflectionParameter): Partial<GPUBindGroupLayoutEntry> {
+        if(parameterReflection.type.kind == "resource") {
+            if(parameterReflection.type.baseShape == "texture2D") {
+                let slangAccess = parameterReflection.type.access;
+                if(slangAccess == undefined) {
+                    return { texture: {} };
+                }
+                let access = ACCESS_MAP[slangAccess];
+                let format: GPUTextureFormat = "r32float";
 
-        if (globalLayout == null) {
-            throw new Error("Could not get layout");
-        }
-
-        const bindingType = globalLayout.getDescriptorSetDescriptorRangeType(0, index);
-
-        // Special case.. TODO: Remove this as soon as the reflection API properly reports write-only textures.
-        if (parameter.getName() == "outputTexture") {
-            return { storageTexture: { access: "write-only", format: "rgba8unorm" } };
-        }
-
-        if (bindingType == this.slangWasmModule.BindingType.Texture) {
-            return { texture: {} };
-        }
-        else if (bindingType == this.slangWasmModule.BindingType.MutableTexture) {
-            return { storageTexture: { access: "read-write", format: "r32float" } };
-        }
-        else if (bindingType == this.slangWasmModule.BindingType.ConstantBuffer) {
+                // Special case.. TODO: Remove this as soon as the reflection API properly reports formats
+                if (name == "outputTexture") {
+                    format = "rgba8unorm";
+                }
+                return { storageTexture: { access, format } };
+            } else if(parameterReflection.type.baseShape == "structuredBuffer") {
+                return { buffer: { type: 'storage' } };
+            } else {
+                let _:never = parameterReflection.type;
+                throw new Error(`Could not generate binding for ${name}`)
+            }
+        } else if (parameterReflection.binding.kind == "uniform") {
             return { buffer: { type: 'uniform' } };
+        } else {
+            throw new Error(`Could not generate binding for ${name}`)
         }
-        else if (bindingType == this.slangWasmModule.BindingType.MutableTypedBuffer) {
-            return { buffer: { type: 'storage' } };
-        }
-        else if (bindingType == this.slangWasmModule.BindingType.MutableRawBuffer) {
-            return { buffer: { type: 'storage' } };
-        }
-        return null;
     }
 
-    getResourceBindings(linkedProgram: ComponentType): Bindings {
-        const reflection: ProgramLayout | null = linkedProgram.getLayout(0); // assume target-index = 0
+    getResourceBindings(reflectionJson: ReflectionJSON): Bindings {
 
-        if (reflection == null) {
-            throw new Error("Could not get reflection!");
-        }
-
-        const count = reflection.getParameterCount();
-
-        let resourceDescriptors = new Map();
-        for (let i = 0; i < count; i++) {
-            const parameter = reflection.getParameterByIndex(i);
-            if (parameter == null) {
-                throw new Error("Invalid state!");
-            }
-            const name = parameter.getName();
+        let resourceDescriptors: Bindings = new Map();
+        for (let parameter of reflectionJson.parameters) {
+            const name = parameter.name;
             let binding = {
-                binding: parameter.getBindingIndex(),
+                binding: parameter.binding.kind == "descriptorTableSlot"?parameter.binding.index : 0,
                 visibility: GPUShaderStage.COMPUTE,
             };
 
-            const resourceInfo = this.getBindingDescriptor(parameter.getBindingIndex(), reflection, parameter);
+            let parameterReflection = reflectionJson.parameters.find((p) => p.name == name)
+
+            if (parameterReflection == undefined) {
+                throw new Error("Could not find parameter in reflection JSON")
+            }
+
+            const resourceInfo = this.getBindingDescriptor(name, parameterReflection);
 
             // extend binding with resourceInfo
-            if (resourceInfo)
-                Object.assign(binding, resourceInfo);
+            Object.assign(binding, resourceInfo);
 
             resourceDescriptors.set(name, binding);
         }
@@ -437,7 +419,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, HashedStringData[], ReflectionJSON, { [key: string]: ThreadGroupSize }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, HashedStringData[], ReflectionJSON, { [key: string]: [number, number, number] }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -493,16 +475,16 @@ export class SlangCompiler {
                         0 /* entryPointIndex */, 0 /* targetIndex */);
             }
 
-            let bindings = noWebGPU?new Map():this.getResourceBindings(linkedProgram);
-
             let reflectionJson: ReflectionJSON = linkedProgram.getLayout(0)?.toJsonObject();
+
+            let bindings: Bindings = noWebGPU ? new Map() : this.getResourceBindings(reflectionJson);
 
             // remove incorrect uniform bindings
             let has_uniform_been_binded = false;
-            for(let parameterReflection of reflectionJson.parameters) {
+            for (let parameterReflection of reflectionJson.parameters) {
                 if (parameterReflection.binding.kind != "uniform") continue;
-                
-                if(!has_uniform_been_binded) {
+
+                if (!has_uniform_been_binded) {
                     has_uniform_been_binded = true;
                 } else {
                     bindings.delete(parameterReflection.name);
@@ -510,15 +492,9 @@ export class SlangCompiler {
             }
 
             // Also read the shader work-group sizes.
-            let threadGroupSize: { [key: string]: ThreadGroupSize } = {};
-            const layout = linkedProgram.getLayout(0);
-            if (layout) {
-                const entryPoints = this.findDefinedEntryPoints(shaderSource);
-                for (const name of entryPoints) {
-                    const entryPointReflection = layout.findEntryPointByName(name);
-                    threadGroupSize[name] = entryPointReflection ? entryPointReflection.getComputeThreadGroupSize() :
-                        { x: 1, y: 1, z: 1 } as ThreadGroupSize;
-                }
+            let threadGroupSizes: { [key: string]: [number, number, number] } = {};
+            for (const entryPoint of reflectionJson.entryPoints) {
+                threadGroupSizes[entryPoint.name] = entryPoint.threadGroupSize;
             }
 
             if (outCode == "") {
@@ -533,7 +509,7 @@ export class SlangCompiler {
             if (!outCode || outCode == "")
                 return null;
 
-            return [outCode, bindings, hashedStrings, reflectionJson, threadGroupSize];
+            return [outCode, bindings, hashedStrings, reflectionJson, threadGroupSizes];
         } catch (e) {
             console.error(e);
             // typescript is missing the type for WebAssembly.Exception

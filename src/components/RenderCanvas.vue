@@ -4,7 +4,7 @@ import type { Bindings, ShaderType } from '../compiler';
 import { ComputePipeline } from '../compute';
 import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
-import { type CallCommand, type HashedStringData, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
+import { type CallCommand, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
 import { onMounted, ref, useTemplateRef } from 'vue';
 import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
@@ -391,15 +391,13 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             throw new Error("threadGroupSize is undefined");
         }
 
-        const blockSizeX = pipeline.threadGroupSize.x;
-        const blockSizeY = pipeline.threadGroupSize.y;
-        const blockSizeZ = pipeline.threadGroupSize.z;
+        const blockSize = pipeline.threadGroupSize
 
-        const workGroupSizeX = Math.floor((size[0] + blockSizeX - 1) / blockSizeX);
-        const workGroupSizeY = Math.floor((size[1] + blockSizeY - 1) / blockSizeY);
-        const workGroupSizeZ = Math.floor((size[2] + blockSizeZ - 1) / blockSizeZ);
+        const workGroupSize = size
+            .map((size, idx) => [size, blockSize[idx]] as const)
+            .map(([size, blockSize]) => Math.floor((size + blockSize - 1) / blockSize))
 
-        pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY, workGroupSizeZ);
+        pass.dispatchWorkgroups(workGroupSize[0], workGroupSize[1], workGroupSize[2]);
 
         pass.end();
     }
@@ -653,7 +651,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 randomPipeline.createPipelineLayout(layout);
 
                 // Create the pipeline (without resource bindings for now)
-                randomPipeline.createPipeline(module, "computeMain", null);
+                randomPipeline.createPipeline(module, "computeMain");
 
                 randFloatPipeline = randomPipeline;
             }
@@ -772,8 +770,8 @@ function onRun(runCompiledCode: CompiledPlayground) {
                 const pipeline = new ComputePipeline(device);
                 // create a pipeline resource 'signature' based on the bindings found in the program.
                 pipeline.createPipelineLayout(compiledCode.shader.layout);
-                pipeline.createPipeline(module, entryPoint, null);
-                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSize[entryPoint]);
+                pipeline.createPipeline(module, entryPoint);
+                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSizes[entryPoint]);
                 computePipelines.push(pipeline);
             }
 
