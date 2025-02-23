@@ -66,6 +66,7 @@ export type ReflectionParameter = {
 export type ReflectionJSON = {
     "entryPoints": ReflectionEntryPoint[],
     "parameters": ReflectionParameter[],
+    "hashedStrings": { [str: string]: number },
 };
 
 export type ReflectionEntryPoint = {
@@ -353,10 +354,10 @@ export class SlangCompiler {
     }
 
     getBindingDescriptor(name: string, parameterReflection: ReflectionParameter): Partial<GPUBindGroupLayoutEntry> {
-        if(parameterReflection.type.kind == "resource") {
-            if(parameterReflection.type.baseShape == "texture2D") {
+        if (parameterReflection.type.kind == "resource") {
+            if (parameterReflection.type.baseShape == "texture2D") {
                 let slangAccess = parameterReflection.type.access;
-                if(slangAccess == undefined) {
+                if (slangAccess == undefined) {
                     return { texture: {} };
                 }
                 let access = ACCESS_MAP[slangAccess];
@@ -367,10 +368,10 @@ export class SlangCompiler {
                     format = "rgba8unorm";
                 }
                 return { storageTexture: { access, format } };
-            } else if(parameterReflection.type.baseShape == "structuredBuffer") {
+            } else if (parameterReflection.type.baseShape == "structuredBuffer") {
                 return { buffer: { type: 'storage' } };
             } else {
-                let _:never = parameterReflection.type;
+                let _: never = parameterReflection.type;
                 throw new Error(`Could not generate binding for ${name}`)
             }
         } else if (parameterReflection.binding.kind == "uniform") {
@@ -386,7 +387,7 @@ export class SlangCompiler {
         for (let parameter of reflectionJson.parameters) {
             const name = parameter.name;
             let binding = {
-                binding: parameter.binding.kind == "descriptorTableSlot"?parameter.binding.index : 0,
+                binding: parameter.binding.kind == "descriptorTableSlot" ? parameter.binding.index : 0,
                 visibility: GPUShaderStage.COMPUTE,
             };
 
@@ -419,7 +420,7 @@ export class SlangCompiler {
         return true;
     }
 
-    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, HashedStringData[], ReflectionJSON, { [key: string]: [number, number, number] }] {
+    compile(shaderSource: string, entryPointName: string, compileTargetStr: string, noWebGPU: boolean): null | [string, Bindings, HashedStringData, ReflectionJSON, { [key: string]: [number, number, number] }] {
         this.diagnosticsMsg = "";
 
         let shouldLinkPlaygroundModule = RUNNABLE_ENTRY_POINT_NAMES.some((entry_point) => shaderSource.match(entry_point) != null);
@@ -458,7 +459,6 @@ export class SlangCompiler {
                 return null;
             let program: ComponentType = slangSession.createCompositeComponentType(components);
             let linkedProgram: ComponentType = program.link();
-            let hashedStrings: HashedStringData[] = linkedProgram.loadStrings();
 
             let outCode: string;
             if (compileTargetStr == "SPIRV") {
@@ -476,6 +476,7 @@ export class SlangCompiler {
             }
 
             let reflectionJson: ReflectionJSON = linkedProgram.getLayout(0)?.toJsonObject();
+            let hashedStrings: HashedStringData = reflectionJson.hashedStrings ? Object.fromEntries(Object.entries(reflectionJson.hashedStrings).map(entry => entry.reverse())) : {};
 
             let bindings: Bindings = noWebGPU ? new Map() : this.getResourceBindings(reflectionJson);
 

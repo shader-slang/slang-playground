@@ -533,20 +533,8 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 // };
 //
 
-export type HashedStringData = {
-    hash: number,
-    string: string,
-}
-
-function hashToString(hashedStrings: HashedStringData[], hash: number): string {
-    for (let i = 0; i < hashedStrings.length; i++) {
-        if (hashedStrings[i].hash == hash) {
-            return hashedStrings[i].string;
-        }
-    }
-    throw new Error("Could not find matching string hash")
-}
-export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValueResource: GPUBuffer, bufferElementSize: number) {
+export type HashedStringData = {[hash: number]: string}
+export function parsePrintfBuffer(hashedStrings: HashedStringData, printfValueResource: GPUBuffer, bufferElementSize: number) {
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
 
@@ -564,10 +552,10 @@ export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValue
         const type = printfBufferArray[offset];
         switch (type) {
             case 1: // format string
-                formatString = hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0));  // low field
+                formatString = hashedStrings[(printfBufferArray[offset + 1] << 0)]!;  // low field
                 break;
             case 2: // normal string
-                dataArray.push(hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0)));  // low field
+                dataArray.push(hashedStrings[(printfBufferArray[offset + 1] << 0)]);  // low field
                 break;
             case 3: // integer
                 dataArray.push(printfBufferArray[offset + 1]);  // low field

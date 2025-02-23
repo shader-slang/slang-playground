@@ -349,7 +349,7 @@ export type Shader = {
     succ: true,
     code: string,
     layout: Bindings,
-    hashedStrings: HashedStringData[],
+    hashedStrings: HashedStringData,
     reflection: ReflectionJSON,
     threadGroupSizes: { [key: string]: [number, number, number] },
 };
@@ -379,7 +379,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
     window.$jsontree.refreshAll();
 
-    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSizes };
+    return { succ: true, code: compiledCode, layout: layout, hashedStrings, reflection: reflectionJson, threadGroupSizes };
 }
 
 function restoreFromURL(): boolean {
