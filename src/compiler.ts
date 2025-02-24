@@ -372,12 +372,14 @@ export class SlangCompiler {
                 return { buffer: { type: 'storage' } };
             } else {
                 let _: never = parameterReflection.type;
-                throw new Error(`Could not generate binding for ${name}`)
+                console.error(`Could not generate binding for ${name}`)
+                return {}
             }
         } else if (parameterReflection.binding.kind == "uniform") {
             return { buffer: { type: 'uniform' } };
         } else {
-            throw new Error(`Could not generate binding for ${name}`)
+            console.error(`Could not generate binding for ${name}`)
+            return {}
         }
     }
 
