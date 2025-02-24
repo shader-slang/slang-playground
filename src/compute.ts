@@ -5,17 +5,11 @@ export class ComputePipeline {
     pipeline: GPUComputePipeline | undefined;
     pipelineLayout: GPUPipelineLayout | "auto" | undefined;
 
-    // TODO: We should make this field optional, and only when user select a "Debug" mode will this option be available,
-    // and we will output this buffer to the output area.
-
-    // outputBuffer;
-    // outputBufferRead;
-    // outputTexture;
     device;
     bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
-    threadGroupSize: ThreadGroupSize | { x: number, y: number, z: number } | undefined;
+    threadGroupSize: [number, number, number] | undefined;
 
     // resource name (string) -> binding descriptor 
     resourceBindings: Bindings | undefined;
@@ -24,7 +18,7 @@ export class ComputePipeline {
         this.device = device;
     }
 
-    setThreadGroupSize(size: ThreadGroupSize | { x: number, y: number, z: number }) {
+    setThreadGroupSize(size: [number, number, number]) {
         this.threadGroupSize = size;
     }
 
@@ -46,7 +40,7 @@ export class ComputePipeline {
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, entryPoint: string, resources: Map<string, GPUTexture | GPUBuffer> | null) {
+    createPipeline(shaderModule: GPUShaderModule, entryPoint: string) {
         if (this.pipelineLayout == undefined)
             throw new Error("Cannot create pipeline without layout");
         const pipeline = this.device.createComputePipeline({
@@ -56,10 +50,6 @@ export class ComputePipeline {
         });
 
         this.pipeline = pipeline;
-
-        // If resources are provided, create the bind group right away
-        if (resources)
-            this.createBindGroup(resources);
     }
 
     createBindGroup(allocatedResources: Map<string, GPUObjectBase>) {
