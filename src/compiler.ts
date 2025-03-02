@@ -3,7 +3,7 @@ import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Pr
 import playgroundSource from "./slang/playground.slang?raw";
 import imageMainSource from "./slang/imageMain.slang?raw";
 import printMainSource from "./slang/printMain.slang?raw";
-import type { HashedStringData } from "./util.js";
+import { sizeFromFormat, type HashedStringData } from "./util.js";
 
 export function isWholeProgramTarget(compileTarget: string) {
     return compileTarget == "METAL" || compileTarget == "SPIRV" || compileTarget == "WGSL";
@@ -25,6 +25,8 @@ const ACCESS_MAP = {
 
 export type Bindings = Map<string, GPUBindGroupLayoutEntry>;
 
+export type ScalarType = `${"uint" | "int"}${8 | 16 | 32 | 64}` | `${"float"}${16 | 32 | 64}`;
+
 export type ReflectionBinding = {
     "kind": "uniform",
     "offset": number,
@@ -40,20 +42,21 @@ export type ReflectionType = {
     "fields": ReflectionParameter[]
 } | {
     "kind": "vector",
-    "elementCount": number,
+    "elementCount": 2 | 3 | 4,
     "elementType": ReflectionType,
 } | {
     "kind": "scalar",
-    "scalarType": `${"uint" | "int"}${8 | 16 | 32 | 64}` | `${"float"}${16 | 32 | 64}`,
+    "scalarType": ScalarType,
 } | {
     "kind": "resource",
     "baseShape": "structuredBuffer",
     "access"?: "readWrite",
-    "resultType": ReflectionType
+    "resultType": ReflectionType,
 } | {
     "kind": "resource",
     "baseShape": "texture2D",
-    "access"?: "readWrite" | "write"
+    "access"?: "readWrite" | "write",
+    "resultType": ReflectionType,
 };
 
 export type ReflectionParameter = {
@@ -361,11 +364,33 @@ export class SlangCompiler {
                     return { texture: {} };
                 }
                 let access = ACCESS_MAP[slangAccess];
-                let format: GPUTextureFormat = "r32float";
 
-                // Special case.. TODO: Remove this as soon as the reflection API properly reports formats
-                if (name == "outputTexture") {
-                    format = "rgba8unorm";
+                let scalarType: ScalarType;
+                let componentCount: 1 | 2 | 3 | 4;
+                if (parameterReflection.type.resultType.kind == "scalar") {
+                    componentCount = 1;
+                    scalarType = parameterReflection.type.resultType.scalarType;
+                } else if (parameterReflection.type.resultType.kind == "vector") {
+                    componentCount = parameterReflection.type.resultType.elementCount;
+                    if (parameterReflection.type.resultType.elementType.kind != "scalar") throw new Error(`Unhandled inner type for ${name}`)
+                    scalarType = parameterReflection.type.resultType.elementType.scalarType;
+                } else {
+                    throw new Error(`Unhandled inner type for ${name}`)
+                }
+
+                let format: GPUTextureFormat = "rgba8unorm";
+                try {
+                    format = getTextureFormat(componentCount, scalarType, access);
+
+                    // Special case.. TODO: Remove this as soon as the reflection API properly reports formats
+                    if (name == "outputTexture") {
+                        format = "rgba8unorm";
+                    }
+                } catch (e) {
+                    if (e instanceof Error)
+                        throw new Error(`Could not get texture format for ${name}: ${e.message}`)
+                    else    
+                        throw new Error(`Could not get texture format for ${name}`)
                 }
                 return { storageTexture: { access, format } };
             } else if (parameterReflection.type.baseShape == "structuredBuffer") {
@@ -384,7 +409,6 @@ export class SlangCompiler {
     }
 
     getResourceBindings(reflectionJson: ReflectionJSON): Bindings {
-
         let resourceDescriptors: Bindings = new Map();
         for (let parameter of reflectionJson.parameters) {
             const name = parameter.name;
@@ -525,3 +549,42 @@ export class SlangCompiler {
         }
     }
 };
+
+type ScalarRepresentation = `8unorm` | `${16|32}float` | `${8|16|32}${"sint" | "uint"}`;
+function getWebGPURepresentation(scalarType: ScalarType): ScalarRepresentation {
+    let size = parseInt(scalarType.replace(/^[a-z]*/, ""));
+    let type = scalarType.replace(/[0-9]*$/, "");
+    if(type == "int")
+        type = "sint";
+
+    return `${size}${type}` as any
+}
+
+function getScalarSize(scalarType: ScalarType): 8 | 16 | 32 | 64 {
+    let size = parseInt(scalarType.replace(/^[a-z]*/, ""));
+    return size as any;
+}
+
+function getTextureFormat(componentCount: 1|2|3|4, scalarType: ScalarType, access: GPUStorageTextureAccess | undefined): GPUTextureFormat {
+    if(access == "read-write" && componentCount > 1) {
+        throw new Error("There are no texture formats available with more than 1 component that are read-write")
+    }
+    let scalarSize = getScalarSize(scalarType);
+
+    if (access == "write-only" && componentCount == 2 && scalarSize != 32) {
+        throw new Error("There are no non 32 bit texture formats available with 2 components that are write-only")
+    }
+
+    if(scalarSize == 64) {
+        throw new Error("There are 64 bit texture formats available")
+    }
+
+    let scalarRepresentation = getWebGPURepresentation(scalarType);
+    if (componentCount == 1) {
+        return `r${scalarRepresentation}`
+    } else if (componentCount == 2) {
+        return `rg${scalarRepresentation}`
+    } else {
+        return `rgba${scalarRepresentation}`
+    }
+}
