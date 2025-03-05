@@ -247,31 +247,32 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         throw new Error("uniformInput doesn't exist or is of incorrect type");
     }
 
+    let uniformBufferData = new ArrayBuffer(playgroundData.uniformSize);
+    let uniformBufferView = new DataView(uniformBufferData);
+
     for (let uniformComponent of playgroundData.uniformComponents.value) {
-        let uniformValue;
+        let offset = uniformComponent.buffer_offset;
+
         if (uniformComponent.type == "SLIDER") {
-            uniformValue = new Float32Array([uniformComponent.value]);
+            uniformBufferView.setFloat32(offset, uniformComponent.value, true);
         } else if (uniformComponent.type == "COLOR_PICK") {
-            uniformValue = new Float32Array(uniformComponent.value);
+            uniformComponent.value.forEach((v, i) => {
+                uniformBufferView.setFloat32(offset + i * 4, v, true);
+            });
         } else if (uniformComponent.type == "TIME") {
-            uniformValue = new Float32Array([timeMS * 0.001]);
+            uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
         } else if (uniformComponent.type == "MOUSE_POSITION") {
-            uniformValue = new Float32Array(4);
-            uniformValue[0] = canvasCurrentMousePos.x;
-            uniformValue[1] = canvasCurrentMousePos.y;
-            uniformValue[2] = canvasLastMouseDownPos.x;
-            uniformValue[3] = canvasLastMouseDownPos.y;
-            if (canvasIsMouseDown)
-                uniformValue[2] = -uniformValue[2];
-            if (canvasMouseClicked)
-                uniformValue[3] = -uniformValue[3];
+            uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
+            uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
+            uniformBufferView.setFloat32(offset + 8, canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1), true);
+            uniformBufferView.setFloat32(offset + 12, canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1), true);
         } else {
-            // exhaustiveness check
-            let _:never = uniformComponent;
-            throw new Error("Invalid state"); 
+            let _: never = uniformComponent;
+            throw new Error("Invalid state");
         }
-        computePipeline.device.queue.writeBuffer(uniformInput, uniformComponent.buffer_offset, uniformValue);
     }
+
+    computePipeline.device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
@@ -662,7 +663,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
             // Initialize the buffer with zeros.
-            let bufferDefault: BufferSource  = new Float32Array([0.0]);
+            let bufferDefault: BufferSource = new Float32Array([0.0]);
             pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "MOUSE_POSITION") {
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
