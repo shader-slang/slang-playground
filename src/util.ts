@@ -119,6 +119,12 @@ export type ParsedCommand = {
     "default": [number, number, number],
     "elementSize": number,
     "offset": number,
+} | {
+    "type": "TIME",
+    "offset": number,
+} | {
+    "type": "MOUSE_POSITION",
+    "offset": number,
 }
 export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
 export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): ResourceCommand[] {
@@ -169,6 +175,22 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     type: playground_attribute_name,
                     url: attribute.arguments[0] as string,
                 };
+            } else if (playground_attribute_name == "TIME") {
+                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    offset: parameter.binding.offset,
+                };
+            } else if (playground_attribute_name == "MOUSE_POSITION") {
+                if (parameter.type.kind != "vector" || parameter.type.elementCount <= 3 || parameter.type.elementType.kind != "scalar" || !parameter.type.elementType.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports float vectors`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    offset: parameter.binding.offset,
+                };
             } else if (playground_attribute_name == "SLIDER") {
                 if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
                     throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`)
@@ -216,37 +238,53 @@ export function getUniformSize(reflection: ReflectionJSON): number {
     return roundUpToNearest(size, 16)
 }
 
-export type UniformController = {
-    type: "slider",
+export type UniformController = { buffer_offset: number } & ({
+    type: "SLIDER",
     name: string,
     value: number,
     min: number,
     max: number,
-    buffer_offset: number,
 } | {
-    type: "color pick",
+    type: "COLOR_PICK",
     name: string,
     value: [number, number, number],
-    buffer_offset: number,
+} | {
+    type: "TIME",
+} | {
+    type: "MOUSE_POSITION",
+})
+
+export function isControllerRendered(controller: UniformController) {
+    return controller.type == "SLIDER" || controller.type == "COLOR_PICK";
 }
 
-export function getUniformSliders(resourceCommands: ResourceCommand[]): UniformController[] {
+export function getUniformControllers(resourceCommands: ResourceCommand[]): UniformController[] {
     let controllers: UniformController[] = [];
     for (let resourceCommand of resourceCommands) {
         if (resourceCommand.parsedCommand.type == 'SLIDER') {
             controllers.push({
-                type: "slider",
+                type: resourceCommand.parsedCommand.type,
+                buffer_offset: resourceCommand.parsedCommand.offset,
                 name: resourceCommand.resourceName,
                 value: resourceCommand.parsedCommand.default,
                 min: resourceCommand.parsedCommand.min,
                 max: resourceCommand.parsedCommand.max,
-                buffer_offset: resourceCommand.parsedCommand.offset,
             })
         } else if (resourceCommand.parsedCommand.type == 'COLOR_PICK') {
             controllers.push({
-                type: "color pick",
+                type: resourceCommand.parsedCommand.type,
+                buffer_offset: resourceCommand.parsedCommand.offset,
                 name: resourceCommand.resourceName,
                 value: resourceCommand.parsedCommand.default,
+            })
+        } else if (resourceCommand.parsedCommand.type == 'TIME') {
+            controllers.push({
+                type: resourceCommand.parsedCommand.type,
+                buffer_offset: resourceCommand.parsedCommand.offset,
+            })
+        } else if (resourceCommand.parsedCommand.type == 'MOUSE_POSITION') {
+            controllers.push({
+                type: resourceCommand.parsedCommand.type,
                 buffer_offset: resourceCommand.parsedCommand.offset,
             })
         }
@@ -405,8 +443,8 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
-            if(typeof value !== "number") throw new Error("Invalid state");
-            
+            if (typeof value !== "number") throw new Error("Invalid state");
+
             let valueAsSignedInteger = value | 0;
             formattedValue = valueAsSignedInteger.toString();
             break;
