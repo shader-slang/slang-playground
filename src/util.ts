@@ -30,18 +30,52 @@ export async function decompressFromBase64URL(base64: string) {
     return decompressed;
 }
 
-export function createOutputTexture(device: GPUDevice, width: number, height: number, format: GPUTextureFormat) {
-    const textureDesc = {
-        label: 'output storage texture',
-        size: { width: width, height: height },
-        format: format,
-        usage: GPUTextureUsage.COPY_SRC |
-            GPUTextureUsage.STORAGE_BINDING |
-            GPUTextureUsage.TEXTURE_BINDING,
-    };
-
-    let storageTexture = device.createTexture(textureDesc);
-    return storageTexture;
+export function sizeFromFormat(format: GPUTextureFormat) {
+    switch (format) {
+        case "r8unorm":
+        case "r8snorm":
+        case "r8uint":
+        case "r8sint":
+            return 1;
+        case "r16uint":
+        case "r16sint":
+        case "r16float":
+        case "rg8unorm":
+        case "rg8snorm":
+        case "rg8uint":
+        case "rg8sint":
+            return 2;
+        case "r32uint":
+        case "r32sint":
+        case "r32float":
+        case "rg16uint":
+        case "rg16sint":
+        case "rg16float":
+        case "rgba8unorm":
+        case "rgba8unorm-srgb":
+        case "rgba8snorm":
+        case "rgba8uint":
+        case "rgba8sint":
+        case "bgra8unorm":
+        case "bgra8unorm-srgb":
+        case "rgb10a2unorm":
+        case "rg11b10ufloat":
+        case "rgb9e5ufloat":
+            return 4;
+        case "rg32uint":
+        case "rg32sint":
+        case "rg32float":
+        case "rgba16uint":
+        case "rgba16sint":
+        case "rgba16float":
+            return 8;
+        case "rgba32uint": 
+        case "rgba32sint": 
+        case "rgba32float":
+            return 16;
+        default:
+            throw new Error(`Could not get size of unrecognized format "${format}"`)
+    }
 }
 
 function reinterpretUint32AsFloat(uint32: number) {
@@ -105,6 +139,10 @@ export type ParsedCommand = {
     "width": number,
     "height": number,
 } | {
+    "type": "BLACK_SCREEN",
+    "width_scale": number,
+    "height_scale": number,
+} | {
     "type": "URL",
     "url": string,
 } | {
@@ -160,6 +198,15 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     type: playground_attribute_name,
                     width: attribute.arguments[0] as number,
                     height: attribute.arguments[1] as number,
+                };
+            } else if (playground_attribute_name == "BLACK_SCREEN") {
+                if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
+                }
+                command = {
+                    type: playground_attribute_name,
+                    width_scale: attribute.arguments[0] as number,
+                    height_scale: attribute.arguments[1] as number,
                 };
             } else if (playground_attribute_name == "URL") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
@@ -405,8 +452,8 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
     switch (specifierType) {
         case 'd':
         case 'i': // Integer (decimal)
-            if(typeof value !== "number") throw new Error("Invalid state");
-            
+            if (typeof value !== "number") throw new Error("Invalid state");
+
             let valueAsSignedInteger = value | 0;
             formattedValue = valueAsSignedInteger.toString();
             break;
@@ -492,21 +539,8 @@ function formatSpecifier(value: string, { flags, width, precision, specifierType
 // };
 //
 
-export type HashedStringData = {
-    hash: number,
-    string: string,
-}
-
-function hashToString(hashedStrings: HashedStringData[], hash: number): string {
-    for (let i = 0; i < hashedStrings.length; i++) {
-        if (hashedStrings[i].hash == hash) {
-            return hashedStrings[i].string;
-        }
-    }
-    throw new Error("Could not find matching string hash")
-}
-export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValueResource: GPUBuffer, bufferElementSize: number) {
-
+export type HashedStringData = { [hash: number]: string }
+export function parsePrintfBuffer(hashedStrings: HashedStringData, printfValueResource: GPUBuffer, bufferElementSize: number) {
     // Read the printf buffer
     const printfBufferArray = new Uint32Array(printfValueResource.getMappedRange())
 
@@ -524,10 +558,10 @@ export function parsePrintfBuffer(hashedStrings: HashedStringData[], printfValue
         const type = printfBufferArray[offset];
         switch (type) {
             case 1: // format string
-                formatString = hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0));  // low field
+                formatString = hashedStrings[(printfBufferArray[offset + 1] << 0)]!;  // low field
                 break;
             case 2: // normal string
-                dataArray.push(hashToString(hashedStrings, (printfBufferArray[offset + 1] << 0)));  // low field
+                dataArray.push(hashedStrings[(printfBufferArray[offset + 1] << 0)]);  // low field
                 break;
             case 3: // integer
                 dataArray.push(printfBufferArray[offset + 1]);  // low field
