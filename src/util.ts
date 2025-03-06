@@ -68,6 +68,7 @@ export function sizeFromFormat(format: GPUTextureFormat) {
         case "rgba16uint":
         case "rgba16sint":
         case "rgba16float":
+            return 8;
         case "rgba32uint": 
         case "rgba32sint": 
         case "rgba32float":
