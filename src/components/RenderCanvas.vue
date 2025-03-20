@@ -175,7 +175,7 @@ function handleResize() {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
 
-            const format = bindingInfo.storageTexture?.format; // TODO:better inference
+            const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
                 throw new Error("Could not find format")
             }
@@ -506,7 +506,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
 
-            const format = bindingInfo.storageTexture?.format; // TODO:better inference
+            const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
                 throw new Error("Could not find format")
             }
@@ -546,7 +546,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             }
 
 
-            const format = bindingInfo.storageTexture?.format; // TODO:better inference
+            const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
                 throw new Error("Could not find format")
             }
