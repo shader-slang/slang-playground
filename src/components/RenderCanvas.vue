@@ -305,7 +305,6 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     for (let uniformComponent of playgroundData.uniformComponents.value) {
         let offset = uniformComponent.buffer_offset;
-        try {
         if (uniformComponent.type == "SLIDER") {
             uniformBufferView.setFloat32(offset, uniformComponent.value, true);
         } else if (uniformComponent.type == "COLOR_PICK") {
@@ -322,10 +321,6 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         } else {
             let _: never = uniformComponent;
             throw new Error("Invalid state");
-        }
-        } catch (error) {
-            emit("logError", "Error when writing to uniform buffer: " + error);
-            return false;
         }
     }
 
