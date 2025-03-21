@@ -177,7 +177,7 @@ function handleResize() {
 
             const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
-                throw new Error("Could not find format")
+                throw new Error(`Could not find format of ${resourceName}`)
             }
             const elementSize = sizeFromFormat(format);
 
@@ -242,7 +242,7 @@ function configContext(device: GPUDevice) {
     let context = canvas.value?.getContext('webgpu');
 
     const canvasConfig = {
-        device: device,
+        device,
         format: navigator.gpu.getPreferredCanvasFormat(),
         usage:
             GPUTextureUsage.RENDER_ATTACHMENT,
@@ -305,7 +305,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     for (let uniformComponent of playgroundData.uniformComponents.value) {
         let offset = uniformComponent.buffer_offset;
-
+        try {
         if (uniformComponent.type == "SLIDER") {
             uniformBufferView.setFloat32(offset, uniformComponent.value, true);
         } else if (uniformComponent.type == "COLOR_PICK") {
@@ -322,6 +322,10 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         } else {
             let _: never = uniformComponent;
             throw new Error("Invalid state");
+        }
+        } catch (error) {
+            emit("logError", "Error when writing to uniform buffer: " + error);
+            return false;
         }
     }
 
@@ -509,7 +513,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
-                throw new Error("Could not find format")
+                throw new Error(`Could not find format of ${resourceName}`);
             }
             const elementSize = sizeFromFormat(format);
 
@@ -549,7 +553,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
-                throw new Error("Could not find format")
+                throw new Error(`Could not find format of ${resourceName}`)
             }
             const elementSize = sizeFromFormat(format);
 
@@ -589,6 +593,9 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 throw new Error(`Resource ${resourceName} is not a texture.`);
             }
 
+
+            const format = parsedCommand.format;
+
             const image = new Image();
             try {
                 // TODO: Pop-up a warning if the image is not CORS-enabled.
@@ -607,7 +614,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 const imageBitmap = await createImageBitmap(image);
                 const texture = device.createTexture({
                     size: [imageBitmap.width, imageBitmap.height],
-                    format: 'rgba8unorm',
+                    format,
                     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
                 });
                 device.queue.copyExternalImageToTexture({ source: imageBitmap }, { texture: texture }, [imageBitmap.width, imageBitmap.height]);

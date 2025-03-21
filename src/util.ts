@@ -30,6 +30,49 @@ export async function decompressFromBase64URL(base64: string) {
     return decompressed;
 }
 
+export type ScalarType = `${"uint" | "int"}${8 | 16 | 32 | 64}` | `${"float"}${16 | 32 | 64}`;
+
+export type SlangFormat = "rgba32f" | "rgba16f" | "rg32f" | "rg16f" | "r11f_g11f_b10f" | "r32f" | "r16f" | "rgba16" | "rgb10_a2" | "rgba8" | "rg16" | "rg8" | "r16" | "r8" | "rgba16_snorm" | "rgba8_snorm" | "rg16_snorm" | "rg8_snorm" | "r16_snorm" | "r8_snorm" | "rgba32i" | "rgba16i" | "rgba8i" | "rg32i" | "rg16i" | "rg8i" | "r32i" | "r16i" | "r8i" | "rgba32ui" | "rgba16ui" | "rgb10_a2ui" | "rgba8ui" | "rg32ui" | "rg16ui" | "rg8ui" | "r32ui" | "r16ui" | "r8ui" | "64ui" | "r64i" | "bgra8"
+
+type ScalarRepresentation = `8unorm` | `${16 | 32}float` | `${8 | 16 | 32}${"sint" | "uint"}`;
+function getWebGPURepresentation(scalarType: ScalarType): ScalarRepresentation {
+    let size = parseInt(scalarType.replace(/^[a-z]*/, ""));
+    let type = scalarType.replace(/[0-9]*$/, "");
+    if (type == "int")
+        type = "sint";
+
+    return `${size}${type}` as any
+}
+
+function getScalarSize(scalarType: ScalarType): 8 | 16 | 32 | 64 {
+    let size = parseInt(scalarType.replace(/^[a-z]*/, ""));
+    return size as any;
+}
+
+export function getTextureFormat(componentCount: 1 | 2 | 3 | 4, scalarType: ScalarType, access: GPUStorageTextureAccess | undefined): GPUTextureFormat {
+    if (access == "read-write" && componentCount > 1) {
+        throw new Error("There are no texture formats available with more than 1 component that are read-write")
+    }
+    let scalarSize = getScalarSize(scalarType);
+
+    if (access == "write-only" && componentCount == 2 && scalarSize != 32) {
+        throw new Error("There are no non 32 bit texture formats available with 2 components that are write-only")
+    }
+
+    if (scalarSize == 64) {
+        throw new Error("There are 64 bit texture formats available")
+    }
+
+    let scalarRepresentation = getWebGPURepresentation(scalarType);
+    if (componentCount == 1) {
+        return `r${scalarRepresentation}`
+    } else if (componentCount == 2) {
+        return `rg${scalarRepresentation}`
+    } else {
+        return `rgba${scalarRepresentation}`
+    }
+}
+
 export function sizeFromFormat(format: GPUTextureFormat) {
     switch (format) {
         case "r8unorm":
@@ -76,6 +119,56 @@ export function sizeFromFormat(format: GPUTextureFormat) {
         default:
             throw new Error(`Could not get size of unrecognized format "${format}"`)
     }
+}
+
+export const ACCESS_MAP = {
+    "readWrite": "read-write",
+    "write": "write-only",
+    "read": "read-only",
+} as const;
+
+const FORMAT_MAP: Partial<Record<SlangFormat, GPUTextureFormat>> = {
+    "rgba32f": "rgba32float",
+    "rgba16f": "rgba16float",
+    "rg32f": "rg32float",
+    "rg16f": "rg16float",
+    "r32f": "r32float",
+    "r16f": "r16float",
+    "rgb10_a2": "rgb10a2unorm",
+    "rgba8": "rgba8unorm",
+    "rg8": "rg8unorm",
+    "r8": "r8unorm",
+    "rgba8_snorm": "rgba8snorm",
+    "rg8_snorm": "rg8snorm",
+    "r8_snorm": "r8snorm",
+    "rgba32i": "rgba32sint",
+    "rgba16i": "rgba16sint",
+    "rgba8i": "rgba8sint",
+    "rg32i": "rg32sint",
+    "rg16i": "rg16sint",
+    "rg8i": "rg8sint",
+    "r32i": "r32sint",
+    "r16i": "r16sint",
+    "r8i": "r8sint",
+    "rgba32ui": "rgba32uint",
+    "rgba16ui": "rgba16uint",
+    "rgb10_a2ui": "rgb10a2uint",
+    "rgba8ui": "rgba8uint",
+    "rg32ui": "rg32uint",
+    "rg16ui": "rg16uint",
+    "rg8ui": "rg8uint",
+    "r32ui": "r32uint",
+    "r16ui": "r16uint",
+    "r8ui": "r8uint",
+    "bgra8": "bgra8unorm"
+}
+
+export function webgpuFormatfromSlangFormat(format: SlangFormat): GPUTextureFormat {
+    let gpuFormat = FORMAT_MAP[format];
+    if (gpuFormat == undefined) {
+        throw new Error(`Could not find webgpu format for ${format}`);
+    }
+    return gpuFormat;
 }
 
 function reinterpretUint32AsFloat(uint32: number) {
@@ -145,6 +238,7 @@ export type ParsedCommand = {
 } | {
     "type": "URL",
     "url": string,
+    "format": GPUTextureFormat,
 } | {
     "type": "SLIDER",
     "default": number,
@@ -218,9 +312,40 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "texture2D") {
                     throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports 2D textures`)
                 }
+                let slangAccess: keyof typeof ACCESS_MAP = parameter.type.access || "read";
+                let access = ACCESS_MAP[slangAccess];
+
+                let scalarType: ScalarType;
+                let componentCount: 1 | 2 | 3 | 4;
+                if (parameter.type.resultType.kind == "scalar") {
+                    componentCount = 1;
+                    scalarType = parameter.type.resultType.scalarType;
+                } else if (parameter.type.resultType.kind == "vector") {
+                    componentCount = parameter.type.resultType.elementCount;
+                    if (parameter.type.resultType.elementType.kind != "scalar") throw new Error(`Unhandled inner type for ${name}`)
+                    scalarType = parameter.type.resultType.elementType.scalarType;
+                } else {
+                    throw new Error(`Unhandled inner type for ${name}`)
+                }
+
+                let format: GPUTextureFormat;
+                if (parameter.format) {
+                    format = webgpuFormatfromSlangFormat(parameter.format);
+                } else {
+                    try {
+                        format = getTextureFormat(componentCount, scalarType, access);
+                    } catch (e) {
+                        if (e instanceof Error)
+                            throw new Error(`Could not get texture format for ${name}: ${e.message}`)
+                        else
+                            throw new Error(`Could not get texture format for ${name}`)
+                    }
+                }
+
                 command = {
                     type: playground_attribute_name,
                     url: attribute.arguments[0] as string,
+                    format,
                 };
             } else if (playground_attribute_name == "TIME") {
                 if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
