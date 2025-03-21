@@ -4,6 +4,9 @@
 
 import playground;
 
+[playground::TIME]
+uniform float time;
+
 typealias vec2 = float2;
 typealias vec3 = float3;
 typealias vec4 = float4;
@@ -15,8 +18,6 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
     float a = atan2(p.x,p.y);
     float r = length(p)*0.75;
     vec2 uv = vec2(a/tau,r);
-	
-    float time = getTime();
 
 	//get the color
 	float xCol = (uv.x - time/3) * 3.0;

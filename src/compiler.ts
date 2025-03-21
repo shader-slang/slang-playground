@@ -514,11 +514,16 @@ export class SlangCompiler {
             for (let parameterReflection of reflectionJson.parameters) {
                 if (parameterReflection.binding.kind != "uniform") continue;
 
-                if (!has_uniform_been_binded) {
-                    has_uniform_been_binded = true;
-                } else {
-                    bindings.delete(parameterReflection.name);
-                }
+                has_uniform_been_binded = true;
+                bindings.delete(parameterReflection.name);
+            }
+
+            if (has_uniform_been_binded) {
+                bindings.set("uniformInput", {
+                    binding: 0,
+                    visibility: GPUShaderStage.COMPUTE,
+                    buffer: { type: "uniform" }
+                });
             }
 
             // Also read the shader work-group sizes.

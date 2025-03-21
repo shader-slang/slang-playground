@@ -14,19 +14,22 @@ uniform float brush_size;
 [playground::COLOR_PICK(1.0, 0.0, 1.0)]
 uniform float3 color;
 
+[playground::MOUSE_POSITION]
+uniform float4 mousePosition;
+
 [shader("compute")]
 [numthreads(8, 8, 1)]
 [playground::CALL(MAX_BRUSH_SIZE, MAX_BRUSH_SIZE, 1)]
 void draw(uint2 dispatchThreadId: SV_DispatchThreadID)
 {
-    if (getMousePosition().z >= 0)
+    if (mousePosition.z >= 0)
         return;
 
     let offset = float2(dispatchThreadId.xy) - float(MAX_BRUSH_SIZE) / 2;
     if (length(offset) > brush_size / 2)
         return;
 
-    var mouse_pos = uint2(getMousePosition().xy + offset);
+    var mouse_pos = uint2(mousePosition.xy + offset);
     tex_red[mouse_pos] = color.r;
     tex_green[mouse_pos] = color.g;
     tex_blue[mouse_pos] = color.b;

@@ -1,5 +1,8 @@
 import playground;
 
+[playground::TIME]
+uniform float time;
+
 [playground::RAND(131072)]
 RWStructuredBuffer<float> buf;
 
@@ -13,7 +16,7 @@ RWStructuredBuffer<float> buf;
 void fillBuffer(uint2 dispatchThreadId : SV_DispatchThreadID)
 {
     uint idx = dispatchThreadId.x;
-    buf[idx] = sin(float(idx) / 1000.0 + 10 * getTime());
+    buf[idx] = sin(float(idx) / 1000.0 + 10 * time);
 }
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)

@@ -295,36 +295,37 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         return false;
 
     const startTime = performance.now();
-
-    let timeArray = new Float32Array(8);
-    timeArray[0] = canvasCurrentMousePos.x;
-    timeArray[1] = canvasCurrentMousePos.y;
-    timeArray[2] = canvasLastMouseDownPos.x;
-    timeArray[3] = canvasLastMouseDownPos.y;
-    if (canvasIsMouseDown)
-        timeArray[2] = -timeArray[2];
-    if (canvasMouseClicked)
-        timeArray[3] = -timeArray[3];
-    timeArray[4] = timeMS * 0.001;
     let uniformInput = allocatedResources.get("uniformInput");
     if (!(uniformInput instanceof GPUBuffer)) {
         throw new Error("uniformInput doesn't exist or is of incorrect type");
     }
-    device.queue.writeBuffer(uniformInput, 0, timeArray);
+
+    let uniformBufferData = new ArrayBuffer(playgroundData.uniformSize);
+    let uniformBufferView = new DataView(uniformBufferData);
 
     for (let uniformComponent of playgroundData.uniformComponents.value) {
-        if (uniformComponent.type == "slider") {
-            let sliderArray = new Float32Array([uniformComponent.value]);
-            device.queue.writeBuffer(uniformInput, uniformComponent.buffer_offset, sliderArray);
-        } else if (uniformComponent.type == "color pick") {
-            let sliderArray = new Float32Array(uniformComponent.value);
-            device.queue.writeBuffer(uniformInput, uniformComponent.buffer_offset, sliderArray);
+        let offset = uniformComponent.buffer_offset;
+
+        if (uniformComponent.type == "SLIDER") {
+            uniformBufferView.setFloat32(offset, uniformComponent.value, true);
+        } else if (uniformComponent.type == "COLOR_PICK") {
+            uniformComponent.value.forEach((v, i) => {
+                uniformBufferView.setFloat32(offset + i * 4, v, true);
+            });
+        } else if (uniformComponent.type == "TIME") {
+            uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
+        } else if (uniformComponent.type == "MOUSE_POSITION") {
+            uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
+            uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
+            uniformBufferView.setFloat32(offset + 8, canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1), true);
+            uniformBufferView.setFloat32(offset + 12, canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1), true);
         } else {
-            // exhaustiveness check
             let _: never = uniformComponent;
             throw new Error("Invalid state");
         }
     }
+
+    device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
@@ -666,11 +667,11 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
                 randFloatResources.set("outputBuffer", buffer);
 
-                if (!randFloatResources.has("seed"))
-                    randFloatResources.set("seed",
+                if (!randFloatResources.has("uniformInput"))
+                    randFloatResources.set("uniformInput",
                         device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
-                const seedBuffer = randFloatResources.get("seed") as GPUBuffer;
+                const seedBuffer = randFloatResources.get("uniformInput") as GPUBuffer;
 
                 // Set bindings on the pipeline.
                 randFloatPipeline.createBindGroup(randFloatResources);
@@ -703,7 +704,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
-            // Initialize the buffer with zeros.
+            // Initialize the buffer with the default.
             let bufferDefault: BufferSource
             if (elementSize == 4) {
                 bufferDefault = new Float32Array([parsedCommand.default]);
@@ -715,12 +716,24 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
-            // Initialize the buffer with zeros.
+            // Initialize the buffer with the default.
             let bufferDefault: BufferSource
             if (elementSize == 4) {
                 bufferDefault = new Float32Array(parsedCommand.default);
             } else
                 throw new Error("Unsupported float size for color pick")
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "TIME") {
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource = new Float32Array([0.0]);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "MOUSE_POSITION") {
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource = new Float32Array([0, 0, 0, 0]);
             device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
