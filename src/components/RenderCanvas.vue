@@ -818,7 +818,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
             if (compiler == null) {
                 throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType !== null) {
+            if (compiler.shaderType !== null && !abortRender) {
                 const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
                 firstFrame = false;
                 return keepRendering;
