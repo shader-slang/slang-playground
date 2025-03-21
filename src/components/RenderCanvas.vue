@@ -4,20 +4,18 @@ import type { Bindings, ShaderType } from '../compiler';
 import { ComputePipeline } from '../compute';
 import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
-import { type CallCommand, createOutputTexture, type HashedStringData, NotReadyError, parsePrintfBuffer, type ResourceCommand } from '../util';
+import { type CallCommand, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
 import { onMounted, ref, useTemplateRef } from 'vue';
 import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
 let context: GPUCanvasContext;
 let randFloatPipeline: ComputePipeline;
-let computePipeline: ComputePipeline;
-let extraComputePipelines: ComputePipeline[] = [];
+let computePipelines: ComputePipeline[] = [];
 let passThroughPipeline: GraphicsPipeline;
 
-let resourceBindings: Bindings;
+let compiledCode: CompiledPlayground;
 let allocatedResources: Map<string, GPUTexture | GPUBuffer>;
 let randFloatResources: Map<string, GPUObjectBase>;
-let hashedStrings: HashedStringData[];
 
 let renderThread: Promise<void> | null = null;
 let abortRender = false;
@@ -160,19 +158,74 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
 }
 
 function handleResize() {
-    if (!computePipeline || !passThroughPipeline)
+    if (!passThroughPipeline)
         return;
 
     if (currentWindowSize[0] < 2 || currentWindowSize[1] < 2)
         return;
 
-    safeSet(allocatedResources, "outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'rgba8unorm'));
-    computePipeline.createBindGroup(allocatedResources);
+    for (const { resourceName, parsedCommand } of compiledCode.resourceCommands) {
+        if (parsedCommand.type === "BLACK_SCREEN") {
+            const width = parsedCommand.width_scale * currentWindowSize[0];
+            const height = parsedCommand.height_scale * currentWindowSize[1];
+            const size = width * height;
+
+            const bindingInfo = compiledCode.shader.layout.get(resourceName);
+            if (!bindingInfo) {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            const format = bindingInfo.storageTexture?.format;
+            if (format == undefined) {
+                throw new Error(`Could not find format of ${resourceName}`)
+            }
+            const elementSize = sizeFromFormat(format);
+
+            if (!bindingInfo.texture && !bindingInfo.storageTexture) {
+                throw new Error(`Resource ${resourceName} is an invalid type for BLACK`);
+            }
+            try {
+                let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT;
+                if (bindingInfo.storageTexture) {
+                    usage |= GPUTextureUsage.STORAGE_BINDING;
+                }
+                const texture = device.createTexture({
+                    size: [width, height],
+                    format,
+                    usage: usage,
+                });
+
+                let zeros = new Uint8Array(Array(size * elementSize).fill(0));
+                device.queue.writeTexture({ texture }, zeros, { bytesPerRow: width * elementSize }, { width, height });
+
+                // Initialize the texture with zeros.
+                const encoder = device.createCommandEncoder({ label: 'resize encoder' });
+                let oldTexture = allocatedResources.get(resourceName);
+                if (!(oldTexture instanceof GPUTexture)) {
+                    throw new Error("Cannot resize non texture");
+                }
+                let sharedWidth = Math.min(width, oldTexture.width);
+                let sharedHeight = Math.min(height, oldTexture.height);
+                encoder.copyTextureToTexture({ texture: oldTexture }, { texture }, {
+                    width: sharedWidth,
+                    height: sharedHeight,
+                })
+                
+                let commandBuffer = encoder.finish();
+                device.queue.submit([commandBuffer]);
+
+                safeSet(allocatedResources, resourceName, texture);
+            }
+            catch (error) {
+                throw new Error(`Failed to create texture: ${error}`);
+            }
+        }
+    }
 
     passThroughPipeline.inputTexture = (allocatedResources.get("outputTexture") as GPUTexture);
     passThroughPipeline.createBindGroup();
 
-    for (const pipeline of extraComputePipelines)
+    for (const pipeline of computePipelines)
         pipeline.createBindGroup(allocatedResources);
 }
 
@@ -189,7 +242,7 @@ function configContext(device: GPUDevice) {
     let context = canvas.value?.getContext('webgpu');
 
     const canvasConfig = {
-        device: device,
+        device,
         format: navigator.gpu.getPreferredCanvasFormat(),
         usage:
             GPUTextureUsage.RENDER_ATTACHMENT,
@@ -252,7 +305,6 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     for (let uniformComponent of playgroundData.uniformComponents.value) {
         let offset = uniformComponent.buffer_offset;
-
         if (uniformComponent.type == "SLIDER") {
             uniformBufferView.setFloat32(offset, uniformComponent.value, true);
         } else if (uniformComponent.type == "COLOR_PICK") {
@@ -272,7 +324,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         }
     }
 
-    computePipeline.device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
+    device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
@@ -285,14 +337,13 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         encoder.clearBuffer(printfBufferRead);
     }
 
-    // The extra passes always go first.
-    // zip the extraComputePipelines and callCommands together
-    for (const [pipeline, command] of playgroundData.callCommands.map((x: CallCommand, i: number) => [extraComputePipelines[i], x] as const)) {
+    // zip the computePipelines and callCommands together
+    for (const [pipeline, command] of playgroundData.callCommands.map((x: CallCommand, i: number) => [computePipelines[i], x] as const)) {
         if (command.callOnce && !firstFrame) {
             // If the command is marked as callOnce and it's not the first frame, skip it.
             continue;
         }
-        const pass = encoder.beginComputePass({ label: 'extra passes' });
+        const pass = encoder.beginComputePass({ label: `${command.fnName} compute pass` });
         pass.setBindGroup(0, pipeline.bindGroup || null);
         if (pipeline.pipeline == undefined) {
             throw new Error("pipeline is undefined");
@@ -340,32 +391,18 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             throw new Error("threadGroupSize is undefined");
         }
 
-        const blockSizeX = pipeline.threadGroupSize.x;
-        const blockSizeY = pipeline.threadGroupSize.y;
-        const blockSizeZ = pipeline.threadGroupSize.z;
+        const blockSize = pipeline.threadGroupSize
 
-        const workGroupSizeX = Math.floor((size[0] + blockSizeX - 1) / blockSizeX);
-        const workGroupSizeY = Math.floor((size[1] + blockSizeY - 1) / blockSizeY);
-        const workGroupSizeZ = Math.floor((size[2] + blockSizeZ - 1) / blockSizeZ);
+        const workGroupSize = size
+            .map((size, idx) => [size, blockSize[idx]] as const)
+            .map(([size, blockSize]) => Math.floor((size + blockSize - 1) / blockSize))
 
-        pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY, workGroupSizeZ);
+        pass.dispatchWorkgroups(workGroupSize[0], workGroupSize[1], workGroupSize[2]);
 
         pass.end();
     }
 
-    const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
-
-    pass.setBindGroup(0, computePipeline.bindGroup || null);
-    if (computePipeline.pipeline == undefined)
-        throw new Error("Compute pipeline is not defined.");
-    pass.setPipeline(computePipeline.pipeline);
-
     if (currentDisplayMode == "imageMain") {
-        const workGroupSizeX = (currentWindowSize[0] + 15) / 16;
-        const workGroupSizeY = (currentWindowSize[1] + 15) / 16;
-        pass.dispatchWorkgroups(workGroupSizeX, workGroupSizeY);
-        pass.end();
-
         const renderPassDescriptor = passThroughPipeline.createRenderPassDesc(context.getCurrentTexture().createView());
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
 
@@ -380,27 +417,10 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     // copy output buffer back in print mode
     if (currentDisplayMode == "printMain") {
-        pass.dispatchWorkgroups(1, 1);
-        pass.end();
-
-        let outputBuffer = allocatedResources.get("outputBuffer");
-        if (!(outputBuffer instanceof GPUBuffer)) {
-            throw new Error("outputBuffer is incorrect type or doesn't exist");
-        }
-        let outputBufferRead = allocatedResources.get("outputBufferRead");
-        if (!(outputBufferRead instanceof GPUBuffer)) {
-            throw new Error("outputBufferRead is incorrect type or doesn't exist");
-        }
         let g_printedBuffer = allocatedResources.get("g_printedBuffer")
         if (!(g_printedBuffer instanceof GPUBuffer)) {
             throw new Error("g_printedBuffer is not a buffer");
         }
-        encoder.copyBufferToBuffer(
-            outputBuffer,
-            0,
-            outputBufferRead,
-            0,
-            outputBuffer.size);
         encoder.copyBufferToBuffer(
             g_printedBuffer, 0, printfBufferRead, 0, g_printedBuffer.size);
     }
@@ -416,7 +436,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
         let textResult = "";
         const formatPrint = parsePrintfBuffer(
-            hashedStrings,
+            compiledCode.shader.hashedStrings,
             printfBufferRead,
             printfBufferElementSize);
 
@@ -439,11 +459,8 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         frameCount = 0;
     }
 
-    // Only request the next frame if we are in the render mode
-    if (currentDisplayMode == "imageMain")
-        return true;
-    else
-        return false;
+    // Request the next frame
+    return true;
 }
 
 function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: string, value: T) {
@@ -455,10 +472,10 @@ function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: str
     map.set(key, value);
 };
 
-async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipeline, resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
+async function processResourceCommands(resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
     let allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
 
-    safeSet(allocatedResources, "uniformInput", pipeline.device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+    safeSet(allocatedResources, "uniformInput", device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
@@ -472,7 +489,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 throw new Error(`Resource ${resourceName} is an invalid type for ZEROS`);
             }
 
-            const buffer = pipeline.device.createBuffer({
+            const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             });
@@ -481,14 +498,19 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
             // Initialize the buffer with zeros.
             let zeros: BufferSource = new Uint8Array(parsedCommand.count * elementSize);
-            pipeline.device.queue.writeBuffer(buffer, 0, zeros);
+            device.queue.writeBuffer(buffer, 0, zeros);
         } else if (parsedCommand.type === "BLACK") {
             const size = parsedCommand.width * parsedCommand.height;
-            const elementSize = 4; // Assuming 4 bytes per element (e.g., float) TODO: infer from type.
             const bindingInfo = resourceBindings.get(resourceName);
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
+
+            const format = bindingInfo.storageTexture?.format;
+            if (format == undefined) {
+                throw new Error(`Could not find format of ${resourceName}`);
+            }
+            const elementSize = sizeFromFormat(format);
 
             if (!bindingInfo.texture && !bindingInfo.storageTexture) {
                 throw new Error(`Resource ${resourceName} is an invalid type for BLACK`);
@@ -498,9 +520,9 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 if (bindingInfo.storageTexture) {
                     usage |= GPUTextureUsage.STORAGE_BINDING;
                 }
-                const texture = pipeline.device.createTexture({
+                const texture = device.createTexture({
                     size: [parsedCommand.width, parsedCommand.height],
-                    format: bindingInfo.storageTexture ? 'r32float' : 'rgba8unorm',
+                    format,
                     usage: usage,
                 });
 
@@ -508,7 +530,48 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
                 // Initialize the texture with zeros.
                 let zeros = new Uint8Array(Array(size * elementSize).fill(0));
-                pipeline.device.queue.writeTexture({ texture }, zeros, { bytesPerRow: parsedCommand.width * elementSize }, { width: parsedCommand.width, height: parsedCommand.height });
+                device.queue.writeTexture({ texture }, zeros, { bytesPerRow: parsedCommand.width * elementSize }, { width: parsedCommand.width, height: parsedCommand.height });
+            }
+            catch (error) {
+                throw new Error(`Failed to create texture: ${error}`);
+            }
+        } else if (parsedCommand.type === "BLACK_SCREEN") {
+            const width = parsedCommand.width_scale * currentWindowSize[0];
+            const height = parsedCommand.height_scale * currentWindowSize[1];
+            const size = width * height;
+
+            const bindingInfo = resourceBindings.get(resourceName);
+            if (!bindingInfo) {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+
+            const format = bindingInfo.storageTexture?.format;
+            if (format == undefined) {
+                throw new Error(`Could not find format of ${resourceName}`)
+            }
+            const elementSize = sizeFromFormat(format);
+
+            if (!bindingInfo.texture && !bindingInfo.storageTexture) {
+                throw new Error(`Resource ${resourceName} is an invalid type for BLACK`);
+            }
+            try {
+                let usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.COPY_SRC | GPUTextureUsage.RENDER_ATTACHMENT;
+                if (bindingInfo.storageTexture) {
+                    usage |= GPUTextureUsage.STORAGE_BINDING;
+                }
+                const texture = device.createTexture({
+                    size: [width, height],
+                    format,
+                    usage: usage,
+                });
+
+                safeSet(allocatedResources, resourceName, texture);
+
+                // Initialize the texture with zeros.
+                let zeros = new Uint8Array(Array(size * elementSize).fill(0));
+                device.queue.writeTexture({ texture }, zeros, { bytesPerRow: width * elementSize }, { width, height });
+                device.queue.submit([]);
             }
             catch (error) {
                 throw new Error(`Failed to create texture: ${error}`);
@@ -524,6 +587,9 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
             if (!bindingInfo.texture) {
                 throw new Error(`Resource ${resourceName} is not a texture.`);
             }
+
+
+            const format = parsedCommand.format;
 
             const image = new Image();
             try {
@@ -541,12 +607,12 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
             try {
                 const imageBitmap = await createImageBitmap(image);
-                const texture = pipeline.device.createTexture({
+                const texture = device.createTexture({
                     size: [imageBitmap.width, imageBitmap.height],
-                    format: 'rgba8unorm',
+                    format,
                     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
                 });
-                pipeline.device.queue.copyExternalImageToTexture({ source: imageBitmap }, { texture: texture }, [imageBitmap.width, imageBitmap.height]);
+                device.queue.copyExternalImageToTexture({ source: imageBitmap }, { texture: texture }, [imageBitmap.width, imageBitmap.height]);
                 safeSet(allocatedResources, resourceName, texture);
             }
             catch (error) {
@@ -563,7 +629,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
             }
 
-            const buffer = pipeline.device.createBuffer({
+            const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             });
@@ -572,7 +638,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
             // Place a call to a shader that fills the buffer with random numbers.
             if (!randFloatPipeline) {
-                const randomPipeline = new ComputePipeline(pipeline.device);
+                const randomPipeline = new ComputePipeline(device);
 
                 if (compiler == null) {
                     throw new Error("Compiler is not defined!");
@@ -583,12 +649,12 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 }
 
                 let [code, layout] = compiledResult;
-                const module = pipeline.device.createShaderModule({ code: code });
+                const module = device.createShaderModule({ code: code });
 
                 randomPipeline.createPipelineLayout(layout);
 
                 // Create the pipeline (without resource bindings for now)
-                randomPipeline.createPipeline(module, "computeMain", null);
+                randomPipeline.createPipeline(module, "computeMain");
 
                 randFloatPipeline = randomPipeline;
             }
@@ -605,7 +671,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
                 if (!randFloatResources.has("uniformInput"))
                     randFloatResources.set("uniformInput",
-                        pipeline.device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
+                        device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
                 const seedBuffer = randFloatResources.get("uniformInput") as GPUBuffer;
 
@@ -613,10 +679,10 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 randFloatPipeline.createBindGroup(randFloatResources);
 
                 const seedValue = new Float32Array([Math.random(), 0, 0, 0]);
-                pipeline.device.queue.writeBuffer(seedBuffer, 0, seedValue);
+                device.queue.writeBuffer(seedBuffer, 0, seedValue);
 
                 // Encode commands to do the computation
-                const encoder = pipeline.device.createCommandEncoder({ label: 'compute builtin encoder' });
+                const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
                 const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
 
                 pass.setBindGroup(0, randomPipeline.bindGroup || null);
@@ -632,8 +698,8 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
 
                 // Finish encoding and submit the commands
                 const commandBuffer = encoder.finish();
-                pipeline.device.queue.submit([commandBuffer]);
-                await pipeline.device.queue.onSubmittedWorkDone();
+                device.queue.submit([commandBuffer]);
+                await device.queue.onSubmittedWorkDone();
             }
         } else if (parsedCommand.type == "SLIDER") {
             const elementSize = parsedCommand.elementSize;
@@ -646,7 +712,7 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 bufferDefault = new Float32Array([parsedCommand.default]);
             } else
                 throw new Error("Unsupported float size for slider")
-            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "COLOR_PICK") {
             const elementSize = parsedCommand.elementSize;
 
@@ -658,19 +724,19 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
                 bufferDefault = new Float32Array(parsedCommand.default);
             } else
                 throw new Error("Unsupported float size for color pick")
-            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "TIME") {
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
             // Initialize the buffer with zeros.
             let bufferDefault: BufferSource = new Float32Array([0.0]);
-            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "MOUSE_POSITION") {
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
             // Initialize the buffer with zeros.
             let bufferDefault: BufferSource = new Float32Array([0, 0, 0, 0]);
-            pipeline.device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
             let x: never = parsedCommand;
@@ -681,25 +747,12 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
     //
     // Some special-case allocations
     //
-
-    safeSet(allocatedResources, "outputTexture", createOutputTexture(device, currentWindowSize[0], currentWindowSize[1], 'rgba8unorm'));
-
-    safeSet(allocatedResources, "outputBuffer", pipeline.device.createBuffer({
-        size: 2 * 2 * 4,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
-    }));
-
-    safeSet(allocatedResources, "outputBufferRead", pipeline.device.createBuffer({
-        size: 2 * 2 * 4,
-        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
-    }));
-
-    safeSet(allocatedResources, "g_printedBuffer", pipeline.device.createBuffer({
+    safeSet(allocatedResources, "g_printedBuffer", device.createBuffer({
         size: printfBufferSize,
         usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
     }));
 
-    safeSet(allocatedResources, "printfBufferRead", pipeline.device.createBuffer({
+    safeSet(allocatedResources, "printfBufferRead", device.createBuffer({
         size: printfBufferSize,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     }));
@@ -707,43 +760,37 @@ async function processResourceCommands(pipeline: ComputePipeline | GraphicsPipel
     return allocatedResources;
 }
 
-function onRun(compiledCode: CompiledPlayground) {
+function onRun(runCompiledCode: CompiledPlayground) {
     if (!device)
         return;
     if (!compiler)
         return;
 
     resetMouse();
-    if (!computePipeline) {
-        computePipeline = new ComputePipeline(device);
-    }
 
     let firstFrame = true;
 
     withRenderLock(
         // setupFn
         async () => {
-            hashedStrings = compiledCode.shader.hashedStrings;
+            compiledCode = runCompiledCode;
 
-            resourceBindings = compiledCode.shader.layout;
-            // create a pipeline resource 'signature' based on the bindings found in the program.
-            computePipeline.createPipelineLayout(resourceBindings);
-
-            if (extraComputePipelines.length > 0)
-                extraComputePipelines = []; // This should release the resources of the extra pipelines.
+            if (computePipelines.length > 0)
+                computePipelines = []; // This should release the resources of the pipelines.
 
             const module = device.createShaderModule({ code: compiledCode.shader.code });
 
             for (const callCommand of compiledCode.callCommands) {
                 const entryPoint = callCommand.fnName;
                 const pipeline = new ComputePipeline(device);
+                // create a pipeline resource 'signature' based on the bindings found in the program.
                 pipeline.createPipelineLayout(compiledCode.shader.layout);
-                pipeline.createPipeline(module, entryPoint, null);
-                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSize[entryPoint]);
-                extraComputePipelines.push(pipeline);
+                pipeline.createPipeline(module, entryPoint);
+                pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSizes[entryPoint]);
+                computePipelines.push(pipeline);
             }
 
-            allocatedResources = await processResourceCommands(computePipeline, resourceBindings, compiledCode.resourceCommands, compiledCode.uniformSize);
+            allocatedResources = await processResourceCommands(compiledCode.shader.layout, compiledCode.resourceCommands, compiledCode.uniformSize);
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);
@@ -762,10 +809,8 @@ function onRun(compiledCode: CompiledPlayground) {
             passThroughPipeline.inputTexture = outputTexture;
             passThroughPipeline.createBindGroup();
 
-            computePipeline.createPipeline(module, compiledCode.mainEntryPoint, allocatedResources);
-
-            // Create bind groups for the extra pipelines
-            for (const pipeline of extraComputePipelines)
+            // Create bind groups for the pipelines
+            for (const pipeline of computePipelines)
                 pipeline.createBindGroup(allocatedResources);
         },
         // renderFn
@@ -773,7 +818,7 @@ function onRun(compiledCode: CompiledPlayground) {
             if (compiler == null) {
                 throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType !== null) {
+            if (compiler.shaderType !== null && !abortRender) {
                 const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
                 firstFrame = false;
                 return keepRendering;

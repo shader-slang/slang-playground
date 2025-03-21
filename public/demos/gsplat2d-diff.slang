@@ -60,6 +60,7 @@ RWStructuredBuffer<float> adamFirstMoment;
 RWStructuredBuffer<float> adamSecondMoment;
 
 [playground::URL("static/jeep.jpg")]
+[format("rgba8")]
 Texture2D<float4> targetTexture;
 
 // ----- Shared memory declarations --------

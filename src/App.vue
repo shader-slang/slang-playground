@@ -350,9 +350,9 @@ export type Shader = {
     succ: true,
     code: string,
     layout: Bindings,
-    hashedStrings: HashedStringData[],
+    hashedStrings: HashedStringData,
     reflection: ReflectionJSON,
-    threadGroupSize: { [key: string]: ThreadGroupSize },
+    threadGroupSizes: { [key: string]: [number, number, number] },
 };
 
 export type MaybeShader = Shader | {
@@ -370,7 +370,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
         return { succ: false };
     }
 
-    let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSize] = compiledResult;
+    let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSizes] = compiledResult;
     reflectionJson = reflectionJsonObj;
 
     codeGenArea.value?.setEditorValue(compiledCode);
@@ -380,7 +380,7 @@ function compileShader(userSource: string, entryPoint: string, compileTarget: ty
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
     window.$jsontree.refreshAll();
 
-    return { succ: true, code: compiledCode, layout: layout, hashedStrings: hashedStrings, reflection: reflectionJson, threadGroupSize: threadGroupSize };
+    return { succ: true, code: compiledCode, layout: layout, hashedStrings, reflection: reflectionJson, threadGroupSizes };
 }
 
 function restoreFromURL(): boolean {

@@ -3,6 +3,7 @@
 import playground;
 
 [playground::URL("static/jeep.jpg")]
+[format("rgba8")]
 Texture2D<float4> myImage;
 
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)

@@ -96,6 +96,14 @@ public struct playground_BLACKAttribute
     int height;
 };
 
+// Initialize a \`float\` texture with zeros of a size proportional to the screen size.
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_BLACK_SCREENAttribute
+{
+    float widthScale;
+    float heightScale;
+};
+
 // Initialize a texture with image from URL.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_URLAttribute
