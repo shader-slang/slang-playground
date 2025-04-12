@@ -185,7 +185,7 @@ function roundUpToNearest(x: number, nearest: number) {
 }
 
 function getSize(reflectionType: ReflectionType): number {
-    if (reflectionType.kind == "resource") {
+    if (reflectionType.kind == "resource" || reflectionType.kind == "samplerState") {
         throw new Error("unimplemented");
     } else if (reflectionType.kind == "scalar") {
         const bitsMatch = reflectionType.scalarType.match(/\d+$/);
