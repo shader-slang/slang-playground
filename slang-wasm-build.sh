@@ -45,7 +45,7 @@ echo "if(EMSCRIPTEN)
         --emit-tsd \"$<TARGET_FILE_DIR:slang-wasm>/slang-wasm.d.ts\"
         -sMODULARIZE=1
         -sEXPORT_ES6=1
-        -sEXTRA_EXPORTED_RUNTIME_METHODS=['FS']
+        -sEXPORTED_RUNTIME_METHODS=['FS']
     )
 endif()" > "source/slang-wasm/CMakeLists.txt"
 
