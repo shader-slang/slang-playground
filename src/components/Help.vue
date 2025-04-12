@@ -56,6 +56,8 @@ defineExpose({
         Initialize a <code>float</code> texture with zeros of the provided size.
         <h4 class="doc-header"><code>[playground::BLACK_SCREEN(1.0, 1.0)]</code></h4>
         Initialize a <code>float</code> texture with zeros with a size proportional to the screen size.
+        <h4 class="doc-header"><code>[playground::SAMPLER]</code></h4>
+        Initialize a sampler state with linear filtering and repeat address mode for sampling textures.
         <h4 class="doc-header"><code>[playground::URL("https://example.com/image.png")]</code></h4>
         Initialize a texture with image from URL.
         <h4 class="doc-header"><code>[playground::RAND(1000)]</code></h4>

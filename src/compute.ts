@@ -75,6 +75,12 @@ export class ComputePipeline {
                     }
                     entries.push({ binding: bindInfo.binding, resource: resource.createView() });
                 }
+                else if (bindInfo.sampler) {
+                    if (!(resource instanceof GPUSampler)) {
+                        throw new Error("Invalid state");
+                    }
+                    entries.push({ binding: bindInfo.binding, resource: resource });
+                }
                 else if (bindInfo.texture) {
                     if (!(resource instanceof GPUTexture)) {
                         throw new Error("Invalid state");
