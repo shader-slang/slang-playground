@@ -50,6 +50,8 @@ export type ReflectionType = {
     "baseShape": "texture2D",
     "access"?: "readWrite" | "write",
     "resultType": ReflectionType,
+} | {
+    "kind": "samplerState",
 };
 
 export type ReflectionParameter = {
@@ -394,6 +396,8 @@ export class SlangCompiler {
                 console.error(`Could not generate binding for ${name}`)
                 return {}
             }
+        } else if (parameterReflection.type.kind == "samplerState") {
+            return { sampler: {} };
         } else if (parameterReflection.binding.kind == "uniform") {
             return { buffer: { type: 'uniform' } };
         } else {

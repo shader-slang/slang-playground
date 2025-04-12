@@ -1,4 +1,4 @@
-// type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double, 
+// type field: 1 for format string, 2 for normal string, 3 for integer, 4 for float, 5 for double,
 struct FormattedStruct
 {
     uint32_t type = 0xFFFFFFFF;
@@ -111,6 +111,12 @@ public struct playground_URLAttribute
     string url;
 };
 
+// Bind a sampler with reasonable defaults for texture sampling.
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_SAMPLERAttribute
+{
+};
+
 // Initialize a \`float\` buffer with uniform random floats between 0 and 1.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_RANDAttribute
@@ -121,7 +127,8 @@ public struct playground_RANDAttribute
 // Gives the current time in milliseconds.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_TIMEAttribute
-{};
+{
+};
 
 // Gives mouse position info.
 // \`xy\`: mouse position (in pixels) during last button down.
@@ -130,7 +137,8 @@ public struct playground_TIMEAttribute
 // \`sign(mouze.w)\`: button is clicked
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_MOUSE_POSITIONAttribute
-{};
+{
+};
 
 // Control a \`float\` uniform with a provided default, minimum, and maximum.
 [__AttributeUsage(_AttributeTargets.Var)]

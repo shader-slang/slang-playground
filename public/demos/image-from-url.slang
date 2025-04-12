@@ -6,15 +6,14 @@ import playground;
 [format("rgba8")]
 Texture2D<float4> myImage;
 
+[playground::SAMPLER]
+SamplerState sampler;
+
 float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 {
-    uint imageW;
-    uint imageH;
-    myImage.GetDimensions(imageW, imageH);
+    float2 scaled = float2(dispatchThreadID.xy) / screenSize.y;
+    float2 flipped = float2(scaled.x, 1 - scaled.y);
 
-    uint2 scaled = (uint2)floor(float2(dispatchThreadID.xy) / screenSize.y * float2(imageW, imageH));
-    uint2 flipped = uint2(scaled.x, imageH - scaled.y);
-
-    float4 imageColor = myImage[flipped];
+    float4 imageColor = myImage.SampleLevel(sampler, flipped, 0);
     return imageColor;
 }

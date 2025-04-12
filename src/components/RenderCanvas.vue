@@ -14,7 +14,7 @@ let computePipelines: ComputePipeline[] = [];
 let passThroughPipeline: GraphicsPipeline;
 
 let compiledCode: CompiledPlayground;
-let allocatedResources: Map<string, GPUTexture | GPUBuffer>;
+let allocatedResources: Map<string, GPUObjectBase>;
 let randFloatResources: Map<string, GPUObjectBase>;
 
 let renderThread: Promise<void> | null = null;
@@ -210,7 +210,7 @@ function handleResize() {
                     width: sharedWidth,
                     height: sharedHeight,
                 })
-                
+
                 let commandBuffer = encoder.finish();
                 device.queue.submit([commandBuffer]);
 
@@ -463,17 +463,19 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
     return true;
 }
 
-function safeSet<T extends GPUTexture | GPUBuffer>(map: Map<string, T>, key: string, value: T) {
+function safeSet<T extends GPUObjectBase>(map: Map<string, T>, key: string, value: T) {
     if (map.has(key)) {
         let currentEntry = map.get(key);
         if (currentEntry == undefined) throw new Error("Invalid state");
-        currentEntry.destroy();
+        if (currentEntry instanceof GPUTexture || currentEntry instanceof GPUBuffer) {
+            currentEntry.destroy();
+        }
     }
     map.set(key, value);
 };
 
 async function processResourceCommands(resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
-    let allocatedResources: Map<string, GPUBuffer | GPUTexture> = new Map();
+    let allocatedResources: Map<string, GPUObjectBase> = new Map();
 
     safeSet(allocatedResources, "uniformInput", device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
@@ -499,6 +501,16 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             // Initialize the buffer with zeros.
             let zeros: BufferSource = new Uint8Array(parsedCommand.count * elementSize);
             device.queue.writeBuffer(buffer, 0, zeros);
+        } else if (parsedCommand.type === "SAMPLER") {
+            const sampler = device.createSampler({
+                magFilter: 'linear',
+                minFilter: 'linear',
+                mipmapFilter: 'linear',
+                addressModeU: 'repeat',
+                addressModeV: 'repeat',
+                addressModeW: 'repeat',
+            });
+            safeSet(allocatedResources, resourceName, sampler);
         } else if (parsedCommand.type === "BLACK") {
             const size = parsedCommand.width * parsedCommand.height;
             const bindingInfo = resourceBindings.get(resourceName);
