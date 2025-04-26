@@ -112,8 +112,8 @@ export function sizeFromFormat(format: GPUTextureFormat) {
         case "rgba16sint":
         case "rgba16float":
             return 8;
-        case "rgba32uint": 
-        case "rgba32sint": 
+        case "rgba32uint":
+        case "rgba32sint":
         case "rgba32float":
             return 16;
         default:
@@ -185,7 +185,7 @@ function roundUpToNearest(x: number, nearest: number) {
 }
 
 function getSize(reflectionType: ReflectionType): number {
-    if (reflectionType.kind == "resource") {
+    if (reflectionType.kind == "resource" || reflectionType.kind == "samplerState") {
         throw new Error("unimplemented");
     } else if (reflectionType.kind == "scalar") {
         const bitsMatch = reflectionType.scalarType.match(/\d+$/);
@@ -257,7 +257,9 @@ export type ParsedCommand = {
 } | {
     "type": "MOUSE_POSITION",
     "offset": number,
-}
+} | {
+    "type": "SAMPLER"
+};
 export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
 export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): ResourceCommand[] {
     let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
@@ -278,6 +280,13 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     type: playground_attribute_name,
                     count: attribute.arguments[0] as number,
                     elementSize: getSize(parameter.type.resultType),
+                };
+            } else if (playground_attribute_name == "SAMPLER") {
+                if (parameter.type.kind != "samplerState") {
+                    throw new Error(`${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports samplers`);
+                }
+                command = {
+                    type: playground_attribute_name
                 };
             } else if (playground_attribute_name == "RAND") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
