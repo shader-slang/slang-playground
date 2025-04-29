@@ -33,9 +33,9 @@ jobs:
 
           # Temporary workaround for the broken playground
           pushd slang
-          git checkout 591affaf7 # 24
+          #git checkout 591affaf7 # 24
           #git checkout 88a180ba0 # 48
-          #git checkout 7905ff7d7 # 72
+          git checkout 7905ff7d7 # 72
           #git checkout 2631811e33ed231d785a06c1fd6d4a7e303d22f2 # 95
           popd
 
