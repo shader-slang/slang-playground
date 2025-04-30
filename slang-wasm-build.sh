@@ -35,7 +35,7 @@ echo "if(EMSCRIPTEN)
             compiler-core
             slang-capability-defs
             slang-capability-lookup
-            slang-reflect-headers
+            slang-fiddle-output
             slang-lookup-tables
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include .
     )
