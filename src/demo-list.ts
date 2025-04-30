@@ -17,4 +17,5 @@ export let demoList = [
   { name: "Automatic Differentiation", url: "autodiff.slang" },
   { name: "Graphics Entrypoints", url: "entrypoint.slang" },
   { name: "Atomics", url: "atomics.slang" },
+  { name: "Lambda Expressions", url: "lambda.slang" },
 ];
