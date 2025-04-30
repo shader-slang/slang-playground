@@ -36,12 +36,6 @@ jobs:
           mkdir slang-repo
           pushd slang-repo
           git clone https://github.com/shader-slang/slang.git
-
-          # Temporary workaround for the broken playground
-          pushd slang
-          git checkout 2631811e33ed231d785a06c1fd6d4a7e303d22f2
-          popd
-
           popd
           echo "$(git -C slang-repo/slang rev-parse HEAD)" >> key.txt
 
