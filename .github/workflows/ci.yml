@@ -97,7 +97,7 @@ jobs:
         with:
           name: site-artifact
           path: ./dist/
-          compression-level: 1  
+          compression-level: 1
 
       - name: Smoke test
         run: |
@@ -108,7 +108,8 @@ jobs:
           popd
           gzip -d src/slang-wasm.wasm.gz
           cp src/slang-wasm.wasm ./
-          node src/smoke-test.js src/slang/rand_float.slang computeMain
+          cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
+          node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
 
       - name: Cleanup workspace
         run: |

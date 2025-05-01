@@ -111,7 +111,7 @@ jobs:
         with:
           name: site-artifact
           path: ./dist/
-          compression-level: 1  
+          compression-level: 1
 
   # Deployment job
   deploy:
