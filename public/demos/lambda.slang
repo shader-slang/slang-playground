@@ -25,5 +25,5 @@ public void printMain()
     // Alternative syntax:
     // let q = p.map((itn x) => { return x * 2; });
     
-    printf("q = (%d, %d, %d, %d)\n", p.data[0], p.data[1], p.data[2], p.data[3]);
+    printf("q = (%d, %d, %d, %d)\n", q.data[0], q.data[1], q.data[2], q.data[3]);
 }
