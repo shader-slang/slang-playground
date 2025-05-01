@@ -25,7 +25,7 @@ public void printMain()
     let q = p.map((int x) => x * 2 + env);
 
     // Alternative syntax:
-    // let q = p.map((itn x) => { return x * 2 + env; });
+    // let q = p.map((int x) => { return x * 2 + env; });
     
     printf("q = (%d, %d, %d, %d)\n", q.data[0], q.data[1], q.data[2], q.data[3]);
 }
