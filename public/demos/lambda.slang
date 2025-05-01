@@ -20,10 +20,12 @@ public struct MyData
 public void printMain()
 {
     let p = MyData({ 1, 2, 3, 4 });
-    let q = p.map((int x) => x * 2);
+
+    int env = 1;
+    let q = p.map((int x) => x * 2 + env);
 
     // Alternative syntax:
-    // let q = p.map((itn x) => { return x * 2; });
+    // let q = p.map((itn x) => { return x * 2 + env; });
     
     printf("q = (%d, %d, %d, %d)\n", q.data[0], q.data[1], q.data[2], q.data[3]);
 }
