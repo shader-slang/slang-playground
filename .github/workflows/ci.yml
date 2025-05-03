@@ -1,25 +1,9 @@
-name: Deploy to GitHub Pages
+name: Continuous Integration for PR
 
 on:
-  # Runs on pushes targeting the default branch
-  push:
+  pull_request:
     branches:
       - main
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
 
 jobs:
   # Build job
@@ -29,10 +13,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: get slang head commit
+      - name: get emsdk
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build
+          git clone https://github.com/emscripten-core/emsdk.git
+          sed -i 's/\r$//' emsdk/emsdk emsdk/emsdk_env.sh
+
+      - name: get slang head commit
+        run: |
           git clone https://github.com/shader-slang/slang.git slang-repo
           git -C slang-repo rev-parse HEAD > key.txt
 
@@ -96,13 +85,10 @@ jobs:
             ./spirv-tools.d.ts
           key: ${{hashFiles('key-spirv-tool.txt')}}
 
-      - name: Cleanup workspace, move files, and build
+      - name: Build
         run: |
-          rm -rf slang-repo
-          rm -rf emsdk
-          rm -rf spirv-tools
-          mv ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./src/
-          mv ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ./src/
+          cp ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./src/
+          cp ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ./src/
           npm install
           npm run build
 
@@ -113,26 +99,19 @@ jobs:
           path: ./dist/
           compression-level: 1
 
-  # Deployment job
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Smoke test
+        run: |
+          pushd emsdk
+          /bin/sh ./emsdk install latest
+          /bin/sh ./emsdk activate latest
+          source ./emsdk_env.sh
+          popd
+          gzip -d src/slang-wasm.wasm.gz
+          cp src/slang-wasm.wasm ./
+          cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
+          node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
 
-      - name: Download a single artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: site-artifact
-          path: ./_site/
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Cleanup workspace
+        run: |
+          rm -rf slang-repo emsdk spirv-tools
+          rm ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts
