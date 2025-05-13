@@ -72,6 +72,9 @@ defineExpose({
           <li><code>sign(mouze.z)</code>: button is down</br></li>
           <li><code>sign(mouze.w)</code>: button is clicked</br></li>
         </ul>
+        <h4 class="doc-header"><code>[playground::KEY("KeyA")]</code></h4>
+        Sets a scalar uniform to <code>1</code> if the specified key
+        is pressed, <code>0</code> otherwise. Key name comes from either javascript <a href="https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code"><code>event.code</code></a> or <a href="https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key"><code>event.key</code></a>.
         <h4 class="doc-header"><code>[playground::SLIDER(0.3, 0.0, 1.0)]</code></h4>
         Control a <code>float</code> uniform with a provided default, minimum, and maximum.
         <h4 class="doc-header"><code>[playground::COLOR_PICK(0.5, 0.5, 0.5)]</code></h4>

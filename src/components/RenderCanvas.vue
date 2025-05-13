@@ -31,6 +31,8 @@ let canvasCurrentMousePos = { x: 0, y: 0 };
 let canvasIsMouseDown = false;
 let canvasMouseClicked = false;
 
+const pressedKeys = new Set<string>();
+
 const canvas = useTemplateRef("canvas");
 const frameTime = ref(0);
 
@@ -63,7 +65,20 @@ onMounted(() => {
     // therefore, we have to set the resolution same as the container size.
     const observer = new ResizeObserver((entries) => { resizeCanvasHandler(entries); });
     observer.observe(canvas.value);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 })
+
+function handleKeyDown(event: KeyboardEvent) {
+    pressedKeys.add(event.key);
+    pressedKeys.add(event.code);
+}
+
+function handleKeyUp(event: KeyboardEvent) {
+    pressedKeys.delete(event.key);
+    pressedKeys.delete(event.code);
+}
 
 function resizeCanvas(entries: ResizeObserverEntry[]) {
     const canvas = entries[0].target;
@@ -318,6 +333,28 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
             uniformBufferView.setFloat32(offset + 8, canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1), true);
             uniformBufferView.setFloat32(offset + 12, canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1), true);
+        } else if (uniformComponent.type == "KEY") {
+            // Set 1 or 0 depending on key state, using correct type
+            const isPressed = pressedKeys.has(uniformComponent.key);
+            if (uniformComponent.scalarType == "float32") {
+                uniformBufferView.setFloat32(offset, isPressed ? 1.0 : 0.0, true);
+            } else if (uniformComponent.scalarType == "float64") {
+                uniformBufferView.setFloat64(offset, isPressed ? 1.0 : 0.0, true);
+            } else if (uniformComponent.scalarType == "int8") {
+                uniformBufferView.setInt8(offset, isPressed ? 1 : 0);
+            } else if (uniformComponent.scalarType == "int16") {
+                uniformBufferView.setInt16(offset, isPressed ? 1 : 0, true);
+            } else if (uniformComponent.scalarType == "int32") {
+                uniformBufferView.setInt32(offset, isPressed ? 1 : 0, true);
+            } else if (uniformComponent.scalarType == "uint8") {
+                uniformBufferView.setUint8(offset, isPressed ? 1 : 0);
+            } else if (uniformComponent.scalarType == "uint16") {
+                uniformBufferView.setUint16(offset, isPressed ? 1 : 0, true);
+            } else if (uniformComponent.scalarType == "uint32") {
+                uniformBufferView.setUint32(offset, isPressed ? 1 : 0, true);
+            } else {
+                throw new Error("KEY_INPUT only scalar type not supported");
+            }
         } else {
             let _: never = uniformComponent;
             throw new Error("Invalid state");
@@ -748,6 +785,12 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             // Initialize the buffer with zeros.
             let bufferDefault: BufferSource = new Float32Array([0, 0, 0, 0]);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "KEY") {
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource = new Float32Array([0]);
             device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
