@@ -140,6 +140,13 @@ public struct playground_MOUSE_POSITIONAttribute
 {
 };
 
+// Checks if a given key is down. `1.0` if key is down, `0.0` otherwise. Key name comes from either javascript `event.code` or `event.key`.
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_KEYAttribute
+{
+    string keyName;
+};
+
 // Control a \`float\` uniform with a provided default, minimum, and maximum.
 [__AttributeUsage(_AttributeTargets.Var)]
 public struct playground_SLIDERAttribute
