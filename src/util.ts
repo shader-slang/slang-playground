@@ -258,6 +258,11 @@ export type ParsedCommand = {
     "type": "MOUSE_POSITION",
     "offset": number,
 } | {
+    "type": "KEY",
+    key: string,
+    offset: number,
+    scalarType: ScalarType,
+} | {
     "type": "SAMPLER"
 };
 export type ResourceCommand = { resourceName: string; parsedCommand: ParsedCommand; };
@@ -394,6 +399,20 @@ export function getResourceCommandsFromAttributes(reflection: ReflectionJSON): R
                     elementSize: parseInt(parameter.type.elementType.scalarType.slice(5)) / 8,
                     offset: parameter.binding.offset,
                 };
+            } else if (playground_attribute_name == "KEY") {
+                // Only allow on scalar uniforms (float or int)
+                if (parameter.type.kind != "scalar" || parameter.binding.kind != "uniform") {
+                    throw new Error(`${playground_attribute_name} attribute can only be applied to scalar uniforms`);
+                }
+                if (!attribute.arguments || attribute.arguments.length !== 1 || typeof attribute.arguments[0] !== "string") {
+                    throw new Error(`${playground_attribute_name} attribute requires a single string argument (the key name)`);
+                }
+                command = {
+                    type: playground_attribute_name,
+                    key: attribute.arguments[0] as string,
+                    offset: parameter.binding.offset,
+                    scalarType: parameter.type.scalarType,
+                };
             }
 
             if (command != null) {
@@ -433,6 +452,10 @@ export type UniformController = { buffer_offset: number } & ({
     type: "TIME",
 } | {
     type: "MOUSE_POSITION",
+} | {
+    type: "KEY",
+    key: string,
+    scalarType: ScalarType,
 })
 
 export function isControllerRendered(controller: UniformController) {
@@ -467,6 +490,13 @@ export function getUniformControllers(resourceCommands: ResourceCommand[]): Unif
             controllers.push({
                 type: resourceCommand.parsedCommand.type,
                 buffer_offset: resourceCommand.parsedCommand.offset,
+            })
+        } else if (resourceCommand.parsedCommand.type == 'KEY') {
+            controllers.push({
+                type: resourceCommand.parsedCommand.type,
+                buffer_offset: resourceCommand.parsedCommand.offset,
+                key: resourceCommand.parsedCommand.key,
+                scalarType: resourceCommand.parsedCommand.scalarType,
             })
         }
     }
