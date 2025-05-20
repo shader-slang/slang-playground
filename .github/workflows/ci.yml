@@ -56,8 +56,7 @@ jobs:
       - name: slang-wasm build
         if: steps.cache_slang.outputs.cache-hit != 'true'
         run: |
-          sed -i 's/\r$//' ./slang-wasm-build.sh
-          /bin/bash -x ./slang-wasm-build.sh
+          /bin/bash -x ./build_scripts/slang-wasm-build.sh
 
       - name: save slang-wasm
         if: always() && steps.cache_slang.outputs.cache-hit != 'true'
@@ -72,8 +71,7 @@ jobs:
       - name: spirv-tools-wasm build
         if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
         run: |
-          sed -i 's/\r$//' ./spirv-tool-wasm-build.sh
-          /bin/bash -x ./spirv-tool-wasm-build.sh
+          /bin/bash -x ./build_scripts/spirv-tool-wasm-build.sh
 
       - name: save spirv-tools-wasm
         if: always() && steps.cache_spirv_tools.outputs.cache-hit != 'true'

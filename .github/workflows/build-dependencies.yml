@@ -19,15 +19,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: get slang head commit
+      - name: get emsdk
         run: |
           sudo apt-get update
           sudo apt-get install -y ninja-build
-          mkdir slang-repo
-          pushd slang-repo
-          git clone https://github.com/shader-slang/slang.git
-          popd
-          echo "$(git -C slang-repo/slang rev-parse HEAD)" >> key.txt
+          git clone https://github.com/emscripten-core/emsdk.git
+          sed -i 's/\r$//' emsdk/emsdk emsdk/emsdk_env.sh
+
+      - name: get slang head commit
+        run: |
+          git clone https://github.com/shader-slang/slang.git slang-repo
+          git -C slang-repo rev-parse HEAD > key.txt
 
       - name: get spirv-tool head commit
         run: |
@@ -39,15 +41,11 @@ jobs:
 
       - name: slang-wasm build
         run: |
-          sed -i -e 's/\r$//' ./slang-wasm-build.sh
-          chmod +x ./slang-wasm-build.sh
-          ./slang-wasm-build.sh
+          /bin/bash -x ./build_scripts/slang-wasm-build.sh
 
       - name: spirv-tools-wasm build
         run: |
-          sed -i -e 's/\r$//' ./spirv-tool-wasm-build.sh
-          chmod +x ./spirv-tool-wasm-build.sh
-          ./spirv-tool-wasm-build.sh
+          /bin/bash -x ./build_scripts/spirv-tool-wasm-build.sh
 
       - name: Cleanup workspace, move files, and build
         run: |
