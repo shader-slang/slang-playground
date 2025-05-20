@@ -29,78 +29,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: get slang head commit
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build
-          git clone https://github.com/shader-slang/slang.git slang-repo
-          git -C slang-repo rev-parse HEAD > key.txt
-
-      - name: get spirv-tool head commit
-        run: |
-          git clone https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools
-          pushd spirv-tools
-          git checkout vulkan-sdk-1.3.290.0
-          popd
-          git -C spirv-tools rev-parse HEAD > key-spirv-tool.txt
-
-      - name: restore slang-wasm
-        id: cache_slang
-        uses: actions/cache/restore@v4
+      - name: Build and cache WASM dependencies
+        uses: ./.github/actions/build-wasm-deps
         with:
-          path: |
-            ./slang-wasm.wasm.gz
-            ./slang-wasm.js
-            ./slang-wasm.d.ts
-          key: ${{hashFiles('key.txt')}}
+          build-artifacts-dir: ./src
 
-      - name: restore spirv-tools
-        id: cache_spirv_tools
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ./spirv-tools.wasm
-            ./spirv-tools.js
-            ./spirv-tools.d.ts
-          key: ${{hashFiles('key-spirv-tool.txt')}}
-
-      - name: slang-wasm build
-        if: steps.cache_slang.outputs.cache-hit != 'true'
+      - name: Build
         run: |
-          /bin/bash -x ./build_scripts/slang-wasm-build.sh
-
-      - name: save slang-wasm
-        if: always() && steps.cache_slang.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ./slang-wasm.wasm.gz
-            ./slang-wasm.js
-            ./slang-wasm.d.ts
-          key: ${{hashFiles('key.txt')}}
-
-      - name: spirv-tools-wasm build
-        if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
-        run: |
-          /bin/bash -x ./build_scripts/spirv-tool-wasm-build.sh
-
-      - name: save spirv-tools-wasm
-        if: always() && steps.cache_spirv_tools.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ./spirv-tools.wasm
-            ./spirv-tools.js
-            ./spirv-tools.d.ts
-          key: ${{hashFiles('key-spirv-tool.txt')}}
-
-      - name: Cleanup workspace, move files, and build
-        run: |
-          rm -rf slang-repo
-          rm -rf emsdk
-          rm -rf spirv-tools
-          mv ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./src/
-          mv ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ./src/
           npm install
           npm run build
 
