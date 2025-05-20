@@ -8,7 +8,6 @@ on:
 jobs:
   # Build job
   build:
-
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,6 +32,7 @@ jobs:
 
       - name: Smoke test
         run: |
+          cp ./src/slang-wasm.wasm.gz ./src/slang-wasm.js ./src/slang-wasm.d.ts ./
           pushd emsdk
           /bin/sh ./emsdk install latest
           /bin/sh ./emsdk activate latest
