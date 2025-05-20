@@ -42,8 +42,3 @@ jobs:
           cp src/slang-wasm.wasm ./
           cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
           node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
-
-      - name: Cleanup workspace
-        run: |
-          rm -rf slang-repo emsdk spirv-tools
-          rm ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts
