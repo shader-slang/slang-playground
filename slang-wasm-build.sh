@@ -26,6 +26,11 @@ pushd emsdk
 popd
 
 echo "[$(date)] Sync slang repo ..."
+if [ -d slang-repo ]
+then
+	rm -rf slang-repo
+fi
+
 if [ ! -d slang-repo ]
 then
 	echo "[$(date)] Cloning slang repository..."
@@ -42,7 +47,7 @@ pushd slang-repo
 git submodule update --init --recursive
 
 echo "list files in slang-repo"
-ls -la
+ls -la *
 echo "list files in slang-repo/source/slang-wasm"
 ls -la source/slang-wasm
 
