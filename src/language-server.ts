@@ -685,6 +685,118 @@ export function initMonaco() {
             };
         }
     });
+
+    monaco.languages.register({ id: "cuda" });
+    monaco.languages.setMonarchTokensProvider("cuda", {
+        keywords: [
+            // CUDA specific keywords
+            "threadIdx", "blockIdx", "blockDim", "gridDim", 
+            "__global__", "__device__", "__host__", "__shared__", "__constant__",
+            "__restrict__", "__managed__", "__forceinline__", "__launch_bounds__",
+            // CUDA built-in variables and types
+            "dim3", "uint3", "int3", "float3", "double3", "char3", "uchar3",
+            "short3", "ushort3", "long3", "ulong3", "longlong3", "ulonglong3",
+            "cudaError_t", "warpSize", "clock_t",
+            // C++ keywords
+            "if", "else", "for", "while", "do", "switch", "case",
+            "break", "continue", "return", "struct", "class", "union",
+            "template", "typename", "typedef", "const", "static", "volatile",
+            "register", "extern", "inline", "virtual", "explicit", "friend",
+            "public", "private", "protected", "operator", "sizeof", "default",
+            // Types
+            "void", "bool", "int", "float", "double", "char", "unsigned", "signed",
+            "short", "long", "size_t", "ptrdiff_t", "wchar_t", "nullptr_t"
+        ],
+        operators: [
+            '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
+            '&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
+            '<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+            '%=', '<<=', '>>=', '>>>='
+        ],
+        symbols: /[=><!~?:&|+\-*\/\^%]+/,
+        
+        // C# style strings
+        escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+
+        // The main tokenizer for our languages
+        tokenizer: {
+            root: [
+                // Preprocessor directives
+                [/#\s*include\s*[<"]([^">]+)[">]/, 'keyword'],
+                [/#\s*\w+/, 'keyword'],  // Other preprocessor directives like #define, #pragma, etc
+
+                // CUDA kernel attributes
+                [/(__global__|__device__|__host__|__shared__|__constant__|__restrict__|__managed__|__forceinline__)\s*/, 'keyword'],
+                
+                // Template parameters
+                [/<\s*[a-zA-Z_]\w*\s*>/, 'type'],
+
+                // Function declarations
+                [/\b([a-zA-Z_]\w*)\s*(?=\()/, {
+                    cases: {
+                        '@keywords': 'keyword',
+                        '@default': 'function'
+                    }
+                }],
+
+                // Numbers with suffixes (1.0f, 2.0h, 3ull, etc)
+                [/\d*\.\d+([eE][\-+]?\d+)?[fFlL]?/, 'number.float'],
+                [/0[xX][0-9a-fA-F]+[uUlL]*/, 'number.hex'],
+                [/\d+[uUlL]*/, 'number'],
+                
+                // Identifiers and keywords
+                [/[a-zA-Z_]\w*/, {
+                    cases: {
+                        '@keywords': 'keyword',
+                        '@default': 'identifier'
+                    }
+                }],
+                
+                // Comments
+                [/\/\*/, 'comment', '@comment'],
+                [/\/\/.*$/, 'comment'],
+                
+                // Strings
+                [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
+                
+                // Characters
+                [/'[^\\']'/, 'string'],
+                [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
+                [/'/, 'string.invalid'],
+
+                // Delimiters and operators
+                [/[{}()\[\]]/, '@brackets'],
+                [/[<>](?!@symbols)/, '@brackets'],
+                [/@symbols/, {
+                    cases: {
+                        '@operators': 'operator',
+                        '@default': ''
+                    }
+                }],
+
+                // Delimiter
+                [/[;,.]/, 'delimiter'],
+                
+                // Whitespace
+                [/[ \t\r\n]+/, 'white']
+            ],
+            
+            comment: [
+                [/[^\/*]+/, 'comment'],
+                [/\/\*/, 'comment', '@push'],
+                ["\\*/", 'comment', '@pop'],
+                [/[\/*]/, 'comment']
+            ],
+            
+            string: [
+                [/[^\\"]+/, 'string'],
+                [/@escapes/, 'string.escape'],
+                [/\\./, 'string.escape.invalid'],
+                [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
+            ]
+        }
+    });
 }
 
 export function initLanguageServer() {
