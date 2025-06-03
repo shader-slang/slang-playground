@@ -28,12 +28,13 @@ popd
 echo "[$(date)] Sync slang repo ..."
 if [ -d slang-repo ]
 then
+	echo "Remove stale slang-repo dir"
 	rm -rf slang-repo
 fi
 
 if [ ! -d slang-repo ]
 then
-	echo "[$(date)] Cloning slang repository..."
+	echo "[$(date)] Cloning slang repository into slang-repo..."
 	git clone https://github.com/shader-slang/slang.git slang-repo
 	if [ $? -ne 0 ]
 	then
@@ -45,11 +46,6 @@ fi
 
 pushd slang-repo
 git submodule update --init --recursive
-
-echo "list files in slang-repo"
-ls -la *
-echo "list files in slang-repo/source/slang-wasm"
-ls -la source/slang-wasm
 
 # The `,` syntax in sed specifies a range from the line that starts
 # with `target_link_options(` to the line that has just a `)` (possibly indented).
