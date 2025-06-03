@@ -687,114 +687,168 @@ export function initMonaco() {
     });
 
     monaco.languages.register({ id: "cuda" });
-    monaco.languages.setMonarchTokensProvider("cuda", {
-        keywords: [
-            // CUDA specific keywords
-            "threadIdx", "blockIdx", "blockDim", "gridDim", 
-            "__global__", "__device__", "__host__", "__shared__", "__constant__",
-            "__restrict__", "__managed__", "__forceinline__", "__launch_bounds__",
-            // CUDA built-in variables and types
-            "dim3", "uint3", "int3", "float3", "double3", "char3", "uchar3",
-            "short3", "ushort3", "long3", "ulong3", "longlong3", "ulonglong3",
-            "cudaError_t", "warpSize", "clock_t",
-            // C++ keywords
-            "if", "else", "for", "while", "do", "switch", "case",
-            "break", "continue", "return", "struct", "class", "union",
-            "template", "typename", "typedef", "const", "static", "volatile",
-            "register", "extern", "inline", "virtual", "explicit", "friend",
-            "public", "private", "protected", "operator", "sizeof", "default",
-            // Types
-            "void", "bool", "int", "float", "double", "char", "unsigned", "signed",
-            "short", "long", "size_t", "ptrdiff_t", "wchar_t", "nullptr_t"
+    monaco.languages.setMonarchTokensProvider("cuda", {        
+        // Keywords and Identifiers
+        cudaQualifiers: [
+            '__global__', '__device__', '__host__', '__noinline__', '__forceinline__', '__launch_bounds__',
         ],
+        cudaStorageModifiers: [
+            '__constant__', '__managed__', '__shared__', '__restrict__',
+        ],
+        cudaBuiltinVars: [
+            'gridDim', 'blockIdx', 'blockDim', 'threadIdx', 'warpSize',
+        ],
+        // A selection of common CUDA library functions. A more comprehensive list can be added.
+        cudaLibFunctions: [
+            'cudaMalloc', 'cudaFree', 'cudaMemcpy', 'cudaMemset', 'cudaMallocManaged',
+            'atomicAdd', 'atomicExch', 'atomicSub', 'atomicMin', 'atomicMax', 'atomicInc', 'atomicDec', 'atomicCAS',
+            'atomicAnd', 'atomicOr', 'atomicXor',
+            '__shfl', '__shfl_sync', '__shfl_up_sync', '__shfl_down_sync', '__shfl_xor_sync', // Sync variants are common
+            '__ballot', '__ballot_sync', '__all', '__all_sync', '__any', '__any_sync',
+            '__syncthreads', '__syncthreads_count', '__syncthreads_and', '__syncthreads_or',
+            '__threadfence', '__threadfence_block', '__threadfence_system',
+            'clock', 'clock64', 'printf',
+            // Common math functions (often prefixed with __ in device code)
+            '__sinf', '__cosf', '__tanf', '__expf', '__logf', '__log2f', '__log10f',
+            '__sqrtf', '__rsqrtf', '__powf', '__fmaf', '__fma',
+            '__saturatef', 'abs', 'min', 'max', 'ldg', 'tex1Dfetch', 'tex1D', 'tex2D', 'tex3D',
+            // Surface functions
+            'surf1Dread', 'surf2Dread', 'surf3Dread', 'surf1Dwrite', 'surf2Dwrite', 'surf3Dwrite',
+        ],
+        cppKeywords: [
+            'alignas', 'alignof', 'asm', 'auto', 'break', 'case', 'catch', 'class', 'const', 'constexpr', 'const_cast',
+            'continue', 'decltype', 'default', 'delete', 'do', 'dynamic_cast',
+            'else', 'enum', 'explicit', 'export', 'extern', 'false', 'final', 'for', 'friend',
+            'goto', 'if', 'inline', 'mutable', 'namespace', 'new', 'noexcept', 'nullptr',
+            'operator', 'override', 'private', 'protected', 'public', 'register', 'reinterpret_cast',
+            'return', 'sizeof', 'static', 'static_assert', 'static_cast', 'struct',
+            'switch', 'template', 'this', 'thread_local', 'throw', 'true', 'try', 'typedef',
+            'typeid', 'typename', 'union', 'using', 'virtual', 'volatile', 'while',
+            // C keywords often used
+            'restrict', '_Atomic', '_Bool', '_Complex', '_Generic', '_Imaginary',
+            '_Noreturn', '_Static_assert', '_Thread_local'
+        ],
+        storageTypes: [ // Basic C++/CUDA types
+            'bool', 'char', 'char16_t', 'char32_t', 'double', 'float', 'int', 'long', 'short',
+            'signed', 'unsigned', 'void', 'wchar_t', 'half', 'half2', // CUDA half types
+        ],
+        typedefVariables: [ // Common typedefs including from CUDA
+            "size_t", "ptrdiff_t", "wchar_t", "nullptr_t",
+            "cudaError_t", "cudaStream_t", "cudaEvent_t", "dim3" // dim3 is struct but often used like a typedef
+        ],
+
         operators: [
             '=', '>', '<', '!', '~', '?', ':', '==', '<=', '>=', '!=',
             '&&', '||', '++', '--', '+', '-', '*', '/', '&', '|', '^', '%',
-            '<<', '>>', '>>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
-            '%=', '<<=', '>>=', '>>>='
+            '<<', '>>', '+=', '-=', '*=', '/=', '&=', '|=', '^=',
+            '%=', '<<=', '>>=', '->', '.', '...', // Added ellipsis for varargs
         ],
-        symbols: /[=><!~?:&|+\-*\/\^%]+/,
-        
-        // C# style strings
+
+        symbols: /[=><!~?:&|+\-*\/\^%.]+/, // Added dot to symbols as it can be an operator
+
         escapes: /\\(?:[abfnrtv\\"']|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
 
-        // The main tokenizer for our languages
+        brackets: [
+            { open: '{', close: '}', token: 'delimiter.curly' },
+            { open: '[', close: ']', token: 'delimiter.square' },
+            { open: '(', close: ')', token: 'delimiter.parenthesis' },
+            { open: '<', close: '>', token: 'delimiter.angle' }
+        ],
+
         tokenizer: {
             root: [
-                // Preprocessor directives
-                [/#\s*include\s*[<"]([^">]+)[">]/, 'keyword'],
-                [/#\s*\w+/, 'keyword'],  // Other preprocessor directives like #define, #pragma, etc
+                { include: '@whitespace' },
+                { include: '@comments' },
+                { include: '@preprocessor' },
 
-                // CUDA kernel attributes
-                [/(__global__|__device__|__host__|__shared__|__constant__|__restrict__|__managed__|__forceinline__)\s*/, 'keyword'],
-                
-                // Template parameters
-                [/<\s*[a-zA-Z_]\w*\s*>/, 'type'],
+                // CUDA Kernel Launch Syntax
+                [/<<<</, 'keyword.control.cuda.kernel-launch'],
+                [/>>>/, 'keyword.control.cuda.kernel-launch'],
 
-                // Function declarations
-                [/\b([a-zA-Z_]\w*)\s*(?=\()/, {
-                    cases: {
-                        '@keywords': 'keyword',
-                        '@default': 'function'
-                    }
-                }],
+                // CUDA vector types like float4, int2, etc. (e.g., int1, float2, uchar4)
+                [/\b((?:u?(?:char|short|int|long|longlong))|float|double)[1-4]\b/, 'type.cuda.vector'],
+                // dim3 is handled by typedefVariables or as a struct by cppKeywords
 
-                // Numbers with suffixes (1.0f, 2.0h, 3ull, etc)
-                [/\d*\.\d+([eE][\-+]?\d+)?[fFlL]?/, 'number.float'],
-                [/0[xX][0-9a-fA-F]+[uUlL]*/, 'number.hex'],
-                [/\d+[uUlL]*/, 'number'],
-                
-                // Identifiers and keywords
+                // Identifiers, keywords, library functions
                 [/[a-zA-Z_]\w*/, {
                     cases: {
-                        '@keywords': 'keyword',
+                        '@cudaLibFunctions': 'support.function.cuda',
+                        '@cudaQualifiers': 'keyword.qualifier.cuda',
+                        '@cudaStorageModifiers': 'storage.modifier.cuda',
+                        '@cudaBuiltinVars': 'variable.language.cuda',
+                        '@typedefVariables': 'type.typedef',
+                        '@storageTypes': 'type',
+                        '@cppKeywords': 'keyword',
                         '@default': 'identifier'
                     }
                 }],
-                
-                // Comments
-                [/\/\*/, 'comment', '@comment'],
-                [/\/\/.*$/, 'comment'],
-                
-                // Strings
-                [/"([^"\\]|\\.)*$/, 'string.invalid'],
-                [/"/, { token: 'string.quote', bracket: '@open', next: '@string' }],
-                
-                // Characters
-                [/'[^\\']'/, 'string'],
-                [/(')(@escapes)(')/, ['string', 'string.escape', 'string']],
-                [/'/, 'string.invalid'],
 
-                // Delimiters and operators
+                // Numbers (covers C++20 digit separators ')
+                [/\b\d*\.\d+([eE][\-+]?\d+)?[fFhH]?\b/, 'number.float'], // f/F for float, h/H for half
+                [/\b0[xX][0-9a-fA-F](?:[0-9a-fA-F']*[0-9a-fA-F])?(?:[uUlL]{0,2})?\b/, 'number.hex'],
+                [/\b0[bB][01](?:[01']*[01])?(?:[uUlL]{0,2})?\b/, 'number.binary'],
+                [/\b\d(?:[\d']*\d)?(?:[uUlL]{0,2})?\b/, 'number'],
+
+                // Delimiters and Operators
                 [/[{}()\[\]]/, '@brackets'],
-                [/[<>](?!@symbols)/, '@brackets'],
+                [/[<>](?!@symbols)/, '@brackets'], // Distinguish < > for templates/generics
                 [/@symbols/, {
                     cases: {
                         '@operators': 'operator',
                         '@default': ''
                     }
                 }],
+                [/[;,~?:`]/, 'delimiter'], // Added backtick, tilde, colon, question mark
 
-                // Delimiter
-                [/[;,.]/, 'delimiter'],
-                
-                // Whitespace
-                [/[ \t\r\n]+/, 'white']
+                // Strings
+                [/"([^"\\]|\\.)*$/, 'string.invalid'],
+                [/"/, { token: 'string.quote', bracket: '@open', next: '@string_double' }],
+
+                // Characters
+                [/'[^\\']'/, 'string.character'],
+                [/(')(@escapes)(')/, ['string.character', 'constant.character.escape', 'string.character']],
+                [/'/, 'string.invalid']
             ],
-            
-            comment: [
+
+            whitespace: [
+                [/[ \t\r\n]+/, ''], // Tokenize whitespace as empty to avoid default coloring
+            ],
+
+            comments: [
+                [/\/\*/, 'comment', '@comment_block'],
+                [/\/\/.*$/, 'comment.line'],
+            ],
+            comment_block: [ // Changed state name for clarity
                 [/[^\/*]+/, 'comment'],
-                [/\/\*/, 'comment', '@push'],
-                ["\\*/", 'comment', '@pop'],
+                [/\*\//, 'comment', '@pop'],
                 [/[\/*]/, 'comment']
             ],
-            
-            string: [
+
+            string_double: [ // Changed state name for clarity
                 [/[^\\"]+/, 'string'],
-                [/@escapes/, 'string.escape'],
+                [/@escapes/, 'constant.character.escape'],
                 [/\\./, 'string.escape.invalid'],
                 [/"/, { token: 'string.quote', bracket: '@close', next: '@pop' }]
-            ]
+            ],
+
+            preprocessor: [
+                [/^\s*#\s*include/, { token: 'keyword.control.directive.include', next: '@include_path'}],
+                [/^\s*#\s*(define|undef|if|ifdef|ifndef|else|elif|endif|line|error|pragma|warning)\b/, 'keyword.control.directive.cpp'],
+            ],
+            include_path: [ // Changed state name for clarity
+                // Matches <path/to/header.h> or "path/to/header.h"
+                [/\s*"/, { token: 'string.include.identifier.quoted', next: '@include_path_body_quoted', bracket: '@open'}],
+                [/\s*</, { token: 'string.include.identifier.angled', next: '@include_path_body_angled', bracket: '@open'}],
+                [/./, '', '@pop'], // Fallback if no path follows
+            ],
+            include_path_body_quoted: [
+                [/[^"]+/, 'string.include.identifier.quoted'],
+                [/"/, {token: 'string.include.identifier.quoted', next: '@pop', bracket: '@close'}],
+            ],
+            include_path_body_angled: [
+                [/[^>]+/, 'string.include.identifier.angled'],
+                [/>/, {token: 'string.include.identifier.angled', next: '@pop', bracket: '@close'}],
+            ],
         }
     });
 }
