@@ -26,9 +26,22 @@ pushd emsdk
 popd
 
 echo "[$(date)] Sync slang repo ..."
+if [ -d slang-repo ]
+then
+	echo "Remove stale slang-repo dir"
+	rm -rf slang-repo
+fi
+
 if [ ! -d slang-repo ]
 then
+	echo "[$(date)] Cloning slang repository into slang-repo..."
 	git clone https://github.com/shader-slang/slang.git slang-repo
+	if [ $? -ne 0 ]
+	then
+		echo "Error: Failed to clone slang repository"
+		exit 1
+	fi
+	echo "[$(date)] Successfully cloned slang repository"
 fi
 
 pushd slang-repo
