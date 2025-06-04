@@ -29,6 +29,7 @@ const compileTargets = [
     "GLSL",
     "METAL",
     "WGSL",
+    "CUDA",
 ] as const
 const targetProfileMap: { [target in typeof compileTargets[number]]?: { default: string, options: string[] } } = {
     // TODO: uncomment when we support specifying profiles.
@@ -41,6 +42,7 @@ const targetLanguageMap: { [target in typeof compileTargets[number]]: string } =
     "GLSL": "generic-shader",
     "METAL": "generic-shader",
     "WGSL": "wgsl",
+    "CUDA": "cuda",
 };
 
 const codeEditor = useTemplateRef("codeEditor");
