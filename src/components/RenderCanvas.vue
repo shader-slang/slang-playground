@@ -19,6 +19,7 @@ let randFloatResources: Map<string, GPUObjectBase>;
 
 let renderThread: Promise<void> | null = null;
 let abortRender = false;
+const pauseRender = ref(false);
 let onRenderAborted: (() => void) | null = null;
 
 const printfBufferElementSize = 12;
@@ -47,6 +48,7 @@ let emit = defineEmits<{
 
 defineExpose({
     onRun,
+    pauseRender
 });
 
 onMounted(() => {
@@ -873,11 +875,13 @@ function onRun(runCompiledCode: CompiledPlayground) {
             if (compiler == null) {
                 throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType !== null && !abortRender) {
+            if (compiler.shaderType !== null && !abortRender && !pauseRender.value) {
                 const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
                 firstFrame = false;
                 return keepRendering;
             }
+            if (!abortRender) return true;
+            
             return false;
         });
 }

@@ -256,6 +256,24 @@ function doRun() {
     }
 }
 
+const isPaused = ref(false);
+function togglePause() {
+    try {
+        tryTogglePause();
+        isPaused.value = !isPaused.value;
+    } catch (e: any) {
+        diagnosticsText.value = e.message;
+    }
+}
+
+function tryTogglePause() {
+    if (!renderCanvas.value) {
+        throw new Error("WebGPU is not supported in this browser");
+    }
+
+    renderCanvas.value!.pauseRender = !renderCanvas.value!.pauseRender;
+}
+
 function tryRun() {
     smallScreenEditorVisible.value = false;
 
@@ -511,6 +529,12 @@ function logError(message: string) {
                         :title="device == null ? `Run shader feature is disabled because the current browser does not support WebGPU.` : `(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.);`"
                         @click="doRun()">&#9658;
                         Run</button>
+
+                    <button :disabled="device == null"
+                        title="Pause or resume the shader's animation loop"
+                        @click="togglePause()">
+                        {{ isPaused ? '&#9654' + ' Resume' : '&#9208' + ' Pause' }}
+                    </button>
                 </div>
 
                 <!-- Entry/Compile section -->
