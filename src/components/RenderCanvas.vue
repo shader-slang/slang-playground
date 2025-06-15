@@ -948,9 +948,6 @@ function onRun(runCompiledCode: CompiledPlayground) {
 </script>
 
 <template>
-    <div class="renderOverlay">
-        <div id="performanceInfo">{{ `${frameTime.toFixed(1)} ms` }}</div>
-    </div>
     <canvas v-bind="$attrs" class="renderCanvas" @mousedown="mousedown" @mousemove="mousemove" @mouseup="mouseup"
         ref="canvas"></canvas>
     <div class="control-bar">
@@ -960,6 +957,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
             <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;</button>
             <button @click="pauseRender = !pauseRender" :title="pauseRender ? 'Resume' : 'Pause'">⏯</button>
             <span class="frame-counter">Frame: {{ frameID }}</span>
+            <span class="perf-info">{{ frameTime.toFixed(1) }} ms</span>
             <span class="fps-counter">FPS: {{ fps }}</span>
             <span class="resolution">Resolution: {{ canvasWidth }}x{{ canvasHeight }}</span>
         </div>
@@ -976,23 +974,6 @@ function onRun(runCompiledCode: CompiledPlayground) {
     height: 100%;
 }
 
-.renderOverlay {
-    position: absolute;
-    padding: 8px;
-    border-radius: 5px;
-    width: fit-content;
-    background: rgba(0, 0, 0, 0.3);
-}
-
-#performanceInfo {
-    color: white;
-    width: fit-content;
-    -moz-user-select: -moz-none;
-    -khtml-user-select: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
 
 .control-bar {
     position: absolute;
