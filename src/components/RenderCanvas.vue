@@ -960,7 +960,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
             <span class="frame-counter">Frame: {{ frameID }}</span>
             <span class="perf-info">{{ frameTime.toFixed(1) }} ms</span>
             <span class="fps-counter">FPS: {{ fps }}</span>
-            <span class="resolution">Resolution: {{ canvasWidth }}x{{ canvasHeight }}</span>
+            <span class="fps-counter">FPS: {{ Math.round(1000 / frameTime) }}</span>
         </div>
         <div class="controls-right">
             <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;</button>
