@@ -54,7 +54,7 @@ const shareButton = useTemplateRef("shareButton");
 const tooltip = useTemplateRef("tooltip");
 const helpModal = useTemplateRef("helpModal");
 const targetSelect = useTemplateRef("targetSelect");
-const renderCanvas = useTemplateRef("renderCanvas");
+const renderCanvas = useTemplateRef<InstanceType<typeof RenderCanvas>>("renderCanvas");
 
 const selectedDemo = ref("");
 const initialized = ref(false);
@@ -115,7 +115,7 @@ onBeforeMount(async () => {
 });
 
 function updateProfileOptions() {
-    const selectedTarget = targetSelect.value!.getValue();
+    const selectedTarget = targetSelect.value!.getValue() as typeof compileTargets[number];
 
     // If the selected target does not have any profiles, hide the profile dropdown.
     const profileData = targetProfileMap[selectedTarget] || null;
@@ -274,10 +274,10 @@ function tryTogglePause() {
     renderCanvas.value!.pauseRender = !renderCanvas.value!.pauseRender;
 }
 
-const frameID = computed(() => renderCanvas.value?.frameID ?? 0);
-const fps = computed(() => renderCanvas.value?.fps ?? 0);
-const canvasWidth = computed(() => renderCanvas.value?.canvasWidth ?? 0);
-const canvasHeight = computed(() => renderCanvas.value?.canvasHeight ?? 0);
+const frameID = computed<number>(() => renderCanvas.value?.frameID ?? 0);
+const fps = computed<number>(() => renderCanvas.value?.fps ?? 0);
+const canvasWidth = computed<number>(() => renderCanvas.value?.canvasWidth ?? 0);
+const canvasHeight = computed<number>(() => renderCanvas.value?.canvasHeight ?? 0);
 
 function resetFrame() {
     if (renderCanvas.value) {
