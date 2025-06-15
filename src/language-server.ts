@@ -511,7 +511,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.hover(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.hover(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -531,7 +531,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.gotoDefinition(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.gotoDefinition(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -565,7 +565,7 @@ export function initMonaco() {
                 triggerCharacter: context.hasOwnProperty("triggerCharacter") ? (context.triggerCharacter || "") : ""
             };
             let result = slangd.completion(
-                userCodeURI,
+                model.uri.toString(),
                 { line: position.lineNumber - 1, character: position.column - 1 },
                 lspContext
             );
@@ -608,7 +608,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.signatureHelp(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.signatureHelp(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -669,7 +669,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.semanticTokens(userCodeURI);
+            let result = slangd.semanticTokens(model.uri.toString());
             if (result == null) {
                 return null;
             }
