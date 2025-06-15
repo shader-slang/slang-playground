@@ -935,14 +935,15 @@ function onRun(runCompiledCode: CompiledPlayground) {
             if (compiler == null) {
                 throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType !== null && !abortRender && !pauseRender.value) {
-                const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
-                firstFrame = false;
-                return keepRendering;
+            if (abortRender) return false;
+            if (pauseRender.value) return true;
+
+            if (compiler.shaderType === null) {
+                // handle this case
             }
-            if (!abortRender) return true;
-            
-            return false;
+            const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
+            firstFrame = false;
+            return keepRendering;
         });
 }
 </script>
