@@ -564,7 +564,6 @@ function logError(message: string) {
                         :title="device == null ? `Run shader feature is disabled because the current browser does not support WebGPU.` : `(F5) Compile and run the shader that provides either 'printMain' or 'imageMain'.);`"
                         @click="doRun()">&#9658;
                         Run</button>
-
                 </div>
 
                 <!-- Entry/Compile section -->

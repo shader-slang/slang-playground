@@ -56,7 +56,6 @@ defineExpose({
     fps,
     canvasWidth: computed(() => canvas.value?.width ?? 0),
     canvasHeight: computed(() => canvas.value?.height ?? 0),
-    stepFrame,
     setFrame,
 });
 
@@ -80,16 +79,6 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 })
-
-/**
- * Step the render by exactly one frame, optionally reset to frame 0 first.
- */
-/**
- * Step the render by exactly one frame, optionally resetting to frame 0 first.
- */
-function stepFrame(reset = false) {
-    setFrame(reset ? 0 : frameID.value + 1);
-}
 
 /**
  * Go to the specified frame index and render exactly that frame.
