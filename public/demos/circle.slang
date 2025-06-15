@@ -7,6 +7,9 @@ import playground;
 [playground::TIME]
 uniform float time;
 
+[playground::FRAME_ID]
+uniform float frame;
+
 typealias vec2 = float2;
 typealias vec3 = float3;
 typealias vec4 = float4;
@@ -45,7 +48,7 @@ float4 imageMain(uint2 dispatchThreadID, int2 screenSize)
 	// draw color beam
 	uv = (2.0 * uv) - 1.0;
 	float beamWidth = (0.7 + 
-        0.5 * cos(uv.x * 10.0 * tau * 0.15 * clamp(floor(5.0 + 10.0 * cos(time)), 0.0, 10.0)))
+        0.5 * cos(uv.x * 10.0 * tau * 0.15 * clamp(floor(5.0 + 10.0 * cos(time/60.f)), 0.0, 10.0)))
         * abs(1.0 / (30.0 * uv.y));
 	vec3 horBeam = vec3(beamWidth);
 	return vec4(((horBeam) * horColour), 1.0);
