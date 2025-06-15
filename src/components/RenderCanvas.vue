@@ -5,7 +5,7 @@ import { ComputePipeline } from '../compute';
 import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
 import { type CallCommand, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
-import { onMounted, ref, computed, useTemplateRef } from 'vue';
+import { onMounted, ref, useTemplateRef } from 'vue';
 import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
 let context: GPUCanvasContext;
@@ -35,6 +35,8 @@ let canvasMouseClicked = false;
 const pressedKeys = new Set<string>();
 
 const canvas = useTemplateRef("canvas");
+const canvasWidth = ref(0);
+const canvasHeight = ref(0);
 const frameTime = ref(0);
 const frameID = ref(0);
 const fps = ref(0);
@@ -54,8 +56,8 @@ defineExpose({
     frameTime,
     frameID,
     fps,
-    canvasWidth: computed(() => canvas.value?.width ?? 0),
-    canvasHeight: computed(() => canvas.value?.height ?? 0),
+    canvasWidth,
+    canvasHeight,
     setFrame,
 });
 
@@ -78,6 +80,12 @@ onMounted(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+
+    // initialize reported canvas size
+    if (canvas.value) {
+        canvasWidth.value = canvas.value.width;
+        canvasHeight.value = canvas.value.height;
+    }
 })
 
 /**
@@ -278,6 +286,10 @@ function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
     let needResize = resizeCanvas(entries);
     if (needResize) {
         handleResize();
+        if (canvas.value) {
+            canvasWidth.value = canvas.value.width;
+            canvasHeight.value = canvas.value.height;
+        }
     }
 }
 
