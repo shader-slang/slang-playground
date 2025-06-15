@@ -599,7 +599,7 @@ function logError(message: string) {
         <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-code-gen' : '.codeGenSpace'">
             <TabContainer ref="tabContainer">
                 <Tab name="code" label="Target Code">
-                    <MonacoEditor ref="codeGenArea" readOnlyMode />
+                    <MonacoEditor ref="codeGenArea" readOnlyMode modelUri="generated.slang" />
                 </Tab>
 
                 <Tab name="reflection" label="Reflection">
