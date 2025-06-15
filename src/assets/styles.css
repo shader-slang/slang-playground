@@ -236,13 +236,6 @@ button:disabled:hover {
   align-items: center;
 }
 
-.navbar-run > button {
-  width: 100px;
-  height: 100%;
-  box-sizing: border-box;
-  text-align: center;
-}
-
 .navbar-compile {
   flex-basis: 50%;
   display: flex;

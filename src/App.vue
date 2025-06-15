@@ -115,7 +115,7 @@ onBeforeMount(async () => {
 });
 
 function updateProfileOptions() {
-    const selectedTarget = targetSelect.value!.getValue() as typeof compileTargets[number];
+    const selectedTarget = targetSelect.value!.getValue();
 
     // If the selected target does not have any profiles, hide the profile dropdown.
     const profileData = targetProfileMap[selectedTarget] || null;
