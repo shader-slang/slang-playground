@@ -11,6 +11,7 @@ import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTempl
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformControllers, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController, isControllerRendered } from './util'
+import { userCodeURI, commonCodeURI } from './language-server'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
@@ -49,6 +50,8 @@ const codeEditor = useTemplateRef("codeEditor");
 const codeGenArea = useTemplateRef("codeGenArea");
 
 const tabContainer = useTemplateRef("tabContainer");
+const editorTabContainer = useTemplateRef("editorTabContainer");
+const commonEditor = useTemplateRef("commonEditor");
 
 const shareButton = useTemplateRef("shareButton");
 const tooltip = useTemplateRef("tooltip");
@@ -154,10 +157,10 @@ onMounted(async () => {
         }
         else if (event.ctrlKey && event.key === 'b') {
             event.preventDefault();
-            // Your custom code here
             onCompile();
         }
     });
+    editorTabContainer.value?.setActiveTab("user");
 })
 
 async function onShare() {
@@ -168,8 +171,11 @@ async function onShare() {
         throw new Error("Share button not initialized");
     };
     try {
-        const code = codeEditor.value.getValue();
-        const compressed = await compressToBase64URL(code);
+        // Include both user and common sources so share URL reproduces both tabs
+        const userCode = codeEditor.value!.getValue();
+        const commonCode = commonEditor.value?.getValue() || "";
+        const sharePayload = JSON.stringify({ user: userCode, common: commonCode });
+        const compressed = await compressToBase64URL(sharePayload);
         let url = new URL(window.location.href.split('?')[0]);
         const compileTarget = targetSelect.value!.getValue();
         url.searchParams.set("target", compileTarget)
@@ -412,7 +418,20 @@ function restoreFromURL(): boolean {
     const code = urlParams.get('code');
     if (code) {
         decompressFromBase64URL(code).then((decompressed) => {
-            codeEditor.value!.setEditorValue(decompressed);
+            // Try JSON payload for user/common; fall back to legacy single-string
+            try {
+                const data = JSON.parse(decompressed);
+                if (commonEditor.value && data.common !== undefined) {
+                    commonEditor.value.setEditorValue(data.common);
+                }
+                if (data.user !== undefined) {
+                    codeEditor.value!.setEditorValue(data.user);
+                } else {
+                    codeEditor.value!.setEditorValue(decompressed);
+                }
+            } catch {
+                codeEditor.value!.setEditorValue(decompressed);
+            }
             updateEntryPointOptions();
             compileOrRun();
         });
@@ -606,7 +625,23 @@ function logError(message: string) {
             </TabContainer>
         </Teleport>
         <Teleport v-if="pageLoaded" defer :to="isSmallScreen ? '#small-screen-editor' : '#big-screen-editor'">
-            <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
+            <TabContainer ref="editorTabContainer">
+                <Tab name="user" label="user.slang">
+                    <MonacoEditor
+                        class="codingSpace"
+                        ref="codeEditor"
+                        :modelUri="userCodeURI"
+                        @vue:mounted="runIfFullyInitialized()"
+                    />
+                </Tab>
+                <Tab name="common" label="common.slang">
+                    <MonacoEditor
+                        class="codingSpace"
+                        ref="commonEditor"
+                        :modelUri="commonCodeURI"
+                    />
+                </Tab>
+            </TabContainer>
         </Teleport>
     </div>
     <Help v-show="showHelp" ref="helpModal"></Help>

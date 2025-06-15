@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTemplateRef, onMounted, ref, shallowRef, onUnmounted } from 'vue'
 import * as monaco from 'monaco-editor';
-import { initLanguageServer, initMonaco, translateSeverity, userCodeURI } from '@/language-server';
+import { initLanguageServer, initMonaco, translateSeverity } from '@/language-server';
 import { compiler, slangd } from '@/try-slang';
 
 const container = useTemplateRef('container')
@@ -35,15 +35,16 @@ function setLanguage(language: string) {
 }
 
 defineExpose({
-	setEditorValue,
-	appendEditorValue,
-	getValue,
-	setLanguage,
+  setEditorValue,
+  appendEditorValue,
+  getValue,
+  setLanguage,
 })
 
 
-let { readOnlyMode } = defineProps<{
-	readOnlyMode?: boolean
+const props = defineProps<{
+  readOnlyMode?: boolean
+  modelUri: string
 }>()
 
 onMounted(() => {
@@ -53,24 +54,26 @@ onMounted(() => {
 		throw new Error("Could not find container for editor");
 	}
 	initMonaco();
-	let model = readOnlyMode
-		? monaco.editor.createModel(preloadCode)
-		: monaco.editor.createModel("", "slang", monaco.Uri.parse(userCodeURI));
-	editor.value = monaco.editor.create(container.value, {
-		model: model,
-		language: readOnlyMode ? 'csharp' : 'slang',
-		theme: 'slang-dark',
-		readOnly: readOnlyMode,
-		lineNumbers: readOnlyMode ? "off" : "on",
-		automaticLayout: true,
-		wordWrap: wordWrap,
-		"semanticHighlighting.enabled": true,
-		renderValidationDecorations: "on",
-		minimap: {
-			enabled: false
-		},
-	});
-	if (!readOnlyMode) {
+   let model = props.readOnlyMode
+     ? monaco.editor.createModel(preloadCode)
+     : monaco.editor.createModel(
+         "",
+         "slang",
+         monaco.Uri.parse(props.modelUri)
+       );
+  editor.value = monaco.editor.create(container.value, {
+    model: model,
+    language: props.readOnlyMode ? 'csharp' : 'slang',
+    theme: 'slang-dark',
+    readOnly: props.readOnlyMode,
+    lineNumbers: props.readOnlyMode ? "off" : "on",
+    automaticLayout: true,
+    wordWrap: wordWrap,
+    "semanticHighlighting.enabled": true,
+    renderValidationDecorations: "on",
+    minimap: { enabled: false },
+  });
+  if (!props.readOnlyMode) {
 		model.onDidChangeContent(codeEditorChangeContent);
 		model.setValue(preloadCode);
 	}
@@ -102,7 +105,15 @@ function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
 			}
 		));
 	try {
-		slangd.didChangeTextDocument(userCodeURI, lspChanges);
+		slangd.didChangeTextDocument(props.modelUri, lspChanges);
+		// Also update the Slang compiler's virtual filesystem so imports (e.g. import common) work
+		if (compiler && editor.value) {
+			const fsPath = monaco.Uri.parse(props.modelUri).path;
+			compiler.slangWasmModule.FS.writeFile(
+				fsPath,
+				editor.value.getValue()
+			);
+		}
 		if (diagnosticTimeout != null) {
 			clearTimeout(diagnosticTimeout);
 		}
@@ -110,7 +121,7 @@ function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
 			if (slangd == null) {
 				throw new Error("Slang is undefined!");
 			}
-			let diagnostics = slangd.getDiagnostics(userCodeURI);
+           let diagnostics = slangd.getDiagnostics(props.modelUri);
 			let model = editor.value?.getModel();
 			if (model == null) {
 				throw new Error("Could not get editor model");
