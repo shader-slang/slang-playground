@@ -11,6 +11,7 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 export const userCodeURI = "file:///user.slang";
+export const commonCodeURI = "file:///common.slang";
 const playgroundCodeURI = "file:///playground.slang";
 let languageRegistered = false;
 export function initMonaco() {
@@ -510,7 +511,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.hover(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.hover(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -530,7 +531,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.gotoDefinition(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.gotoDefinition(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -564,7 +565,7 @@ export function initMonaco() {
                 triggerCharacter: context.hasOwnProperty("triggerCharacter") ? (context.triggerCharacter || "") : ""
             };
             let result = slangd.completion(
-                userCodeURI,
+                model.uri.toString(),
                 { line: position.lineNumber - 1, character: position.column - 1 },
                 lspContext
             );
@@ -607,7 +608,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.signatureHelp(userCodeURI, { line: position.lineNumber - 1, character: position.column - 1 });
+            let result = slangd.signatureHelp(model.uri.toString(), { line: position.lineNumber - 1, character: position.column - 1 });
             if (result == null) {
                 return null;
             }
@@ -668,7 +669,7 @@ export function initMonaco() {
             if (slangd == null) {
                 return null;
             }
-            let result = slangd.semanticTokens(userCodeURI);
+            let result = slangd.semanticTokens(model.uri.toString());
             if (result == null) {
                 return null;
             }
@@ -858,6 +859,7 @@ export function initLanguageServer() {
         throw new Error("Slang is undefined!");
     }
     slangd.didOpenTextDocument(userCodeURI, "");
+    slangd.didOpenTextDocument(commonCodeURI, "");
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 

@@ -109,6 +109,7 @@ export class SlangCompiler {
 
         module.FS.createDataFile("/", "user.slang", new DataView(new ArrayBuffer(0)), true, true, false);
         module.FS.createDataFile("/", "playground.slang", new DataView(new ArrayBuffer(0)), true, true, false);
+        module.FS.createDataFile("/", "common.slang", new DataView(new ArrayBuffer(0)), true, true, false);
     }
 
     init() {
