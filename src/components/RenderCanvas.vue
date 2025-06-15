@@ -51,15 +51,21 @@ let emit = defineEmits<{
 }>();
 
 defineExpose({
-    onRun,
-    pauseRender,
-    frameTime,
-    frameID,
-    fps,
-    canvasWidth,
-    canvasHeight,
-    setFrame,
+    onRun
 });
+
+/**
+ * Toggle full screen on the canvas container.
+ */
+function toggleFullscreen() {
+    const container = canvas.value?.parentElement as HTMLElement | null;
+    if (!container) return;
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+    } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+    }
+}
 
 onMounted(() => {
     if (canvas.value == null) {
@@ -947,6 +953,20 @@ function onRun(runCompiledCode: CompiledPlayground) {
     </div>
     <canvas v-bind="$attrs" class="renderCanvas" @mousedown="mousedown" @mousemove="mousemove" @mouseup="mouseup"
         ref="canvas"></canvas>
+    <div class="control-bar">
+        <div class="controls-left">
+            <button @click="setFrame(0)" title="Reset frame to 0">&#x23EE;</button>
+            <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;</button>
+            <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;</button>
+            <button @click="pauseRender = !pauseRender" :title="pauseRender ? 'Resume' : 'Pause'">⏯</button>
+            <span class="frame-counter">Frame: {{ frameID }}</span>
+            <span class="fps-counter">FPS: {{ fps }}</span>
+            <span class="resolution">Resolution: {{ canvasWidth }}x{{ canvasHeight }}</span>
+        </div>
+        <div class="controls-right">
+            <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;</button>
+        </div>
+    </div>
 </template>
 
 <style scoped>
@@ -972,5 +992,36 @@ function onRun(runCompiledCode: CompiledPlayground) {
     -webkit-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+
+.control-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 32px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: white;
+    font-size: 14px;
+}
+.control-bar .controls-left > * {
+    margin-right: 8px;
+}
+.control-bar .controls-right > * {
+    margin-left: 8px;
+}
+.control-bar button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+}
+.control-bar button:disabled {
+    cursor: default;
+    opacity: 0.5;
 }
 </style>

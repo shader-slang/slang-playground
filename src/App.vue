@@ -256,58 +256,6 @@ function doRun() {
     }
 }
 
-const isPaused = ref(false);
-function togglePause() {
-    try {
-        tryTogglePause();
-        isPaused.value = !isPaused.value;
-    } catch (e: any) {
-        diagnosticsText.value = e.message;
-    }
-}
-
-function tryTogglePause() {
-    if (!renderCanvas.value) {
-        throw new Error("WebGPU is not supported in this browser");
-    }
-
-    renderCanvas.value!.pauseRender = !renderCanvas.value!.pauseRender;
-}
-
-const frameID = computed<number>(() => renderCanvas.value?.frameID ?? 0);
-const fps = computed<number>(() => renderCanvas.value?.fps ?? 0);
-const canvasWidth = computed<number>(() => renderCanvas.value?.canvasWidth ?? 0);
-const canvasHeight = computed<number>(() => renderCanvas.value?.canvasHeight ?? 0);
-
-function resetFrame() {
-    if (renderCanvas.value) {
-        renderCanvas.value.setFrame(0);
-        isPaused.value = true;
-    }
-}
-
-function nextFrame() {
-    if (renderCanvas.value) {
-        renderCanvas.value.setFrame(frameID.value + 1);
-        isPaused.value = true;
-    }
-}
-function prevFrame() {
-    if (renderCanvas.value) {
-        renderCanvas.value.setFrame(frameID.value - 1);
-        isPaused.value = true;
-    }
-}
-
-function toggleFullscreen() {
-    const container = document.getElementById('renderOutput');
-    if (!container) return;
-    if (!document.fullscreenElement) {
-        container.requestFullscreen();
-    } else if (document.exitFullscreen) {
-        document.exitFullscreen();
-    }
-}
 
 function tryRun() {
     smallScreenEditorVisible.value = false;
@@ -626,20 +574,6 @@ function logError(message: string) {
             <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
                 <RenderCanvas :device="device" @log-error="logError" @log-output="(log) => { printedText = log }"
                     ref="renderCanvas"></RenderCanvas>
-                <div class="control-bar">
-                    <div class="controls-left">
-                        <button @click="resetFrame" title="Reset frame to 0">&#x23EE;</button>
-                        <button @click="prevFrame" title="Step backward">&#x23F4;</button>
-                        <button @click="nextFrame" title="Step forward">&#x23F5;</button>
-                        <button @click="togglePause" :title="isPaused ? 'Resume' : 'Pause'">⏯</button>
-                        <span class="frame-counter">Frame: {{ frameID }}</span>
-                        <span class="fps-counter">FPS: {{ fps }}</span>
-                        <span class="resolution">Resolution: {{ canvasWidth }}x{{ canvasHeight }}</span>
-                    </div>
-                    <div class="controls-right">
-                        <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;</button>
-                    </div>
-                </div>
             </div>
             <textarea readonly class="printSpace outputSpace"
                 v-show="currentDisplayMode == 'printMain'">{{ printedText }}</textarea>
@@ -743,36 +677,5 @@ function logError(message: string) {
     background-color: var(--code-editor-background);
     height: 100%;
     overflow-y: scroll;
-}
-
-.control-bar {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 32px;
-    padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    color: white;
-    font-size: 14px;
-}
-.control-bar .controls-left > * {
-    margin-right: 8px;
-}
-.control-bar .controls-right > * {
-    margin-left: 8px;
-}
-.control-bar button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-}
-.control-bar button:disabled {
-    cursor: default;
-    opacity: 0.5;
 }
 </style>
