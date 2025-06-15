@@ -5,7 +5,7 @@ import { ComputePipeline } from '../compute';
 import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
 import { compiler } from '../try-slang';
 import { type CallCommand, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
-import { onMounted, ref, useTemplateRef } from 'vue';
+import { onMounted, ref, computed, useTemplateRef } from 'vue';
 import randFloatShaderCode from "../slang/rand_float.slang?raw";
 
 let context: GPUCanvasContext;
@@ -36,6 +36,8 @@ const pressedKeys = new Set<string>();
 
 const canvas = useTemplateRef("canvas");
 const frameTime = ref(0);
+const frameID = ref(0);
+const fps = ref(0);
 
 const { device } = defineProps<{
     device: GPUDevice;
@@ -48,7 +50,14 @@ let emit = defineEmits<{
 
 defineExpose({
     onRun,
-    pauseRender
+    pauseRender,
+    frameTime,
+    frameID,
+    fps,
+    canvasWidth: computed(() => canvas.value?.width ?? 0),
+    canvasHeight: computed(() => canvas.value?.height ?? 0),
+    stepFrame,
+    setFrame,
 });
 
 onMounted(() => {
@@ -71,6 +80,34 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 })
+
+/**
+ * Step the render by exactly one frame, optionally reset to frame 0 first.
+ */
+/**
+ * Step the render by exactly one frame, optionally resetting to frame 0 first.
+ */
+function stepFrame(reset = false) {
+    setFrame(reset ? 0 : frameID.value + 1);
+}
+
+/**
+ * Go to the specified frame index and render exactly that frame.
+ */
+function setFrame(targetFrame: number) {
+    if (!compiledCode || !compiler) return;
+    // Clamp to non-negative
+    const t = Math.max(0, Math.floor(targetFrame));
+    // Prepare for single frame rendering
+    pauseRender.value = true;
+    // Set internal counter so execFrame's increment brings us to t
+    frameID.value = t - 1;
+    execFrame(performance.now(), compiler.shaderType || null, compiledCode, t === 0)
+        .catch(err => {
+            if (err instanceof Error) emit('logError', `Error rendering frame ${t}: ${err.message}`);
+            else               emit('logError', `Error rendering frame ${t}: ${err}`);
+        });
+}
 
 function handleKeyDown(event: KeyboardEvent) {
     pressedKeys.add(event.key);
@@ -330,6 +367,9 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             });
         } else if (uniformComponent.type == "TIME") {
             uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
+        } else if (uniformComponent.type == "FRAME_ID") {
+            // provide current frame index as float
+            uniformBufferView.setFloat32(offset, frameID.value, true);
         } else if (uniformComponent.type == "MOUSE_POSITION") {
             uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
             uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
@@ -488,12 +528,14 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     const timeElapsed = performance.now() - startTime;
 
+    frameID.value++;
     // Update performance info.
     timeAggregate += timeElapsed;
     frameCount++;
     if (frameCount == 20) {
-        let avgTime = (timeAggregate / frameCount);
+        let avgTime = timeAggregate / frameCount;
         frameTime.value = avgTime;
+        fps.value = Math.round(1000 / avgTime);
         timeAggregate = 0;
         frameCount = 0;
     }
@@ -782,6 +824,12 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             // Initialize the buffer with zeros.
             let bufferDefault: BufferSource = new Float32Array([0.0]);
             device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "FRAME_ID") {
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource = new Float32Array([0.0]);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "MOUSE_POSITION") {
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
@@ -818,10 +866,15 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 }
 
 function onRun(runCompiledCode: CompiledPlayground) {
-    if (!device)
-        return;
-    if (!compiler)
-        return;
+    if (!device) return;
+    if (!compiler) return;
+
+    // reset frame counter and performance stats on (re)start
+    frameID.value = 0;
+    fps.value = 0;
+    frameTime.value = 0;
+    timeAggregate = 0;
+    frameCount = 0;
 
     resetMouse();
 
