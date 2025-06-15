@@ -54,7 +54,7 @@ const shareButton = useTemplateRef("shareButton");
 const tooltip = useTemplateRef("tooltip");
 const helpModal = useTemplateRef("helpModal");
 const targetSelect = useTemplateRef("targetSelect");
-const renderCanvas = useTemplateRef("renderCanvas");
+const renderCanvas = useTemplateRef<InstanceType<typeof RenderCanvas>>("renderCanvas");
 
 const selectedDemo = ref("");
 const initialized = ref(false);
@@ -115,7 +115,7 @@ onBeforeMount(async () => {
 });
 
 function updateProfileOptions() {
-    const selectedTarget = targetSelect.value!.getValue();
+    const selectedTarget = targetSelect.value!.getValue() as typeof compileTargets[number];
 
     // If the selected target does not have any profiles, hide the profile dropdown.
     const profileData = targetProfileMap[selectedTarget] || null;
@@ -255,6 +255,7 @@ function doRun() {
         diagnosticsText.value = e.message;
     }
 }
+
 
 function tryRun() {
     smallScreenEditorVisible.value = false;

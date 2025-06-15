@@ -130,6 +130,12 @@ public struct playground_TIMEAttribute
 {
 };
 
+// Gives the current shader playback frame index.
+[__AttributeUsage(_AttributeTargets.Var)]
+public struct playground_FRAME_IDAttribute
+{
+};
+
 // Gives mouse position info.
 // \`xy\`: mouse position (in pixels) during last button down.
 // \`abs(zw)\`: mouse position during last button click.
