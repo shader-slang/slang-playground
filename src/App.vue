@@ -54,7 +54,7 @@ const shareButton = useTemplateRef("shareButton");
 const tooltip = useTemplateRef("tooltip");
 const helpModal = useTemplateRef("helpModal");
 const targetSelect = useTemplateRef("targetSelect");
-const renderCanvas = useTemplateRef<InstanceType<typeof RenderCanvas>>("renderCanvas");
+const renderCanvas = useTemplateRef("renderCanvas");
 
 const selectedDemo = ref("");
 const initialized = ref(false);
@@ -255,7 +255,6 @@ function doRun() {
         diagnosticsText.value = e.message;
     }
 }
-
 
 function tryRun() {
     smallScreenEditorVisible.value = false;
