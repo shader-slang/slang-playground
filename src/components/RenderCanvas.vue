@@ -35,8 +35,6 @@ let canvasMouseClicked = false;
 const pressedKeys = new Set<string>();
 
 const canvas = useTemplateRef("canvas");
-const canvasWidth = ref(0);
-const canvasHeight = ref(0);
 const frameTime = ref(0);
 const frameID = ref(0);
 const fps = ref(0);
@@ -86,12 +84,6 @@ onMounted(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-
-    // initialize reported canvas size
-    if (canvas.value) {
-        canvasWidth.value = canvas.value.width;
-        canvasHeight.value = canvas.value.height;
-    }
 })
 
 /**
@@ -292,10 +284,6 @@ function resizeCanvasHandler(entries: ResizeObserverEntry[]) {
     let needResize = resizeCanvas(entries);
     if (needResize) {
         handleResize();
-        if (canvas.value) {
-            canvasWidth.value = canvas.value.width;
-            canvasHeight.value = canvas.value.height;
-        }
     }
 }
 
@@ -957,12 +945,12 @@ function onRun(runCompiledCode: CompiledPlayground) {
             <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;</button>
             <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;</button>
             <button @click="pauseRender = !pauseRender" :title="pauseRender ? 'Resume' : 'Pause'">⏯</button>
-            <span class="frame-counter">Frame: {{ frameID }}</span>
-            <span class="perf-info">{{ frameTime.toFixed(1) }} ms</span>
-            <span class="fps-counter">FPS: {{ fps }}</span>
-            <span class="fps-counter">FPS: {{ Math.round(1000 / frameTime) }}</span>
+            <span class="frame-counter">{{ String(frameID).padStart(5, '0') }}</span>
         </div>
         <div class="controls-right">
+            <span>{{ frameTime.toFixed(1) }} ms</span>
+            <span>{{ Math.min(Math.round(1000 / frameTime), 60) }} fps</span>
+            <span>{{ canvas?.width }}x{{ canvas?.height }}</span>
             <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;</button>
         </div>
     </div>
@@ -981,7 +969,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
     bottom: 0;
     left: 0;
     right: 0;
-    height: 32px;
+    height: 36px;
     padding: 4px 8px;
     background: rgba(0, 0, 0, 0.5);
     display: flex;
@@ -989,6 +977,9 @@ function onRun(runCompiledCode: CompiledPlayground) {
     justify-content: space-between;
     color: white;
     font-size: 14px;
+    overflow: hidden;
+    white-space: nowrap; 
+    width: 100%;
 }
 .control-bar .controls-left > * {
     margin-right: 8px;
