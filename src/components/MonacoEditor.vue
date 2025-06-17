@@ -46,6 +46,9 @@ const props = defineProps<{
   readOnlyMode?: boolean
   modelUri: string
 }>()
+const emit = defineEmits<{
+  (e: 'change', value: string): void
+}>()
 
 onMounted(() => {
 	const preloadCode = "";
@@ -86,7 +89,9 @@ onUnmounted(() => {
 	}
 })
 
+
 function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
+	emit('change', editor.value!.getValue())
 	if (slangd == null)
 		return;
 	if (compiler == null) {

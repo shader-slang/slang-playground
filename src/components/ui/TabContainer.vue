@@ -47,7 +47,8 @@ provide(tabInjectKey, {
 })
 
 defineExpose({
-  setActiveTab
+  setActiveTab,
+  activeTab
 })
 </script>
 

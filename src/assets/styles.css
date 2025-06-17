@@ -76,12 +76,6 @@ h2 {
   overflow: hidden;
 }
 
-.leftContainer {
-  display: flex;
-  flex-direction: column;
-  background-color: var(--light-grey);
-  overflow: visible;
-}
 
 .rightContainer {
   overflow: hidden;
