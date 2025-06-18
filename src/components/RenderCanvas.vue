@@ -992,6 +992,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
     border: none;
     color: white;
     cursor: pointer;
+    font-variant-emoji: text;
 }
 .control-bar button:disabled {
     cursor: default;
