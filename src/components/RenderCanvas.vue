@@ -941,17 +941,18 @@ function onRun(runCompiledCode: CompiledPlayground) {
         ref="canvas"></canvas>
     <div class="control-bar">
         <div class="controls-left">
-            <button @click="setFrame(0)" title="Reset frame to 0">&#x23EE;</button>
-            <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;</button>
-            <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;</button>
-            <button @click="pauseRender = !pauseRender" :title="pauseRender ? 'Resume' : 'Pause'">⏯</button>
+            <button @click="setFrame(0)"           title="Reset frame to 0">&#x23EE;&#xFE0E;</button>
+            <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;&#xFE0E;</button>
+            <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;&#xFE0E;</button>
+            <button @click="pauseRender = !pauseRender"
+                    :title="pauseRender ? 'Resume' : 'Pause'">⏯︎</button>
             <span class="frame-counter">{{ String(frameID).padStart(5, '0') }}</span>
         </div>
         <div class="controls-right">
             <span>{{ frameTime.toFixed(1) }} ms</span>
             <span>{{ Math.min(Math.round(1000 / frameTime), 60) }} fps</span>
             <span>{{ canvas?.width }}x{{ canvas?.height }}</span>
-            <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;</button>
+            <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;&#xFE0E;</button>
         </div>
     </div>
 </template>
