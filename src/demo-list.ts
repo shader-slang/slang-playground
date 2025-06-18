@@ -2,6 +2,7 @@ export let demoList = [
   { name: "Simple Print", url: "simple-print.slang" },
   { name: "Simple Image", url: "simple-image.slang" },
   { name: "Image From URL", url: "image-from-url.slang" },
+  { name: "Module From URL", url: "module-from-url.slang" },
   { name: "Multi-kernel Demo", url: "multiple-kernels.slang" },
   { name: "──────────", url: "" },
   { name: "ShaderToy: Circle", url: "circle.slang" },

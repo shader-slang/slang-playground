@@ -11,7 +11,6 @@ import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
 
 export const userCodeURI = "file:///user.slang";
-export const commonCodeURI = "file:///common.slang";
 const playgroundCodeURI = "file:///playground.slang";
 let languageRegistered = false;
 export function initMonaco() {
@@ -859,7 +858,6 @@ export function initLanguageServer() {
         throw new Error("Slang is undefined!");
     }
     slangd.didOpenTextDocument(userCodeURI, "");
-    slangd.didOpenTextDocument(commonCodeURI, "");
     slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
 }
 

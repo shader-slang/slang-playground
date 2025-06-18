@@ -104,9 +104,20 @@ public struct playground_BLACK_SCREENAttribute
     float heightScale;
 };
 
-// Initialize a texture with image from URL.
+// When above textures, initializes the texture with an image from the URL.
+// When above a "void loadModule();" declaration, fetches the referenced slang 
+// file from the URL, and adds it as a tab to the current project which can 
+// then be imported.
 [__AttributeUsage(_AttributeTargets.Var)]
+[__AttributeUsage(_AttributeTargets.Function)]
 public struct playground_URLAttribute
+{
+    string url;
+};
+
+// Import a .slang module from a URL before compilation.
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_MODULE_URLAttribute
 {
     string url;
 };

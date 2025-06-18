@@ -11,7 +11,7 @@ import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, reactive
 import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
 import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformControllers, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController, isControllerRendered } from './util'
-import { userCodeURI, commonCodeURI } from './language-server'
+import { userCodeURI } from './language-server'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
@@ -33,6 +33,42 @@ function normalizeGitHubUrl(input: string): string {
     // ignore
   }
   return input;
+}
+
+// Cache Talos JWT bearer token during session so user is only prompted once
+let talosBearerToken: string | null = null;
+
+async function fetchTextFromUrl(finalURL: URL): Promise<string> {
+  if (finalURL.hostname.endsWith('talos.nvidia.com') &&
+      (finalURL.pathname.startsWith('/api/v1/contents') || finalURL.pathname.startsWith('/contents/'))) {
+    // Support Talos UI paths (/contents/...) by rewriting to the API with matrix params
+    let requestURL = finalURL
+    if (finalURL.pathname.startsWith('/contents/')) {
+      const matrix = ';start=0;limit=9223372036854776000;q=.*;q-lang=pcre;truncate-length=100000'
+      const filePath = finalURL.pathname.substring('/contents'.length)
+      requestURL = new URL(`${finalURL.protocol}//${finalURL.host}/api/v1/contents${matrix}${filePath}`)
+    }
+    if (!talosBearerToken) {
+      talosBearerToken = window.prompt('Enter Talos NVAuth JWT Bearer token')
+    }
+    if (!talosBearerToken) throw new Error('No Talos token provided')
+    const authResp = await fetch(requestURL.toString(), { headers: { Authorization: `Bearer ${talosBearerToken}` } })
+    if (!authResp.ok) throw new Error(`HTTP ${authResp.status} ${authResp.statusText}`)
+    const data: any = await authResp.json()
+    if (Array.isArray(data.results)) {
+      return data.results.map((r: any) => r.content || '').join('\n')
+    }
+    if (Array.isArray(data.lines)) {
+      return data.lines.map((l: any) => typeof l === 'string' ? l : (l.text || '')).join('\n')
+    }
+    if (typeof data.content === 'string') {
+      return data.content
+    }
+    return JSON.stringify(data, null, 2)
+  }
+  const resp = await fetch(finalURL.toString())
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
+  return await resp.text()
 }
 
 // MonacoEditor is a big component, so we load it asynchronously.
@@ -109,15 +145,13 @@ const smallScreenEditorVisible = ref(false);
 // Editor tabs state: default user/common tabs plus imported files
 interface FileTab { name: string; label: string; uri: string; content: string }
 const fileTabs = ref<FileTab[]>([
-  { name: 'user', label: 'user.slang', uri: userCodeURI, content: '' },
-  { name: 'common', label: 'common.slang', uri: commonCodeURI, content: '' }
+  { name: 'user', label: 'user.slang', uri: userCodeURI, content: '' }
 ])
 // Map of MonacoEditor component refs keyed by tab.name
 const editorRefs = reactive<Record<string, any>>({})
 
-// Convenience refs for legacy API (user/common) to drive demos and compile/run
+// Convenience ref for legacy API (user) to drive demos and compile/run
 const codeEditor = computed(() => editorRefs[fileTabs.value[0].name])
-const commonEditor = computed(() => editorRefs[fileTabs.value[1].name])
 
 /**
  * Import .slang from URL into the current tab (with overwrite warning if name matches)
@@ -128,9 +162,7 @@ async function importIntoCurrentTab() {
   const finalURL = new URL(normalizeGitHubUrl(inputURL), window.location.href)
   let text: string
   try {
-    const resp = await fetch(finalURL)
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
-    text = await resp.text()
+    text = await fetchTextFromUrl(finalURL)
   } catch (err: any) {
     diagnosticsText.value = `Failed to import file from URL:\n${err.message}`
     return
@@ -151,9 +183,7 @@ async function importIntoNewTab() {
   const finalURL = new URL(normalizeGitHubUrl(inputURL), window.location.href)
   let text: string
   try {
-    const resp = await fetch(finalURL)
-    if (!resp.ok) throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
-    text = await resp.text()
+    text = await fetchTextFromUrl(finalURL)
   } catch (err: any) {
     diagnosticsText.value = `Failed to import file from URL:\n${err.message}`
     return
@@ -299,7 +329,16 @@ function loadDemo(selectedDemoURL: string) {
         // Retrieve text from selectedDemoURL.
         fetch(finalURL)
             .then((response) => response.text())
-            .then((data) => {
+        .then(async (data) => {
+                if (selectedDemoURL.endsWith("module-from-url.slang")) {
+                    data = await runURLImports(data);
+                    // Activate the newly imported module tab
+                    await nextTick();
+                    const tabs = fileTabs.value;
+                    if (tabs.length > 2) {
+                        editorTabContainer.value?.setActiveTab(tabs[tabs.length - 1].name);
+                    }
+                }
                 codeEditor.value?.setEditorValue(data);
                 updateEntryPointOptions();
                 compileOrRun();
@@ -350,21 +389,67 @@ export type CompiledPlayground = {
     uniformComponents: Ref<UniformController[]>,
 }
 
-function doRun() {
+async function doRun() {
     try {
-        tryRun();
+        await tryRun();
     } catch (e: any) {
         diagnosticsText.value = e.message;
     }
 }
 
-function tryRun() {
+/**
+ * Scan the source for URL-based module void-declarations, fetch each exactly once,
+ * populate FS and editor tabs, strip out the declarations, and return cleaned source.
+ */
+const fetchedURLModules = new Set<string>();
+async function runURLImports(sourceText: string): Promise<string> {
+    const urlImportRe = /\[playground::URL\(\s*"([^"]+)"\s*\)\]\s*void\s+([A-Za-z_]\w*)\s*\(\s*\)\s*;/g;
+    let cleaned = sourceText;
+    let m: RegExpExecArray | null;
+    while ((m = urlImportRe.exec(sourceText)) !== null) {
+        const [, urlStr, modName] = m;
+        const finalURL = new URL(normalizeGitHubUrl(urlStr), window.location.href);
+        const key = finalURL.toString();
+        if (!fetchedURLModules.has(key)) {
+            fetchedURLModules.add(key);
+            let modText: string;
+            try {
+                modText = await fetchTextFromUrl(finalURL);
+            } catch (err: any) {
+                throw new Error(`Failed to fetch module ${modName} from ${urlStr}: ${err.message}`);
+            }
+            const fileName = finalURL.pathname.split('/').pop() || `${modName}.slang`;
+            const existing = fileTabs.value.find(t => t.label === fileName);
+            let tabName: string;
+            if (existing) {
+                existing.content = modText;
+                tabName = existing.name;
+            } else {
+                tabName = fileName.replace(/\W+/g, '_');
+                fileTabs.value.push({ name: tabName, label: fileName, uri: `file:///${fileName}`, content: modText });
+                await nextTick();
+            }
+            editorRefs[tabName]?.setEditorValue(modText);
+            try {
+                compiler?.slangWasmModule.FS.writeFile(
+                    new URL(fileTabs.value.find(t => t.name === tabName)!.uri).pathname,
+                    modText
+                );
+            } catch {}
+        }
+        cleaned = cleaned.replace(m[0], '');
+    }
+    return cleaned;
+}
+
+async function tryRun() {
     smallScreenEditorVisible.value = false;
 
     if (!renderCanvas.value) {
         throw new Error("WebGPU is not supported in this browser");
     }
-    const userSource = codeEditor.value!.getValue()
+    // Use current editor text for shader source
+    const userSource = codeEditor.value!.getValue();
 
     // We will have some restrictions on runnable shader, the user code has to define imageMain or printMain function.
     // We will do a pre-filter on the user input source code, if it's not runnable, we will not run it.
@@ -437,6 +522,7 @@ async function onCompile() {
         await compiler.initSpirvTools();
 
     // compile the compute shader code from input text area
+    // Module-from-url directive is handled natively by Slang; compile directly
     const userSource = codeEditor.value!.getValue();
     compileShader(userSource, selectedEntrypoint.value, compileTarget);
 
@@ -791,7 +877,7 @@ function logError(message: string) {
                         :ref="el => editorRefs[tab.name] = el"
                         :modelUri="tab.uri"
                         @vue:mounted="runIfFullyInitialized"
-                        @change="(val) => { tab.content = val }"
+                        @change="(val) => { tab.content = val; if (tab.name === 'user') contentSource = 'user-code'; }"
                     />
                 </Tab>
             </TabContainer>
