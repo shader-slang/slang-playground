@@ -64,6 +64,8 @@ defineExpose({
         Initialize a <code>float</code> buffer with uniform random floats between 0 and 1.
         <h4 class="doc-header"><code>[playground::TIME]</code></h4>
         Gives a <code>float</code> uniform the current time in milliseconds.
+        <h4 class="doc-header"><code>[playground::FRAME_ID]</code></h4>
+        Gives a <code>float</code> uniform the current frame index (starting from 0).
         <h4 class="doc-header"><code>[playground::MOUSE_POSITION]</code></h4>
         Gives a <code>float4</code> uniform mouse data.
         <ul>

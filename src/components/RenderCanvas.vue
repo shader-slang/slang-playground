@@ -19,6 +19,7 @@ let randFloatResources: Map<string, GPUObjectBase>;
 
 let renderThread: Promise<void> | null = null;
 let abortRender = false;
+const pauseRender = ref(false);
 let onRenderAborted: (() => void) | null = null;
 
 const printfBufferElementSize = 12;
@@ -35,6 +36,8 @@ const pressedKeys = new Set<string>();
 
 const canvas = useTemplateRef("canvas");
 const frameTime = ref(0);
+const frameID = ref(0);
+const fps = ref(0);
 
 const { device } = defineProps<{
     device: GPUDevice;
@@ -46,8 +49,21 @@ let emit = defineEmits<{
 }>();
 
 defineExpose({
-    onRun,
+    onRun
 });
+
+/**
+ * Toggle full screen on the canvas container.
+ */
+function toggleFullscreen() {
+    const container = canvas.value?.parentElement as HTMLElement | null;
+    if (!container) return;
+    if (!document.fullscreenElement) {
+        container.requestFullscreen();
+    } else if (document.exitFullscreen) {
+        document.exitFullscreen();
+    }
+}
 
 onMounted(() => {
     if (canvas.value == null) {
@@ -69,6 +85,24 @@ onMounted(() => {
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
 })
+
+/**
+ * Go to the specified frame index and render exactly that frame.
+ */
+function setFrame(targetFrame: number) {
+    if (!compiledCode || !compiler) return;
+    // Clamp to non-negative
+    const t = Math.max(0, Math.floor(targetFrame));
+    // Prepare for single frame rendering
+    pauseRender.value = true;
+    // Set internal counter so execFrame's increment brings us to t
+    frameID.value = t - 1;
+    execFrame(performance.now(), compiler.shaderType || null, compiledCode, t === 0)
+        .catch(err => {
+            if (err instanceof Error) emit('logError', `Error rendering frame ${t}: ${err.message}`);
+            else               emit('logError', `Error rendering frame ${t}: ${err}`);
+        });
+}
 
 function handleKeyDown(event: KeyboardEvent) {
     pressedKeys.add(event.key);
@@ -328,6 +362,9 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             });
         } else if (uniformComponent.type == "TIME") {
             uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
+        } else if (uniformComponent.type == "FRAME_ID") {
+            // provide current frame index as float
+            uniformBufferView.setFloat32(offset, frameID.value, true);
         } else if (uniformComponent.type == "MOUSE_POSITION") {
             uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
             uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
@@ -486,12 +523,14 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     const timeElapsed = performance.now() - startTime;
 
+    frameID.value++;
     // Update performance info.
     timeAggregate += timeElapsed;
     frameCount++;
     if (frameCount == 20) {
-        let avgTime = (timeAggregate / frameCount);
+        let avgTime = timeAggregate / frameCount;
         frameTime.value = avgTime;
+        fps.value = Math.round(1000 / avgTime);
         timeAggregate = 0;
         frameCount = 0;
     }
@@ -780,6 +819,12 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             // Initialize the buffer with zeros.
             let bufferDefault: BufferSource = new Float32Array([0.0]);
             device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
+        } else if (parsedCommand.type == "FRAME_ID") {
+            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
+
+            // Initialize the buffer with zeros.
+            let bufferDefault: BufferSource = new Float32Array([0.0]);
+            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else if (parsedCommand.type == "MOUSE_POSITION") {
             const buffer = allocatedResources.get("uniformInput") as GPUBuffer
 
@@ -816,10 +861,15 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 }
 
 function onRun(runCompiledCode: CompiledPlayground) {
-    if (!device)
-        return;
-    if (!compiler)
-        return;
+    if (!device) return;
+    if (!compiler) return;
+
+    // reset frame counter and performance stats on (re)start
+    frameID.value = 0;
+    fps.value = 0;
+    frameTime.value = 0;
+    timeAggregate = 0;
+    frameCount = 0;
 
     resetMouse();
 
@@ -873,22 +923,38 @@ function onRun(runCompiledCode: CompiledPlayground) {
             if (compiler == null) {
                 throw new Error("Could not get compiler");
             }
-            if (compiler.shaderType !== null && !abortRender) {
-                const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
-                firstFrame = false;
-                return keepRendering;
+            if (abortRender) return false;
+            if (pauseRender.value) return true;
+
+            if (compiler.shaderType === null) {
+                // handle this case
             }
-            return false;
+            const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
+            firstFrame = false;
+            return keepRendering;
         });
 }
 </script>
 
 <template>
-    <div class="renderOverlay">
-        <div id="performanceInfo">{{ `${frameTime.toFixed(1)} ms` }}</div>
-    </div>
     <canvas v-bind="$attrs" class="renderCanvas" @mousedown="mousedown" @mousemove="mousemove" @mouseup="mouseup"
         ref="canvas"></canvas>
+    <div class="control-bar">
+        <div class="controls-left">
+            <button @click="setFrame(0)"           title="Reset frame to 0">&#x23EE;&#xFE0E;</button>
+            <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;&#xFE0E;</button>
+            <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;&#xFE0E;</button>
+            <button @click="pauseRender = !pauseRender"
+                    :title="pauseRender ? 'Resume' : 'Pause'">⏯︎</button>
+            <span class="frame-counter">{{ String(frameID).padStart(5, '0') }}</span>
+        </div>
+        <div class="controls-right">
+            <span>{{ frameTime.toFixed(1) }} ms</span>
+            <span>{{ Math.min(Math.round(1000 / frameTime), 60) }} fps</span>
+            <span>{{ canvas?.width }}x{{ canvas?.height }}</span>
+            <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;&#xFE0E;</button>
+        </div>
+    </div>
 </template>
 
 <style scoped>
@@ -898,21 +964,39 @@ function onRun(runCompiledCode: CompiledPlayground) {
     height: 100%;
 }
 
-.renderOverlay {
-    position: absolute;
-    padding: 8px;
-    border-radius: 5px;
-    width: fit-content;
-    background: rgba(0, 0, 0, 0.3);
-}
 
-#performanceInfo {
+.control-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     color: white;
-    width: fit-content;
-    -moz-user-select: -moz-none;
-    -khtml-user-select: none;
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+    font-size: 14px;
+    overflow: hidden;
+    white-space: nowrap; 
+    width: 100%;
+}
+.control-bar .controls-left > * {
+    margin-right: 8px;
+}
+.control-bar .controls-right > * {
+    margin-left: 8px;
+}
+.control-bar button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-variant-emoji: text;
+}
+.control-bar button:disabled {
+    cursor: default;
+    opacity: 0.5;
 }
 </style>
