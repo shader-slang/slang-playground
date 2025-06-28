@@ -13,82 +13,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: get emsdk
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build
-          git clone https://github.com/emscripten-core/emsdk.git
-          sed -i 's/\r$//' emsdk/emsdk emsdk/emsdk_env.sh
-
-      - name: get slang head commit
-        run: |
-          git clone https://github.com/shader-slang/slang.git slang-repo
-          git -C slang-repo rev-parse HEAD > key.txt
-
-      - name: get spirv-tool head commit
-        run: |
-          git clone https://github.com/KhronosGroup/SPIRV-Tools.git spirv-tools
-          pushd spirv-tools
-          git checkout vulkan-sdk-1.3.290.0
-          popd
-          git -C spirv-tools rev-parse HEAD > key-spirv-tool.txt
-
-      - name: restore slang-wasm
-        id: cache_slang
-        uses: actions/cache/restore@v4
+      - name: Build and cache WASM dependencies
+        uses: ./.github/actions/build-wasm-deps
         with:
-          path: |
-            ./slang-wasm.wasm.gz
-            ./slang-wasm.js
-            ./slang-wasm.d.ts
-          key: ${{hashFiles('key.txt')}}
-
-      - name: restore spirv-tools
-        id: cache_spirv_tools
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ./spirv-tools.wasm
-            ./spirv-tools.js
-            ./spirv-tools.d.ts
-          key: ${{hashFiles('key-spirv-tool.txt')}}
-
-      - name: slang-wasm build
-        if: steps.cache_slang.outputs.cache-hit != 'true'
-        run: |
-          sed -i 's/\r$//' ./slang-wasm-build.sh
-          /bin/bash -x ./slang-wasm-build.sh
-
-      - name: save slang-wasm
-        if: always() && steps.cache_slang.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ./slang-wasm.wasm.gz
-            ./slang-wasm.js
-            ./slang-wasm.d.ts
-          key: ${{hashFiles('key.txt')}}
-
-      - name: spirv-tools-wasm build
-        if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
-        run: |
-          sed -i 's/\r$//' ./spirv-tool-wasm-build.sh
-          /bin/bash -x ./spirv-tool-wasm-build.sh
-
-      - name: save spirv-tools-wasm
-        if: always() && steps.cache_spirv_tools.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ./spirv-tools.wasm
-            ./spirv-tools.js
-            ./spirv-tools.d.ts
-          key: ${{hashFiles('key-spirv-tool.txt')}}
+          build-artifacts-dir: ./src
 
       - name: Build
         run: |
-          cp ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./src/
-          cp ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ./src/
           npm install
           npm run build
 
@@ -101,6 +32,7 @@ jobs:
 
       - name: Smoke test
         run: |
+          cp ./src/slang-wasm.wasm.gz ./src/slang-wasm.js ./src/slang-wasm.d.ts ./
           pushd emsdk
           /bin/sh ./emsdk install latest
           /bin/sh ./emsdk activate latest
@@ -110,8 +42,3 @@ jobs:
           cp src/slang-wasm.wasm ./
           cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
           node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
-
-      - name: Cleanup workspace
-        run: |
-          rm -rf slang-repo emsdk spirv-tools
-          rm ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts
