@@ -115,9 +115,6 @@ async function tryGetDevice() {
         "float32-blendable",
         "clip-distances",
         "dual-source-blending",
-        "subgroups",
-        "texture-formats-tier1",
-        "texture-formats-tier2",
     ];
     const requiredFeatures: GPUFeatureName[] = allowedFeatures.filter(f => adapter.features.has(f));
 
