@@ -100,9 +100,25 @@ async function tryGetDevice() {
         console.log('need a browser that supports WebGPU');
         return null;
     }
-    const requiredFeatures: [] = [];
+    // Allow list of GPU features that can impact WGSL
+    const allowedFeatures: GPUFeatureName[] = [
+        "depth32float-stencil8",
+        "texture-compression-bc",
+        "texture-compression-bc-sliced-3d",
+        "texture-compression-etc2",
+        "texture-compression-astc",
+        "texture-compression-astc-sliced-3d",
+        "shader-f16",
+        "rg11b10ufloat-renderable",
+        "bgra8unorm-storage",
+        "float32-filterable",
+        "float32-blendable",
+        "clip-distances",
+        "dual-source-blending",
+    ];
+    const requiredFeatures: GPUFeatureName[] = allowedFeatures.filter(f => adapter.features.has(f));
 
-    let device = await adapter?.requestDevice({ requiredFeatures });
+    let device = await adapter.requestDevice({ requiredFeatures });
     if (!device) {
         console.log('need a browser that supports WebGPU');
         return null;
