@@ -1,10 +1,10 @@
-import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Session } from '../media/slang-wasm.worker.js';
+import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Session } from '../media/slang-wasm.js';
 import playgroundSource from "./slang/playground.slang?raw";
 import imageMainSource from "./slang/imageMain.slang?raw";
 import printMainSource from "./slang/printMain.slang?raw";
 import { RUNNABLE_ENTRY_POINT_NAMES } from "slang-playground-shared";
-import type { HashedStringData, ScalarType, ReflectionParameter, ReflectionJSON, Bindings, RunnableShaderType, ShaderType, Shader, Result, CompileRequest, CompileTarget } from 'slang-playground-shared'
-import type { SpirvTools } from '../media/spirv-tools.worker';
+import type { HashedStringData, ScalarType, ReflectionParameter, ReflectionJSON, Bindings, RunnableShaderType, Shader, Result, CompileRequest, CompileTarget } from 'slang-playground-shared'
+import type { SpirvTools } from '../media/spirv-tools.js';
 import { ACCESS_MAP, getTextureFormat, webgpuFormatfromSlangFormat } from './compilationUtils.js';
 
 export function isWholeProgramTarget(compileTarget: CompileTarget) {
@@ -101,35 +101,35 @@ export class SlangCompiler {
 		}
 	}
 
-    async initSpirvTools(spirvToolsInitializer: () => Promise<SpirvTools>) {
-        if (!this.spirvToolsModule) {
-            this.spirvToolsModule = await spirvToolsInitializer();
-        }
-    }
+	async initSpirvTools(spirvToolsInitializer: () => Promise<SpirvTools>) {
+		if (!this.spirvToolsModule) {
+			this.spirvToolsModule = await spirvToolsInitializer();
+		}
+	}
 
-    spirvDisassembly(spirvBinary: any): Result<string> {
-        if (!this.spirvToolsModule)
-            throw new Error("Spirv tools not initialized");
-        let disAsmCode = this.spirvToolsModule.dis(
-            spirvBinary,
-            this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
-            this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_INDENT |
-            this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES
-        );
+	spirvDisassembly(spirvBinary: any): Result<string> {
+		if (!this.spirvToolsModule)
+			throw new Error("Spirv tools not initialized");
+		let disAsmCode = this.spirvToolsModule.dis(
+			spirvBinary,
+			this.spirvToolsModule.SPV_ENV_UNIVERSAL_1_3,
+			this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_INDENT |
+			this.spirvToolsModule.SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES
+		);
 
 
-        if (disAsmCode == "Error") {
+		if (disAsmCode == "Error") {
 			return {
 				succ: false,
 				message: "Error disassembling SPIR-V code",
 			};
 		}
 
-        return {
+		return {
 			succ: true,
 			result: disAsmCode,
 		};
-    }
+	}
 
 	// If user code defines imageMain or printMain, we will know the entry point name because they're
 	// already defined in our pre-built module. So we will add those one of those entry points to the
