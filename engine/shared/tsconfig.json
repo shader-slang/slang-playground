@@ -1,17 +1,12 @@
 {
+	"extends": "../tsconfig.base.json",
 	"compilerOptions": {
-		"module": "commonjs",
-		"target": "es2020",
 		"lib": [
 			"es2020",
 			"WebWorker",
 			"DOM"
 		],
 		"rootDir": "src",
-		"sourceMap": true,
-		"types": [
-			"@webgpu/types",
-		],
 		"composite": true,
 		"outDir": "dist"
 	},

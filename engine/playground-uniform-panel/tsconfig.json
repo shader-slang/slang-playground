@@ -1,25 +1,9 @@
 {
 	"compilerOptions": {
-		"module": "esnext",
-		"target": "esnext",
-		"lib": [
-			"esnext",
-			"WebWorker",
-			"DOM"
-		],
 		"rootDir": "src",
-		"sourceMap": true,
-		"types": [
-			"@webgpu/types",
-		],
-		"moduleResolution": "bundler"
 	},
 	"include": [
 		"src"
 	],
-	"exclude": [
-		"node_modules",
-		".vscode-test-web"
-	],
-	"references": [{ "path": "../shared/tsconfig.json" }]
+	"extends": "../tsconfig.base.json"
 }
