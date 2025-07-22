@@ -1,5 +1,17 @@
 {
     "name": "slang-playground-engine",
     "version": "0.0.1",
-    "workspaces": ["shared", "slang-compilation-engine", "playground-render-canvas", "playground-uniform-panel"]
+    "workspaces": [
+        "shared",
+        "slang-compilation-engine",
+        "playground-render-canvas",
+        "playground-uniform-panel"
+    ],
+    "scripts": {
+        "build": "npm-run-all --parallel build:*",
+        "build:shared": "npm --prefix ./shared run build",
+        "build:slang-compilation-engine": "npm --prefix ./slang-compilation-engine run build",
+        "build:playground-render-canvas": "npm --prefix ./playground-render-canvas run build",
+        "build:playground-uniform-panel": "npm --prefix ./playground-uniform-panel run build"
+    }
 }

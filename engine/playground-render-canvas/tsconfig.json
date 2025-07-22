@@ -12,7 +12,7 @@
 		"types": [
 			"@webgpu/types",
 		],
-    	"moduleResolution": "bundler"
+		"moduleResolution": "bundler"
 	},
 	"include": [
 		"src"

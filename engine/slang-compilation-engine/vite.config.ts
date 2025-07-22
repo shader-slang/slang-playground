@@ -8,9 +8,7 @@ export default defineConfig({
       name: 'slang-compilation-engine',
       fileName: (format) => `index.${format}.js`
     },
-    rollupOptions: {
-      external: ['vscode'],
-    },
+    rollupOptions: {},
     sourcemap: true,
   },
   assetsInclude: ['**/*.slang'],
