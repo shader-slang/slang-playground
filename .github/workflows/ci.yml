@@ -46,4 +46,4 @@ jobs:
           gzip -d src/slang-wasm.wasm.gz
           cp src/slang-wasm.wasm ./
           cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
-          node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
+          node slang-repo/smoke-test.js engine/slang-compilation-engine/src/slang/rand_float.slang computeMain
