@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "run-p type-check build-engine \"build-only {@}\" --",
+    "build": "npm --prefix ./engine run build && run-p type-check build-only",
     "build-engine": "npm --prefix ./engine run build",
     "preview": "vite preview",
     "build-only": "vite build",

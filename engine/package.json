@@ -8,7 +8,7 @@
         "playground-uniform-panel"
     ],
     "scripts": {
-        "build": "npm-run-all --parallel build:*",
+        "build": "npm run build:shared && npm-run-all --parallel build:slang-compilation-engine build:playground-render-canvas build:playground-uniform-panel",
         "build:shared": "npm --prefix ./shared run build",
         "build:slang-compilation-engine": "npm --prefix ./slang-compilation-engine run build",
         "build:playground-render-canvas": "npm --prefix ./playground-render-canvas run build",

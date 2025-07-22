@@ -1,10 +1,10 @@
-import type { ComponentType, EmbindString, GlobalSession, MainModule, Module, Session } from '../media/slang-wasm.js';
+import type { ComponentType, GlobalSession, MainModule, Module, Session } from '../media/slang-wasm.d.ts';
 import playgroundSource from "./slang/playground.slang?raw";
 import imageMainSource from "./slang/imageMain.slang?raw";
 import printMainSource from "./slang/printMain.slang?raw";
 import { RUNNABLE_ENTRY_POINT_NAMES } from "slang-playground-shared";
 import type { HashedStringData, ScalarType, ReflectionParameter, ReflectionJSON, Bindings, RunnableShaderType, Shader, Result, CompileRequest, CompileTarget } from 'slang-playground-shared'
-import type { SpirvTools } from '../media/spirv-tools.js';
+import type { SpirvTools } from '../media/spirv-tools.d.ts';
 import { ACCESS_MAP, getTextureFormat, webgpuFormatfromSlangFormat } from './compilationUtils.js';
 
 export function isWholeProgramTarget(compileTarget: CompileTarget) {
