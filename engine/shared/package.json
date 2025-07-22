@@ -1,5 +1,6 @@
 {
 	"name": "slang-playground-shared",
+	"version": "0.0.1",
 	"description": "Shared code for the Slang VSCode extension",
 	"main": "dist/index.umd.js",
 	"module": "dist/index.es.js",

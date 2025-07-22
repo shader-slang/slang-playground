@@ -1,5 +1,6 @@
 {
 	"name": "playground-render-canvas",
+	"version": "0.0.1",
 	"description": "Extension for the Slang Shading Language",
 	"main": "dist/index.umd.js",
 	"module": "dist/index.es.js",
