@@ -29,7 +29,7 @@ const { name, min, max } = defineProps<{
     flex-direction: row;
     align-items: center;
     min-width: 0;
-    color: white;
+    color: var(--vscode-editor-foreground, var(--code-editor-foreground));
 
 }
 
@@ -51,7 +51,7 @@ const { name, min, max } = defineProps<{
 
 .numberInput {
     background-color: transparent;
-    color: white;
+    color: var(--vscode-editor-foreground, var(--code-editor-foreground));
     border: none;
     outline: none;
     width: 60px;

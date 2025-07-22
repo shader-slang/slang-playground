@@ -40,7 +40,7 @@ function updateColor(event: Event) {
     flex-direction: row;
     align-items: center;
     min-width: 0;
-    color: white;
+    color: var(--vscode-editor-foreground, var(--code-editor-foreground));
 
 }
 

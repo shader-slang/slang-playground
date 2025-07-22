@@ -19,7 +19,11 @@
     "monaco-editor": "^0.52.0",
     "pako": "^2.1.0",
     "splitpanes": "^3.1.8",
-    "vue": "^3.5.13"
+    "vue": "^3.5.17",
+		"playground-render-canvas": "file:./engine/playground-render-canvas",
+		"playground-uniform-panel": "file:./engine/playground-uniform-panel",
+		"slang-compilation-engine": "file:./engine/slang-compilation-engine",
+		"slang-playground-shared": "file:./engine/shared"
   },
   "devDependencies": {
     "@tsconfig/node22": "^22.0.0",

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useTemplateRef, onMounted, ref, shallowRef, onUnmounted } from 'vue'
 import * as monaco from 'monaco-editor';
-import { initLanguageServer, initMonaco, translateSeverity, userCodeURI } from '@/language-server';
-import { compiler, slangd } from '@/try-slang';
+import { initLanguageServer, initMonaco, translateSeverity, userCodeURI } from '../language-server';
+import { compiler, slangd } from '../try-slang';
 
 const container = useTemplateRef('container')
 const editor = shallowRef<monaco.editor.IStandaloneCodeEditor>();
@@ -91,6 +91,11 @@ function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
 	}
 	let lspChanges = new compiler.slangWasmModule.TextEditList();
 
+	{
+		const FS = compiler.slangWasmModule.FS;
+		FS.writeFile("/user.slang", editor.value!.getValue());
+	}
+	
 	e.changes.forEach(change =>
 		lspChanges.push_back(
 			{
