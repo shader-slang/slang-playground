@@ -21,7 +21,7 @@
 		"type-check": "vue-tsc --build"
 	},
 	"dependencies": {
-		"slang-playground-shared": "file:../shared"
+		"slang-playground-shared": "0.0.1"
 	},
 	"peerDependencies": {
 		"vue": "^3.5.17"

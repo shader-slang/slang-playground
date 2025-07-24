@@ -1,12 +1,7 @@
 {
     "name": "slang-playground-engine",
     "version": "0.0.1",
-    "workspaces": [
-        "shared",
-        "slang-compilation-engine",
-        "playground-render-canvas",
-        "playground-uniform-panel"
-    ],
+    "workspaces": ["*"],
     "scripts": {
         "build": "npm run build -w shared && npm run build --workspaces --exclude=shared"
     }
