@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "dev": "vite",
-    "build": "npm --prefix ./engine run build && run-p type-check build-only",
-    "build-engine": "npm --prefix ./engine run build",
+    "build": "npm run build-engine && run-p type-check build-only",
+    "build-engine": "npm run build -w slang-playground-shared && npm run build --workspaces --exclude=slang-playground-shared",
     "preview": "vite preview",
     "build-only": "vite build",
     "type-check": "vue-tsc --build"
