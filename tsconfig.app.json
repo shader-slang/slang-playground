@@ -3,21 +3,13 @@
   "include": [
     "env.d.ts",
     "src/**/*",
-    "src/**/*.vue",
-    "compiler.ts",
-    "compute.ts",
-    "demos/demo-list.ts",
-    "language-server.ts",
-    "src/main.ts",
-    "pass_through.ts",
-    "playgroundShader.ts",
-    "try-slang.ts",
-    "util.ts"
+    "src/**/*.vue"
 , "public/jsontree"  ],
   "exclude": [
     "src/**/__tests__/*"
   ],
   "compilerOptions": {
+    "baseUrl": ".",
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "paths": {
       "@/*": [
