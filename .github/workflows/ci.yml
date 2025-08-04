@@ -18,11 +18,6 @@ jobs:
         with:
           build-artifacts-dir: ./src
 
-      - name: Copy types to compilation engine
-        run: |
-          cp ./src/slang-wasm.d.ts ./engine/slang-compilation-engine/media/slang-wasm.d.ts
-          cp ./src/spirv-tools.d.ts ./engine/slang-compilation-engine/media/spirv-tools.d.ts
-
       - name: Build
         run: |
           npm install
@@ -46,4 +41,4 @@ jobs:
           gzip -d src/slang-wasm.wasm.gz
           cp src/slang-wasm.wasm ./
           cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
-          node slang-repo/smoke-test.js engine/slang-compilation-engine/src/slang/rand_float.slang computeMain
+          node slang-repo/smoke-test.js src/slang/rand_float.slang computeMain
