@@ -351,7 +351,10 @@ async function compileShader(userSource: string, entryPoint: string, compileTarg
         noWebGPU: device.value == null
     }, '/user.slang', [], spirvTools);
     if (compiledResult.succ == false) {
-        diagnosticsText.value = compiledResult.message + "\n" + compiledResult.log;
+        diagnosticsText.value = compiledResult.message;
+        if(compiledResult.log) {
+            diagnosticsText.value += "\n" + compiledResult.log;
+        }
         codeGenArea.value?.setEditorValue('Compilation returned empty result.');
         return compiledResult;
     }
