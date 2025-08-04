@@ -4,7 +4,6 @@ import { defineConfig, PluginOption, PreviewServerHook, ServerHook } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import vueDevTools from 'vite-plugin-vue-devtools'
-import { resolve } from 'path'
 
 function gzipFixPlugin(): PluginOption {
   const fixHeader: PreviewServerHook & ServerHook = (server) => {
@@ -36,6 +35,8 @@ export default defineConfig({
   ],
   base: '',
   resolve: {
-    dedupe: ['vue']
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    },
   },
 })

@@ -3,23 +3,20 @@ import TabContainer from './components/ui/TabContainer.vue'
 import Tab from './components/ui/Tab.vue'
 import Selector from './components/ui/Selector.vue'
 import Tooltip from './components/ui/Tooltip.vue'
+import Slider from './components/ui/Slider.vue'
 import Help from './components/Help.vue'
-import { RenderCanvas } from 'playground-render-canvas';
-import 'playground-render-canvas/dist/playground-render-canvas.css';
-import { UniformPanel } from 'playground-uniform-panel';
-import 'playground-uniform-panel/dist/playground-uniform-panel.css';
+import RenderCanvas from './components/RenderCanvas.vue'
 import { compiler, checkShaderType, slangd, moduleLoadingMessage } from './try-slang'
-import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, shallowRef, useTemplateRef, watch, type Ref } from 'vue'
-import { isWholeProgramTarget, compilePlayground } from 'slang-compilation-engine'
+import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, useTemplateRef, watch, type Ref } from 'vue'
+import { isWholeProgramTarget, type Bindings, type ReflectionJSON, type RunnableShaderType, type ShaderType } from './compiler'
 import { demoList } from './demo-list'
-import { compressToBase64URL, decompressFromBase64URL, isWebGPUSupported } from './util'
+import { compressToBase64URL, decompressFromBase64URL, getResourceCommandsFromAttributes, getUniformSize, getUniformControllers, isWebGPUSupported, parseCallCommands, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController, isControllerRendered } from './util'
 import type { ThreadGroupSize } from './slang-wasm'
 import { Splitpanes, Pane } from 'splitpanes'
 import 'splitpanes/dist/splitpanes.css'
 import ReflectionView from './components/ReflectionView.vue'
+import Colorpick from './components/ui/Colorpick.vue'
 import { useWindowSize } from '@vueuse/core'
-import { default as spirvTools } from "./spirv-tools.js";
-import { type Result, type Shader, type ReflectionJSON, type RunnableShaderType, type ShaderType, type CallCommand, type HashedStringData, type ResourceCommand, type UniformController, isControllerRendered } from 'slang-playground-shared'
 
 // MonacoEditor is a big component, so we load it asynchronously.
 const MonacoEditor = defineAsyncComponent(() => import('./components/MonacoEditor.vue'))
@@ -78,7 +75,7 @@ watch(diagnosticsText, (newText, _) => {
         tabContainer.value?.setActiveTab("diagnostics")
     }
 })
-const device = shallowRef<GPUDevice | null>(null);
+const device = ref<GPUDevice | null>(null);
 
 const currentDisplayMode = ref<ShaderType>("imageMain");
 const uniformComponents = ref<UniformController[]>([])
@@ -159,7 +156,7 @@ function updateProfileOptions() {
 
 onMounted(async () => {
     pageLoaded.value = true;
-    if (!device.value) {
+    if (!device) {
         logError(moduleLoadingMessage + "Browser does not support WebGPU, Run shader feature is disabled.");
     }
     runIfFullyInitialized();
@@ -228,12 +225,7 @@ function loadDemo(selectedDemoURL: string) {
 function updateEntryPointOptions() {
     if (!compiler)
         return;
-    let entrypointsResult = compiler.findDefinedEntryPoints(codeEditor.value!.getValue(), window.location.href + "user.slang");
-    if (!entrypointsResult.succ) {
-        console.error("Failed to find entry points: ", entrypointsResult.message);
-        return;
-    }
-    entrypoints.value = entrypointsResult.result;
+    entrypoints.value = compiler.findDefinedEntryPoints(codeEditor.value!.getValue());
     if ((selectedEntrypoint.value == "" || !entrypoints.value.includes(selectedEntrypoint.value)) && entrypoints.value.length > 0)
         selectedEntrypoint.value = entrypoints.value[0];
 }
@@ -262,6 +254,16 @@ function compileOrRun() {
     }
 }
 
+export type CompiledPlayground = {
+    slangSource: string,
+    shader: Shader,
+    mainEntryPoint: RunnableShaderType,
+    resourceCommands: ResourceCommand[],
+    callCommands: CallCommand[],
+    uniformSize: number,
+    uniformComponents: Ref<UniformController[]>,
+}
+
 function doRun() {
     try {
         tryRun();
@@ -270,7 +272,7 @@ function doRun() {
     }
 }
 
-async function tryRun() {
+function tryRun() {
     smallScreenEditorVisible.value = false;
 
     if (!renderCanvas.value) {
@@ -288,27 +290,43 @@ async function tryRun() {
     }
 
     const entryPointName = shaderType;
-    const compilationResult = await compileShader(userSource, entryPointName, "WGSL");
+    const ret = compileShader(userSource, entryPointName, "WGSL");
 
-    const compiledPlaygroundResult = compilePlayground(compilationResult, window.location.href + 'user.slang', shaderType);
-
-    if (compiledPlaygroundResult.succ == false) {
+    if (!ret.succ) {
         toggleDisplayMode(null);
-        diagnosticsText.value = compiledPlaygroundResult.message;
-        codeGenArea.value?.setEditorValue('Compilation returned empty result.');
         return;
     }
 
-    const compiledPlayground = compiledPlaygroundResult.result;
-
-    uniformComponents.value = compiledPlayground.uniformComponents
+    let resourceCommands = getResourceCommandsFromAttributes(ret.reflection);
+    let uniformSize = getUniformSize(ret.reflection)
+    uniformComponents.value = getUniformControllers(resourceCommands)
 
     if (areAnyUniformsRendered.value) {
         tabContainer.value?.setActiveTab("uniforms")
     }
-    toggleDisplayMode(shaderType);
 
-    renderCanvas.value.onRun(compiledPlayground);
+    let callCommands: CallCommand[] | null = null;
+    try {
+        callCommands = parseCallCommands(ret.reflection);
+    }
+    catch (error: any) {
+        throw new Error("Error while parsing CALL commands: " + error.message);
+    }
+
+    if (compiler == null) {
+        throw new Error("Could not get compiler");
+    }
+    toggleDisplayMode(compiler.shaderType);
+
+    renderCanvas.value.onRun({
+        slangSource: userSource,
+        shader: ret,
+        mainEntryPoint: entryPointName,
+        resourceCommands,
+        callCommands,
+        uniformSize,
+        uniformComponents: uniformComponents,
+    });
 }
 
 // For the compile button action, we don't have restriction on user code that it has to define imageMain or printMain function.
@@ -330,46 +348,57 @@ async function onCompile() {
     if (compiler == null) throw new Error("Compiler doesn't exist");
 
     if (compileTarget == "SPIRV")
-        await compiler.initSpirvTools(spirvTools);
+        await compiler.initSpirvTools();
 
     // compile the compute shader code from input text area
     const userSource = codeEditor.value!.getValue();
     compileShader(userSource, selectedEntrypoint.value, compileTarget);
+
+    if (compiler.diagnosticsMsg.length > 0) {
+        diagnosticsText.value = compiler.diagnosticsMsg;
+        return;
+    }
 }
 
 function toggleDisplayMode(displayMode: ShaderType) {
     currentDisplayMode.value = displayMode;
 }
 
-async function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number]): Promise<Result<Shader>> {
+export type Shader = {
+    succ: true,
+    code: string,
+    layout: Bindings,
+    hashedStrings: HashedStringData,
+    reflection: ReflectionJSON,
+    threadGroupSizes: { [key: string]: [number, number, number] },
+};
+
+export type MaybeShader = Shader | {
+    succ: false
+};
+
+function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number]): MaybeShader {
     if (compiler == null) throw new Error("No compiler available");
-    const compiledResult = await compiler.compile({
-        target: compileTarget,
-        entrypoint: entryPoint,
-        sourceCode: userSource,
-        shaderPath: '/user.slang',
-        noWebGPU: device.value == null
-    }, '/user.slang', [], spirvTools);
-    if (compiledResult.succ == false) {
-        diagnosticsText.value = compiledResult.message;
-        if(compiledResult.log) {
-            diagnosticsText.value += "\n" + compiledResult.log;
-        }
+    const compiledResult = compiler.compile(userSource, entryPoint, compileTarget, device.value == null);
+    diagnosticsText.value = compiler.diagnosticsMsg;
+
+    // If compile is failed, we just clear the codeGenArea
+    if (!compiledResult) {
         codeGenArea.value?.setEditorValue('Compilation returned empty result.');
-        return compiledResult;
+        return { succ: false };
     }
-    diagnosticsText.value = "";
 
-    reflectionJson = compiledResult.result.reflection;
+    let [compiledCode, layout, hashedStrings, reflectionJsonObj, threadGroupSizes] = compiledResult;
+    reflectionJson = reflectionJsonObj;
 
-    codeGenArea.value?.setEditorValue(compiledResult.result.code);
+    codeGenArea.value?.setEditorValue(compiledCode);
     codeGenArea.value?.setLanguage(targetLanguageMap[compileTarget]);
 
     // Update reflection info.
     window.$jsontree.setJson("reflectionDiv", reflectionJson);
     window.$jsontree.refreshAll();
 
-    return compiledResult;
+    return { succ: true, code: compiledCode, layout: layout, hashedStrings, reflection: reflectionJson, threadGroupSizes };
 }
 
 function restoreFromURL(): boolean {
@@ -558,7 +587,7 @@ function logError(message: string) {
         </Teleport>
         <Teleport defer :to="isSmallScreen ? '#small-screen-display' : '.outputSpace'" v-if="device != null">
             <div id="renderOutput" v-show="currentDisplayMode == 'imageMain'">
-                <RenderCanvas :device="device" :show-fullscreen-toggle="true" @log-error="logError" @log-output="(log) => { printedText = log }"
+                <RenderCanvas :device="device" @log-error="logError" @log-output="(log) => { printedText = log }"
                     ref="renderCanvas"></RenderCanvas>
             </div>
             <textarea readonly class="printSpace outputSpace"
@@ -576,7 +605,15 @@ function logError(message: string) {
 
                 <Tab name="uniforms" label="Uniforms"
                     v-if="currentDisplayMode == 'imageMain' && areAnyUniformsRendered">
-                    <UniformPanel :uniformComponents="uniformComponents"/>
+                    <div class="uniformPanel">
+                        <div v-for="uniformComponent in uniformComponents">
+                            <Slider v-if="uniformComponent.type == 'SLIDER'" :name="uniformComponent.name"
+                                v-model:value="uniformComponent.value" :min="uniformComponent.min"
+                                :max="uniformComponent.max" />
+                            <Colorpick v-if="uniformComponent.type == 'COLOR_PICK'" :name="uniformComponent.name"
+                                v-model:value="uniformComponent.value" />
+                        </div>
+                    </div>
                 </Tab>
 
                 <Tab name="diagnostics" label="Diagnostics" v-if="diagnosticsText != ''">
@@ -649,5 +686,11 @@ function logError(message: string) {
 
 .resultSpace [style*="display: none"]~.splitpanes__splitter~div {
     height: 100% !important;
+}
+
+.uniformPanel {
+    background-color: var(--code-editor-background);
+    height: 100%;
+    overflow-y: scroll;
 }
 </style>
