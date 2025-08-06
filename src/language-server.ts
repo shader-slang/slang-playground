@@ -31,7 +31,23 @@ export function initMonaco() {
             return new editorWorker();
         }
     };
+    monaco.editor.defineTheme("slang-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: "function", foreground: "DCDCAA" },
+            { token: "parameter", foreground: "B0B0B0" },
+            { token: "variable", foreground: "8CDCFE" },
+            { token: "enumMember", foreground: "98AD1C" },
+        ],
+        colors: {
+            "editor.foreground": "#F0F0F0",
+        },
+    });
     monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+}
+
+export function initMonacoLanguages() {
     if (languageRegistered)
         return;
     languageRegistered = true;
@@ -489,20 +505,6 @@ export function initMonaco() {
             // If no match is found, return null
             return null;
         }
-    });
-
-    monaco.editor.defineTheme("slang-dark", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-            { token: "function", foreground: "DCDCAA" },
-            { token: "parameter", foreground: "B0B0B0" },
-            { token: "variable", foreground: "8CDCFE" },
-            { token: "enumMember", foreground: "98AD1C" },
-        ],
-        colors: {
-            "editor.foreground": "#F0F0F0",
-        },
     });
 
     monaco.languages.registerHoverProvider("slang", {

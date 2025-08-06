@@ -411,8 +411,6 @@ function restoreFromURL(): boolean {
 
 async function runIfFullyInitialized() {
     if (compiler && slangd && pageLoaded && codeEditor.value) {
-        (await import("./language-server")).initLanguageServer();
-
         initialized.value = true;
 
         let gotCodeFromUrl = restoreFromURL();

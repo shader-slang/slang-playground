@@ -68,6 +68,7 @@ createModule(moduleConfig).then((module) => {
         {
             let FS = module.FS;
             FS.writeFile("/playground.slang", PLAYGROUND_SOURCE);
+            FS.writeFile("/user.slang", "");
         }
         compiler = new SlangCompiler(module);
         let result = compiler.init();

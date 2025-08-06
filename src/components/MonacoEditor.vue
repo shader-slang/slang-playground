@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useTemplateRef, onMounted, ref, shallowRef, onUnmounted } from 'vue'
 import * as monaco from 'monaco-editor';
-import { initLanguageServer, initMonaco, translateSeverity, userCodeURI } from '../language-server';
+import { initLanguageServer, initMonaco, initMonacoLanguages, translateSeverity, userCodeURI } from '../language-server';
 import { compiler, slangd } from '../try-slang';
 
 const container = useTemplateRef('container')
@@ -74,6 +74,16 @@ onMounted(() => {
 		model.onDidChangeContent(codeEditorChangeContent);
 		model.setValue(preloadCode);
 	}
+	async function setupMonaco() {
+		initLanguageServer();
+		initMonacoLanguages();
+	}
+	// Wait for WASM to be loaded before initializing Monaco and the language server
+	if (slangd || compiler) {
+		setupMonaco();
+	} else {
+		window.addEventListener('slangLoaded', setupMonaco, { once: true });
+	}
 })
 
 onUnmounted(() => {
@@ -95,7 +105,7 @@ function codeEditorChangeContent(e: monaco.editor.IModelContentChangedEvent) {
 		const FS = compiler.slangWasmModule.FS;
 		FS.writeFile("/user.slang", editor.value!.getValue());
 	}
-	
+
 	e.changes.forEach(change =>
 		lspChanges.push_back(
 			{
