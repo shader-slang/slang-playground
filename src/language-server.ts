@@ -1,5 +1,4 @@
 import { slangd } from './try-slang.js';
-import playgroundSource from "./slang/playground.slang?raw";
 import type { CompletionContext } from './slang-wasm.js';
 
 import * as monaco from "monaco-editor";
@@ -9,6 +8,7 @@ import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker';
 import cssWorker from 'monaco-editor/esm/vs/language/css/css.worker?worker';
 import htmlWorker from 'monaco-editor/esm/vs/language/html/html.worker?worker';
 import tsWorker from 'monaco-editor/esm/vs/language/typescript/ts.worker?worker';
+import { PLAYGROUND_SOURCE } from 'slang-compilation-engine';
 
 export const userCodeURI = "file:///user.slang";
 const playgroundCodeURI = "file:///playground.slang";
@@ -31,7 +31,23 @@ export function initMonaco() {
             return new editorWorker();
         }
     };
+    monaco.editor.defineTheme("slang-dark", {
+        base: "vs-dark",
+        inherit: true,
+        rules: [
+            { token: "function", foreground: "DCDCAA" },
+            { token: "parameter", foreground: "B0B0B0" },
+            { token: "variable", foreground: "8CDCFE" },
+            { token: "enumMember", foreground: "98AD1C" },
+        ],
+        colors: {
+            "editor.foreground": "#F0F0F0",
+        },
+    });
     monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+}
+
+export function initMonacoLanguages() {
     if (languageRegistered)
         return;
     languageRegistered = true;
@@ -491,20 +507,6 @@ export function initMonaco() {
         }
     });
 
-    monaco.editor.defineTheme("slang-dark", {
-        base: "vs-dark",
-        inherit: true,
-        rules: [
-            { token: "function", foreground: "DCDCAA" },
-            { token: "parameter", foreground: "B0B0B0" },
-            { token: "variable", foreground: "8CDCFE" },
-            { token: "enumMember", foreground: "98AD1C" },
-        ],
-        colors: {
-            "editor.foreground": "#F0F0F0",
-        },
-    });
-
     monaco.languages.registerHoverProvider("slang", {
         provideHover: function (model, position) {
             if (slangd == null) {
@@ -858,7 +860,7 @@ export function initLanguageServer() {
         throw new Error("Slang is undefined!");
     }
     slangd.didOpenTextDocument(userCodeURI, "");
-    slangd.didOpenTextDocument(playgroundCodeURI, playgroundSource);
+    slangd.didOpenTextDocument(playgroundCodeURI, PLAYGROUND_SOURCE);
 }
 
 export function translateSeverity(severity: number) {

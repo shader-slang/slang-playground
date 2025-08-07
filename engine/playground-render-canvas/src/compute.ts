@@ -1,5 +1,4 @@
-import type { Bindings } from "./compiler";
-import type { ThreadGroupSize } from "./slang-wasm";
+import type { Bindings } from "slang-playground-shared";
 
 export class ComputePipeline {
     pipeline: GPUComputePipeline | undefined;
@@ -26,7 +25,7 @@ export class ComputePipeline {
         this.resourceBindings = resourceDescriptors;
 
         const entries: GPUBindGroupLayoutEntry[] = [];
-        for (const [name, binding] of this.resourceBindings) {
+        for (const binding of Object.values(this.resourceBindings)) {
             entries.push(binding);
         }
         const bindGroupLayoutDescriptor: GPUBindGroupLayoutDescriptor = {
@@ -60,7 +59,7 @@ export class ComputePipeline {
 
         const entries: GPUBindGroupEntry[] = [];
         for (const [name, resource] of allocatedResources) {
-            const bindInfo = this.resourceBindings.get(name);
+            const bindInfo = this.resourceBindings[name];
 
             if (bindInfo) {
                 if (bindInfo.buffer) {
@@ -91,10 +90,10 @@ export class ComputePipeline {
         }
 
         // Check that all resources are bound
-        if (entries.length != this.resourceBindings.size) {
+        if (entries.length != Object.keys(this.resourceBindings).length) {
             let missingEntries: string[] = []
             // print out the names of the resources that aren't bound
-            for (const [name, resource] of this.resourceBindings) {
+            for (const [name, resource] of Object.entries(this.resourceBindings)) {
                 if (!entries.find(entry => entry.binding == resource.binding)) {
                     missingEntries.push(name);
                 }

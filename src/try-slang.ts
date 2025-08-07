@@ -1,4 +1,5 @@
-import { SlangCompiler, RUNNABLE_ENTRY_POINT_NAMES } from './compiler.js';
+import { PLAYGROUND_SOURCE, SlangCompiler } from 'slang-compilation-engine';
+import { RUNNABLE_ENTRY_POINT_NAMES } from "slang-playground-shared";
 import { fetchWithProgress } from './util.js';
 import type { LanguageServer, MainModule } from "./slang-wasm.js";
 import type { PublicApi as JJsonPublicApi } from "jjsontree.js/src/ts/api.js"
@@ -64,15 +65,20 @@ createModule(moduleConfig).then((module) => {
     if (label)
         label.innerText = "Initializing Slang Compiler...";
     try {
+        {
+            let FS = module.FS;
+            FS.writeFile("/playground.slang", PLAYGROUND_SOURCE);
+            FS.writeFile("/user.slang", "");
+        }
         compiler = new SlangCompiler(module);
         let result = compiler.init();
         slangd = module.createLanguageServer();
-        if (result.ret) {
+        if (result.succ) {
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";
             window.dispatchEvent(new CustomEvent('slangLoaded', {}));
         }
         else {
-            console.log(result.msg);
+            console.log(result.message);
             moduleLoadingMessage = "Failed to initialize Slang Compiler.\n";
             if (label)
                 label.innerText = moduleLoadingMessage;
