@@ -1,13 +1,7 @@
 import { CallCommand, CompiledPlayground, ParsedCommand, ReflectionJSON, ReflectionType, ResourceCommand, Result, ScalarType, Shader, SlangFormat, UniformController } from "slang-playground-shared";
 import { ACCESS_MAP, webgpuFormatfromSlangFormat, getTextureFormat } from "./compilationUtils";
 
-export function compilePlayground(compileResult: Result<Shader>, uri: string, entrypoint: string): Result<CompiledPlayground> {
-    if (!compileResult.succ) {
-        return compileResult;
-    }
-
-    const compilation = compileResult.result;
-
+export function compilePlayground(compilation: Shader, uri: string, entrypoint: string): Result<CompiledPlayground> {
     let resourceCommandsResult = getResourceCommandsFromAttributes(compilation.reflection);
     if (resourceCommandsResult.succ == false) {
         return resourceCommandsResult;

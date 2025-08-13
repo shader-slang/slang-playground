@@ -266,16 +266,9 @@ function compileOrRun() {
     }
 }
 
-function doRun() {
-    try {
-        tryRun();
-    } catch (e: any) {
-        diagnosticsText.value = e.message;
-    }
-}
-
-async function tryRun() {
+async function doRun() {
     smallScreenEditorVisible.value = false;
+    diagnosticsText.value = "";
 
     if (!renderCanvas.value) {
         throw new Error("WebGPU is not supported in this browser");
@@ -294,12 +287,20 @@ async function tryRun() {
     const entryPointName = shaderType;
     const compilationResult = await compileShader(userSource, entryPointName, "WGSL", false);
 
-    const compiledPlaygroundResult = compilePlayground(compilationResult, window.location.href + 'user.slang', shaderType);
+    if (compilationResult.succ == false) {
+        // compileShader takes care of diagnostics already, so they aren't added here
+        toggleDisplayMode(null);
+        return;
+    }
+
+    const compiledPlaygroundResult = compilePlayground(compilationResult.result, window.location.href + 'user.slang', shaderType);
 
     if (compiledPlaygroundResult.succ == false) {
         toggleDisplayMode(null);
-        diagnosticsText.value = compiledPlaygroundResult.message;
-        codeGenArea.value?.setEditorValue('Compilation returned empty result.');
+        diagnosticsText.value += compiledPlaygroundResult.message;
+        if(compiledPlaygroundResult.log) {
+            diagnosticsText.value += "\n" + compiledPlaygroundResult.log;
+        }
         return;
     }
 
@@ -320,6 +321,7 @@ async function tryRun() {
 // have no way to call the user defined function, and compile engine cannot compile the source code.
 async function onCompile() {
     smallScreenEditorVisible.value = false;
+    diagnosticsText.value = "";
 
     toggleDisplayMode(null);
     const compileTarget = targetSelect.value!.getValue();
@@ -355,14 +357,13 @@ async function compileShader(userSource: string, entryPoint: string, compileTarg
         noWebGPU,
     }, '/user.slang', [], spirvTools);
     if (compiledResult.succ == false) {
-        diagnosticsText.value = compiledResult.message;
+        diagnosticsText.value += compiledResult.message;
         if(compiledResult.log) {
             diagnosticsText.value += "\n" + compiledResult.log;
         }
         codeGenArea.value?.setEditorValue('Compilation returned empty result.');
         return compiledResult;
     }
-    diagnosticsText.value = "";
 
     reflectionJson = compiledResult.result.reflection;
 
