@@ -230,7 +230,11 @@ function updateEntryPointOptions() {
         return;
     let entrypointsResult = compiler.findDefinedEntryPoints(codeEditor.value!.getValue(), window.location.href + "user.slang");
     if (!entrypointsResult.succ) {
-        console.error("Failed to find entry points: ", entrypointsResult.message);
+        let errorMessage = `Failed to find entry points: ${entrypointsResult.message}`;
+        if (entrypointsResult.log) {
+            errorMessage += "\n" + entrypointsResult.log;
+        }
+        console.error(errorMessage);
         return;
     }
     entrypoints.value = entrypointsResult.result;
@@ -288,7 +292,7 @@ async function tryRun() {
     }
 
     const entryPointName = shaderType;
-    const compilationResult = await compileShader(userSource, entryPointName, "WGSL");
+    const compilationResult = await compileShader(userSource, entryPointName, "WGSL", false);
 
     const compiledPlaygroundResult = compilePlayground(compilationResult, window.location.href + 'user.slang', shaderType);
 
@@ -334,21 +338,21 @@ async function onCompile() {
 
     // compile the compute shader code from input text area
     const userSource = codeEditor.value!.getValue();
-    compileShader(userSource, selectedEntrypoint.value, compileTarget);
+    compileShader(userSource, selectedEntrypoint.value, compileTarget, true);
 }
 
 function toggleDisplayMode(displayMode: ShaderType) {
     currentDisplayMode.value = displayMode;
 }
 
-async function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number]): Promise<Result<Shader>> {
+async function compileShader(userSource: string, entryPoint: string, compileTarget: typeof compileTargets[number], noWebGPU: boolean): Promise<Result<Shader>> {
     if (compiler == null) throw new Error("No compiler available");
     const compiledResult = await compiler.compile({
         target: compileTarget,
         entrypoint: entryPoint,
         sourceCode: userSource,
         shaderPath: '/user.slang',
-        noWebGPU: device.value == null
+        noWebGPU,
     }, '/user.slang', [], spirvTools);
     if (compiledResult.succ == false) {
         diagnosticsText.value = compiledResult.message;
