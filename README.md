@@ -33,6 +33,8 @@ Move them into the `src` directory of the slang-playground.
 
 Run `npm install` to install dependencies.
 
+Run `npm run build-engine` to build library files. You will need to do this any time they are updated.
+
 Run `npm run dev` to start the development server. The command will show you the URL where you can access the playground.
 
 Run `npm run build` to build the project. It will create a `dist` directory with the build artifacts. The website should be hostable on any static file server from this directory.

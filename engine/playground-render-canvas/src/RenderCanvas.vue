@@ -1,21 +1,18 @@
 <script setup lang="ts">
-import type { CompiledPlayground } from '@/App.vue';
-import type { Bindings, ShaderType } from '../compiler';
-import { ComputePipeline } from '../compute';
-import { GraphicsPipeline, passThroughshaderCode } from '../pass_through';
-import { compiler } from '../try-slang';
-import { type CallCommand, NotReadyError, parsePrintfBuffer, type ResourceCommand, sizeFromFormat } from '../util';
-import { onMounted, ref, useTemplateRef } from 'vue';
-import randFloatShaderCode from "../slang/rand_float.slang?raw";
+import { ComputePipeline } from './compute';
+import { GraphicsPipeline, passThroughshaderCode } from './pass_through';
+import { NotReadyError, parsePrintfBuffer, sizeFromFormat, isWebGPUSupported } from './canvasUtils';
+import type { Bindings, CallCommand, CompiledPlayground, PlaygroundMessage, ResourceCommand, RunnableShaderType, ShaderType } from 'slang-playground-shared';
+import { onMounted, ref, useTemplateRef, type Ref, inject } from 'vue';
 
+let fileUri: string;
 let context: GPUCanvasContext;
-let randFloatPipeline: ComputePipeline;
+let shaderType: RunnableShaderType;
 let computePipelines: ComputePipeline[] = [];
 let passThroughPipeline: GraphicsPipeline;
 
 let compiledCode: CompiledPlayground;
 let allocatedResources: Map<string, GPUObjectBase>;
-let randFloatResources: Map<string, GPUObjectBase>;
 
 let renderThread: Promise<void> | null = null;
 let abortRender = false;
@@ -34,22 +31,24 @@ let canvasMouseClicked = false;
 
 const pressedKeys = new Set<string>();
 
-const canvas = useTemplateRef("canvas");
+const canvas = useTemplateRef("canvasRef");
 const frameTime = ref(0);
 const frameID = ref(0);
 const fps = ref(0);
 
-const { device } = defineProps<{
+const { device, showFullscreenToggle } = defineProps<{
     device: GPUDevice;
+    showFullscreenToggle: Boolean;
 }>()
 
-let emit = defineEmits<{
+const emit = defineEmits<{
     (e: 'logError', message: string): void;
     (e: 'logOutput', message: string): void;
+    (e: 'mounted'): void;
 }>();
 
 defineExpose({
-    onRun
+    onRun,
 });
 
 /**
@@ -65,7 +64,7 @@ function toggleFullscreen() {
     }
 }
 
-onMounted(() => {
+onMounted(async () => {
     if (canvas.value == null) {
         throw new Error("Could not get canvas element");
     }
@@ -84,23 +83,25 @@ onMounted(() => {
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+
+    emit('mounted');
 })
 
 /**
  * Go to the specified frame index and render exactly that frame.
  */
 function setFrame(targetFrame: number) {
-    if (!compiledCode || !compiler) return;
+    if (!compiledCode) return;
     // Clamp to non-negative
     const t = Math.max(0, Math.floor(targetFrame));
     // Prepare for single frame rendering
     pauseRender.value = true;
     // Set internal counter so execFrame's increment brings us to t
     frameID.value = t - 1;
-    execFrame(performance.now(), compiler.shaderType || null, compiledCode, t === 0)
+    execFrame(performance.now(), shaderType, compiledCode, t === 0)
         .catch(err => {
             if (err instanceof Error) emit('logError', `Error rendering frame ${t}: ${err.message}`);
-            else               emit('logError', `Error rendering frame ${t}: ${err}`);
+            else emit('logError', `Error rendering frame ${t}: ${err}`);
         });
 }
 
@@ -157,7 +158,7 @@ function withRenderLock(setupFn: { (): Promise<void>; }, renderFn: { (timeMS: nu
             const newRenderLoop = async (timeMS: number) => {
                 let nextFrame = false;
                 try {
-                    const keepRendering = await renderFn(timeMS, compiler?.shaderType || null);
+                    const keepRendering = await renderFn(timeMS, shaderType);
                     nextFrame = keepRendering && !abortRender;
                     if (nextFrame)
                         requestAnimationFrame(newRenderLoop);
@@ -219,7 +220,7 @@ function handleResize() {
             const height = parsedCommand.height_scale * currentWindowSize[1];
             const size = width * height;
 
-            const bindingInfo = compiledCode.shader.layout.get(resourceName);
+            const bindingInfo = compiledCode.shader.layout[resourceName];
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
@@ -352,7 +353,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
     let uniformBufferData = new ArrayBuffer(playgroundData.uniformSize);
     let uniformBufferView = new DataView(uniformBufferData);
 
-    for (let uniformComponent of playgroundData.uniformComponents.value) {
+    for (let uniformComponent of playgroundData.uniformComponents) {
         let offset = uniformComponent.buffer_offset;
         if (uniformComponent.type == "SLIDER") {
             uniformBufferView.setFloat32(offset, uniformComponent.value, true);
@@ -363,7 +364,6 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         } else if (uniformComponent.type == "TIME") {
             uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
         } else if (uniformComponent.type == "FRAME_ID") {
-            // provide current frame index as float
             uniformBufferView.setFloat32(offset, frameID.value, true);
         } else if (uniformComponent.type == "MOUSE_POSITION") {
             uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
@@ -407,16 +407,23 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
     if (!(printfBufferRead instanceof GPUBuffer)) {
         throw new Error("printfBufferRead is not a buffer");
     }
+    let g_printedBuffer = allocatedResources.get("g_printedBuffer")
+    if (!(g_printedBuffer instanceof GPUBuffer)) {
+        throw new Error("g_printedBuffer is not a buffer");
+    }
     if (currentDisplayMode == "printMain") {
         encoder.clearBuffer(printfBufferRead);
+        encoder.clearBuffer(g_printedBuffer);
     }
 
     // zip the computePipelines and callCommands together
+    let anyEntryPointRan = false;
     for (const [pipeline, command] of playgroundData.callCommands.map((x: CallCommand, i: number) => [computePipelines[i], x] as const)) {
         if (command.callOnce && !firstFrame) {
             // If the command is marked as callOnce and it's not the first frame, skip it.
             continue;
         }
+        anyEntryPointRan = true;
         const pass = encoder.beginComputePass({ label: `${command.fnName} compute pass` });
         pass.setBindGroup(0, pipeline.bindGroup || null);
         if (pipeline.pipeline == undefined) {
@@ -427,7 +434,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         let size: [number, number, number];
         if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
-                emit("logError", "Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
+                console.error("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();
                 return false;
             }
@@ -442,7 +449,7 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             }
             else {
                 pass.end();
-                emit("logError", "Error when dispatching " + command.fnName + ". Resource type not supported for dispatch: " + resource);
+                emit("logError", "Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 return false;
             }
         } else if (command.type == "FIXED_SIZE") {
@@ -476,6 +483,10 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
         pass.end();
     }
 
+    if (!anyEntryPointRan) {
+        pauseRender.value = true;
+    }
+
     if (currentDisplayMode == "imageMain") {
         const renderPassDescriptor = passThroughPipeline.createRenderPassDesc(context.getCurrentTexture().createView());
         const renderPass = encoder.beginRenderPass(renderPassDescriptor);
@@ -491,10 +502,6 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
 
     // copy output buffer back in print mode
     if (currentDisplayMode == "printMain") {
-        let g_printedBuffer = allocatedResources.get("g_printedBuffer")
-        if (!(g_printedBuffer instanceof GPUBuffer)) {
-            throw new Error("g_printedBuffer is not a buffer");
-        }
         encoder.copyBufferToBuffer(
             g_printedBuffer, 0, printfBufferRead, 0, g_printedBuffer.size);
     }
@@ -508,17 +515,16 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
     if (currentDisplayMode == "printMain") {
         await printfBufferRead.mapAsync(GPUMapMode.READ);
 
-        let textResult = "";
         const formatPrint = parsePrintfBuffer(
             compiledCode.shader.hashedStrings,
             printfBufferRead,
             printfBufferElementSize);
 
-        if (formatPrint.length != 0)
-            textResult += "Shader Output:\n" + formatPrint.join("") + "\n";
+        if (formatPrint.length != 0) {
+            emit("logOutput", formatPrint.join(""));
+        }
 
         printfBufferRead.unmap();
-        emit("logOutput", textResult);
     }
 
     const timeElapsed = performance.now() - startTime;
@@ -558,7 +564,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
     for (const { resourceName, parsedCommand } of resourceCommands) {
         if (parsedCommand.type === "ZEROS") {
             const elementSize = parsedCommand.elementSize;
-            const bindingInfo = resourceBindings.get(resourceName);
+            const bindingInfo = resourceBindings[resourceName];
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
@@ -589,7 +595,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             safeSet(allocatedResources, resourceName, sampler);
         } else if (parsedCommand.type === "BLACK") {
             const size = parsedCommand.width * parsedCommand.height;
-            const bindingInfo = resourceBindings.get(resourceName);
+            const bindingInfo = resourceBindings[resourceName];
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
@@ -628,7 +634,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             const height = parsedCommand.height_scale * currentWindowSize[1];
             const size = width * height;
 
-            const bindingInfo = resourceBindings.get(resourceName);
+            const bindingInfo = resourceBindings[resourceName];
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
@@ -666,7 +672,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             }
         } else if (parsedCommand.type === "URL") {
             // Load image from URL and wait for it to be ready.
-            const bindingInfo = resourceBindings.get(resourceName);
+            const bindingInfo = resourceBindings[resourceName];
 
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
@@ -680,13 +686,16 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             const format = parsedCommand.format;
 
             const image = new Image();
+
+            let url = new URL(parsedCommand.url, fileUri).href; // Resolve relative URLs against the file URI
+
             try {
                 // TODO: Pop-up a warning if the image is not CORS-enabled.
                 // TODO: Pop-up a warning for the user to confirm that its okay to load a cross-origin image (i.e. do you trust this code..)
                 //
                 image.crossOrigin = "anonymous";
 
-                image.src = parsedCommand.url;
+                image.src = url;
                 await image.decode();
             }
             catch (error) {
@@ -706,9 +715,54 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
             catch (error) {
                 throw new Error(`Failed to create texture from image: ${error}`);
             }
+        } else if (parsedCommand.type === "DATA") {
+            const bindingInfo = resourceBindings[resourceName];
+            if (!bindingInfo) {
+                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+            }
+
+            if (!bindingInfo.buffer) {
+                throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
+            }
+
+            try {
+                // Resolve relative URLs against the file URI
+                let url = new URL(parsedCommand.url, fileUri).href;
+
+                // Fetch binary data from URL
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch data from ${url}: ${response.statusText}`);
+                }
+
+                const arrayBuffer = await response.arrayBuffer();
+                const data = new Uint8Array(arrayBuffer);
+
+                // Calculate buffer size (must be multiple of element size)
+                const elementCount = Math.floor(data.length / parsedCommand.elementSize);
+                const bufferSize = elementCount * parsedCommand.elementSize;
+
+                if (bufferSize === 0) {
+                    throw new Error(`Data from ${url} is too small for element size ${parsedCommand.elementSize}`);
+                }
+
+                // Create GPU buffer
+                const buffer = device.createBuffer({
+                    size: bufferSize,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                });
+
+                // Upload data to GPU buffer (only the aligned portion)
+                device.queue.writeBuffer(buffer, 0, data.slice(0, bufferSize));
+
+                safeSet(allocatedResources, resourceName, buffer);
+            }
+            catch (error) {
+                throw new Error(`Failed to process DATA command for ${resourceName}: ${error}`);
+            }
         } else if (parsedCommand.type === "RAND") {
             const elementSize = 4; // RAND is only valid for floats
-            const bindingInfo = resourceBindings.get(resourceName);
+            const bindingInfo = resourceBindings[resourceName];
             if (!bindingInfo) {
                 throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
             }
@@ -722,73 +776,17 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
             });
 
+            const floatArray = new Float32Array(parsedCommand.count);
+            for (let i = 0; i < parsedCommand.count; i++) {
+                floatArray[i] = Math.random();
+            }
+
+            const data = new Uint8Array(floatArray.buffer);
+
+            // Upload data to GPU buffer (only the aligned portion)
+            device.queue.writeBuffer(buffer, 0, data);
+
             safeSet(allocatedResources, resourceName, buffer);
-
-            // Place a call to a shader that fills the buffer with random numbers.
-            if (!randFloatPipeline) {
-                const randomPipeline = new ComputePipeline(device);
-
-                if (compiler == null) {
-                    throw new Error("Compiler is not defined!");
-                }
-                const compiledResult = compiler.compile(randFloatShaderCode, "computeMain", "WGSL", false);
-                if (!compiledResult) {
-                    throw new Error("[Internal] Failed to compile randFloat shader");
-                }
-
-                let [code, layout] = compiledResult;
-                const module = device.createShaderModule({ code: code });
-
-                randomPipeline.createPipelineLayout(layout);
-
-                // Create the pipeline (without resource bindings for now)
-                randomPipeline.createPipeline(module, "computeMain");
-
-                randFloatPipeline = randomPipeline;
-            }
-
-            // Dispatch a random number generation shader.
-            {
-                const randomPipeline = randFloatPipeline;
-
-                // Alloc resources for the shader.
-                if (!randFloatResources)
-                    randFloatResources = new Map();
-
-                randFloatResources.set("outputBuffer", buffer);
-
-                if (!randFloatResources.has("uniformInput"))
-                    randFloatResources.set("uniformInput",
-                        device.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
-
-                const seedBuffer = randFloatResources.get("uniformInput") as GPUBuffer;
-
-                // Set bindings on the pipeline.
-                randFloatPipeline.createBindGroup(randFloatResources);
-
-                const seedValue = new Float32Array([Math.random(), 0, 0, 0]);
-                device.queue.writeBuffer(seedBuffer, 0, seedValue);
-
-                // Encode commands to do the computation
-                const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
-                const pass = encoder.beginComputePass({ label: 'compute builtin pass' });
-
-                pass.setBindGroup(0, randomPipeline.bindGroup || null);
-
-                if (randomPipeline.pipeline == undefined) {
-                    throw new Error("Random pipeline is undefined");
-                }
-                pass.setPipeline(randomPipeline.pipeline);
-
-                const workGroupSizeX = Math.floor((parsedCommand.count + 63) / 64);
-                pass.dispatchWorkgroups(workGroupSizeX, 1);
-                pass.end();
-
-                // Finish encoding and submit the commands
-                const commandBuffer = encoder.finish();
-                device.queue.submit([commandBuffer]);
-                await device.queue.onSubmittedWorkDone();
-            }
         } else if (parsedCommand.type == "SLIDER") {
             const elementSize = parsedCommand.elementSize;
 
@@ -849,7 +847,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
     //
     safeSet(allocatedResources, "g_printedBuffer", device.createBuffer({
         size: printfBufferSize,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST,
     }));
 
     safeSet(allocatedResources, "printfBufferRead", device.createBuffer({
@@ -862,7 +860,6 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
 function onRun(runCompiledCode: CompiledPlayground) {
     if (!device) return;
-    if (!compiler) return;
 
     // reset frame counter and performance stats on (re)start
     frameID.value = 0;
@@ -870,6 +867,10 @@ function onRun(runCompiledCode: CompiledPlayground) {
     frameTime.value = 0;
     timeAggregate = 0;
     frameCount = 0;
+    pauseRender.value = false;
+
+    shaderType = runCompiledCode.mainEntryPoint;
+    fileUri = runCompiledCode.uri;
 
     resetMouse();
 
@@ -920,16 +921,13 @@ function onRun(runCompiledCode: CompiledPlayground) {
         },
         // renderFn
         async (timeMS: number) => {
-            if (compiler == null) {
-                throw new Error("Could not get compiler");
-            }
             if (abortRender) return false;
             if (pauseRender.value) return true;
 
-            if (compiler.shaderType === null) {
+            if (shaderType === null) {
                 // handle this case
             }
-            const keepRendering = await execFrame(timeMS, compiler?.shaderType || null, compiledCode, firstFrame);
+            const keepRendering = await execFrame(timeMS, shaderType, compiledCode, firstFrame);
             firstFrame = false;
             return keepRendering;
         });
@@ -938,21 +936,21 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
 <template>
     <canvas v-bind="$attrs" class="renderCanvas" @mousedown="mousedown" @mousemove="mousemove" @mouseup="mouseup"
-        ref="canvas"></canvas>
+        ref="canvasRef"></canvas>
     <div class="control-bar">
         <div class="controls-left">
-            <button @click="setFrame(0)"           title="Reset frame to 0">&#x23EE;&#xFE0E;</button>
+            <button @click="setFrame(0)" title="Reset frame to 0">&#x23EE;&#xFE0E;</button>
             <button @click="setFrame(frameID - 1)" title="Step backward">&#x23F4;&#xFE0E;</button>
             <button @click="setFrame(frameID + 1)" title="Step forward">&#x23F5;&#xFE0E;</button>
-            <button @click="pauseRender = !pauseRender"
-                    :title="pauseRender ? 'Resume' : 'Pause'">⏯︎</button>
+            <button @click="pauseRender = !pauseRender" :title="pauseRender ? 'Resume' : 'Pause'">⏯︎</button>
             <span class="frame-counter">{{ String(frameID).padStart(5, '0') }}</span>
         </div>
         <div class="controls-right">
             <span>{{ frameTime.toFixed(1) }} ms</span>
             <span>{{ Math.min(Math.round(1000 / frameTime), 60) }} fps</span>
             <span>{{ canvas?.width }}x{{ canvas?.height }}</span>
-            <button @click="toggleFullscreen" title="Toggle full screen">&#x26F6;&#xFE0E;</button>
+            <button v-if="showFullscreenToggle" @click="toggleFullscreen"
+                title="Toggle full screen">&#x26F6;&#xFE0E;</button>
         </div>
     </div>
 </template>
@@ -979,15 +977,17 @@ function onRun(runCompiledCode: CompiledPlayground) {
     color: white;
     font-size: 14px;
     overflow: hidden;
-    white-space: nowrap; 
-    width: 100%;
+    white-space: nowrap;
 }
-.control-bar .controls-left > * {
+
+.control-bar .controls-left>* {
     margin-right: 8px;
 }
-.control-bar .controls-right > * {
+
+.control-bar .controls-right>* {
     margin-left: 8px;
 }
+
 .control-bar button {
     background: none;
     border: none;
@@ -995,6 +995,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
     cursor: pointer;
     font-variant-emoji: text;
 }
+
 .control-bar button:disabled {
     cursor: default;
     opacity: 0.5;
