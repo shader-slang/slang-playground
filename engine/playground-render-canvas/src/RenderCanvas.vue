@@ -430,9 +430,34 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             throw new Error("pipeline is undefined");
         }
         pass.setPipeline(pipeline.pipeline);
+
         // Determine the workgroup size based on the size of the buffer or texture.
         let size: [number, number, number];
-        if (command.type == "RESOURCE_BASED") {
+        if (command.type == "INDIRECT") {
+            // validate buffer
+            if (!allocatedResources.has(command.bufferName)) {
+                emit("logError", "Error when dispatching " + command.fnName + ". Indirect buffer not found: " + command.bufferName);
+                pass.end();
+                return false;
+            }
+            const indirectBuffer = allocatedResources.get(command.bufferName);
+            if (!(indirectBuffer instanceof GPUBuffer)) {
+                emit("logError", "Error when dispatching " + command.fnName + ". Indirect resource is not a buffer: " + command.bufferName);
+                pass.end();
+                return false;
+            }
+
+            try {
+                pass.dispatchWorkgroupsIndirect(indirectBuffer, command.offset);
+            } catch (e) {
+                emit("logError", "Failed to perform indirect dispatch for " + command.fnName + ": " + (e as Error).message);
+                pass.end();
+                return false;
+            }
+
+            pass.end();
+            continue; // Exit early since indirect dispatches are handled specially
+        } else if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
                 console.error("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();

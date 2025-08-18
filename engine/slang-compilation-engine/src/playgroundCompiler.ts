@@ -384,6 +384,21 @@ function parseCallCommands(reflection: ReflectionJSON): Result<CallCommand[]> {
                     fnName,
                     size: attribute.arguments as number[]
                 };
+            } else if (attribute.name === "playground_CALL_INDIRECT") {
+                if (callCommand != null) {
+                    return {
+                        succ: false,
+                        message: `Multiple CALL commands found for ${fnName}`,
+                    };
+                }
+                const bufferName = attribute.arguments[0] as string;
+                const offset = attribute.arguments[1] as number;
+                callCommand = {
+                    type: "INDIRECT",
+                    fnName,
+                    bufferName,
+                    offset,
+                };
             } else if (attribute.name === "playground_CALL_ONCE") {
                 if (callOnce) {
                     return {
