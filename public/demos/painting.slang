@@ -39,7 +39,7 @@ void draw(uint2 dispatchThreadId: SV_DispatchThreadID)
     if (mousePosition.z >= 0)
         return;
 
-    let offset = float2(dispatchThreadId.xy) - float(MAX_BRUSH_SIZE) / 2;
+    let offset = float2(dispatchThreadId.xy) - brush_size;
     if (length(offset) > brush_size / 2)
         return;
 

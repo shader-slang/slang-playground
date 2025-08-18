@@ -581,7 +581,12 @@ function safeSet<T extends GPUObjectBase>(map: Map<string, T>, key: string, valu
     map.set(key, value);
 };
 
-async function processResourceCommands(resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
+async function processResourceCommands(
+    resourceBindings: Bindings,
+    resourceCommands: ResourceCommand[],
+    resourceMetadata: { [k: string]: ResourceMetadata },
+    uniformSize: number
+) {
     let allocatedResources: Map<string, GPUObjectBase> = new Map();
 
     safeSet(allocatedResources, "uniformInput", device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
@@ -600,7 +605,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
             });
 
             safeSet(allocatedResources, resourceName, buffer);
@@ -774,7 +779,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 // Create GPU buffer
                 const buffer = device.createBuffer({
                     size: bufferSize,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
                 });
 
                 // Upload data to GPU buffer (only the aligned portion)
@@ -798,7 +803,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
             });
 
             const floatArray = new Float32Array(parsedCommand.count);
@@ -883,6 +888,31 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
     return allocatedResources;
 }
 
+type ResourceMetadata = {
+    indirect?: boolean,
+    excludeBinding: string[],
+}
+
+function getResourceMetadata(compiledCode: CompiledPlayground): { [k: string]: ResourceMetadata } {
+    const metadata = {};
+
+    for (const resourceName of Object.keys(compiledCode.shader.layout)) {
+        metadata[resourceName] = {
+            indirect: false,
+            excludeBinding: [],
+        };
+    }
+
+    for (const callCommand of compiledCode.callCommands) {
+        if (callCommand.type === 'INDIRECT') {
+            metadata[callCommand.bufferName].indirect = true;
+            metadata[callCommand.bufferName].excludeBinding.push("buffer");
+        }
+    }
+
+    return metadata;
+}
+
 function onRun(runCompiledCode: CompiledPlayground) {
     if (!device) return;
 
@@ -911,17 +941,38 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
             const module = device.createShaderModule({ code: compiledCode.shader.code });
 
+            const resource_metadata = getResourceMetadata(compiledCode);
+
             for (const callCommand of compiledCode.callCommands) {
                 const entryPoint = callCommand.fnName;
                 const pipeline = new ComputePipeline(device);
+
+                const entryPointReflection = compiledCode.shader.reflection.entryPoints.find(e => e.name === entryPoint);
+                if (!entryPointReflection) {
+                    throw new Error(`Entry point ${entryPoint} not found in reflection data`);
+                }
+
+                const pipelineBindings: Bindings = {};
+                for (const param in compiledCode.shader.layout) {
+                    if (resource_metadata[param]?.excludeBinding.includes(entryPoint)) {
+                        continue;
+                    }
+                    pipelineBindings[param] = compiledCode.shader.layout[param];
+                }
+
                 // create a pipeline resource 'signature' based on the bindings found in the program.
-                pipeline.createPipelineLayout(compiledCode.shader.layout);
+                pipeline.createPipelineLayout(pipelineBindings);
                 pipeline.createPipeline(module, entryPoint);
                 pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSizes[entryPoint]);
                 computePipelines.push(pipeline);
             }
 
-            allocatedResources = await processResourceCommands(compiledCode.shader.layout, compiledCode.resourceCommands, compiledCode.uniformSize);
+            allocatedResources = await processResourceCommands(
+                compiledCode.shader.layout,
+                compiledCode.resourceCommands,
+                resource_metadata,
+                compiledCode.uniformSize
+            );
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);
