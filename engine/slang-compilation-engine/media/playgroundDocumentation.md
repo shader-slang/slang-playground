@@ -85,6 +85,10 @@ Dispatch a compute pass using the resource size to determine the work-group size
 Dispatch a compute pass with the given grid of threads.
 The number of work-groups will be determined by dividing by the number of threads per work-group and rounding up.
 
+### `[playground::CALL_INDIRECT("BUFFER-NAME", 0)]`
+
+Dispatch a compute pass with an indirect command buffer and an offset in bytes.
+
 ### `[playground::CALL::ONCE]`
 
 Only dispatch the compute pass once at the start of rendering. Should be used in addition to another CALL command.

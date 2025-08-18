@@ -86,6 +86,8 @@ defineExpose({
         <h4 class="doc-header"><code>[playground::CALL(512, 512, 1)]</code></h4>
         Dispatch a compute pass with the given grid of threads.
         The number of work-groups will be determined by dividing by the number of threads per work-group and rounding up.
+        <h4 class="doc-header"><code>[playground::CALL_INDIRECT("BUFFER-NAME", 0)]</code></h4>
+        Dispatch a compute pass with an indirect command buffer and an offset in bytes.
         <h4 class="doc-header"><code>[playground::CALL::ONCE]</code></h4>
         Only dispatch the compute pass once at the start of rendering.
       <h4>Playground functions</h4>
