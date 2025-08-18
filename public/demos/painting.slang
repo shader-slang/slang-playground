@@ -1,6 +1,7 @@
 import playground;
 
-const static int MAX_BRUSH_SIZE = 16;
+static const int MAX_BRUSH_SIZE = 64;
+static const uint THREAD_COUNT = 8;
 
 [playground::BLACK_SCREEN(1.0, 1.0)]
 RWTexture2D<float> tex_red;
@@ -9,7 +10,10 @@ RWTexture2D<float> tex_green;
 [playground::BLACK_SCREEN(1.0, 1.0)]
 RWTexture2D<float> tex_blue;
 
-[playground::SLIDER(10.0, 4.0, 16.0)]
+[playground::ZEROS(8)]
+RWStructuredBuffer<uint> indirectBuffer;
+
+[playground::SLIDER(10.0, 4.0, 64.0)]
 uniform float brush_size;
 [playground::COLOR_PICK(1.0, 0.0, 1.0)]
 uniform float3 color;
@@ -18,14 +22,24 @@ uniform float3 color;
 uniform float4 mousePosition;
 
 [shader("compute")]
-[numthreads(8, 8, 1)]
-[playground::CALL(MAX_BRUSH_SIZE, MAX_BRUSH_SIZE, 1)]
+[numthreads(1, 1, 1)]
+[playground::CALL(1, 1, 1)]
+void update(uint2 dispatchThreadId: SV_DispatchThreadID)
+{
+    indirectBuffer[0] = uint(2.0 * brush_size + THREAD_COUNT + 1.0) / THREAD_COUNT;
+    indirectBuffer[1] = uint(2.0 * brush_size + THREAD_COUNT + 1.0) / THREAD_COUNT;
+    indirectBuffer[2] = 1;
+}
+
+[shader("compute")]
+[numthreads(THREAD_COUNT, THREAD_COUNT, 1)]
+[playground::CALL_INDIRECT("indirectBuffer", 0)]
 void draw(uint2 dispatchThreadId: SV_DispatchThreadID)
 {
     if (mousePosition.z >= 0)
         return;
 
-    let offset = float2(dispatchThreadId.xy) - float(MAX_BRUSH_SIZE) / 2;
+    let offset = float2(dispatchThreadId.xy) - brush_size;
     if (length(offset) > brush_size / 2)
         return;
 

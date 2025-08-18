@@ -211,6 +211,12 @@ export type CallCommand = {
 	fnName: string,
 	size: number[],
 	callOnce?: boolean,
+} | {
+	type: "INDIRECT",
+	fnName: string,
+	bufferName: string,
+	offset: number,
+	callOnce?: boolean,
 };
 
 export type PlaygroundRun = {

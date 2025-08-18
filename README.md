@@ -64,5 +64,4 @@ The files will then be available at `out/1/artifact/artifact.zip`.
 * Run `gh act -P ubuntu-latest=catthehacker/ubuntu:full-latest -j 'build' --artifact-server-path ./out`
 * This will create a file at `out/1/artifact/artifact.zip`
 * Extracting the zip file will provide a directory from which you can host the website with any web server
-    * As an example, you can use vscode's live server extension to host the website by opening `index.html`
-
+  * As an example, you can use vscode's live server extension to host the website by opening `index.html`

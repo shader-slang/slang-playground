@@ -195,6 +195,15 @@ public struct playground_CALL_SIZE_OFAttribute
     string resourceName;
 };
 
+// Dispatch a compute pass by indirect call: use a buffer name and an integer offset
+// (the buffer is expected to contain entrypoint indices or dispatch parameters).
+[__AttributeUsage(_AttributeTargets.Function)]
+public struct playground_CALL_INDIRECTAttribute
+{
+    string bufferName;
+    int offset;
+};
+
 // Only dispatch the compute pass once at the start of rendering.
 [__AttributeUsage(_AttributeTargets.Function)]
 public struct playground_CALL_ONCEAttribute

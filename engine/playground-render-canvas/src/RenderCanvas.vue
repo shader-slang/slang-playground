@@ -430,9 +430,34 @@ async function execFrame(timeMS: number, currentDisplayMode: ShaderType, playgro
             throw new Error("pipeline is undefined");
         }
         pass.setPipeline(pipeline.pipeline);
+
         // Determine the workgroup size based on the size of the buffer or texture.
         let size: [number, number, number];
-        if (command.type == "RESOURCE_BASED") {
+        if (command.type == "INDIRECT") {
+            // validate buffer
+            if (!allocatedResources.has(command.bufferName)) {
+                emit("logError", "Error when dispatching " + command.fnName + ". Indirect buffer not found: " + command.bufferName);
+                pass.end();
+                return false;
+            }
+            const indirectBuffer = allocatedResources.get(command.bufferName);
+            if (!(indirectBuffer instanceof GPUBuffer)) {
+                emit("logError", "Error when dispatching " + command.fnName + ". Indirect resource is not a buffer: " + command.bufferName);
+                pass.end();
+                return false;
+            }
+
+            try {
+                pass.dispatchWorkgroupsIndirect(indirectBuffer, command.offset);
+            } catch (e) {
+                emit("logError", "Failed to perform indirect dispatch for " + command.fnName + ": " + (e as Error).message);
+                pass.end();
+                return false;
+            }
+
+            pass.end();
+            continue; // Exit early since indirect dispatches are handled specially
+        } else if (command.type == "RESOURCE_BASED") {
             if (!allocatedResources.has(command.resourceName)) {
                 console.error("Error when dispatching " + command.fnName + ". Resource not found: " + command.resourceName);
                 pass.end();
@@ -556,7 +581,12 @@ function safeSet<T extends GPUObjectBase>(map: Map<string, T>, key: string, valu
     map.set(key, value);
 };
 
-async function processResourceCommands(resourceBindings: Bindings, resourceCommands: ResourceCommand[], uniformSize: number) {
+async function processResourceCommands(
+    resourceBindings: Bindings,
+    resourceCommands: ResourceCommand[],
+    resourceMetadata: { [k: string]: ResourceMetadata },
+    uniformSize: number
+) {
     let allocatedResources: Map<string, GPUObjectBase> = new Map();
 
     safeSet(allocatedResources, "uniformInput", device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
@@ -575,7 +605,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
             });
 
             safeSet(allocatedResources, resourceName, buffer);
@@ -749,7 +779,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
                 // Create GPU buffer
                 const buffer = device.createBuffer({
                     size: bufferSize,
-                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
                 });
 
                 // Upload data to GPU buffer (only the aligned portion)
@@ -773,7 +803,7 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
 
             const buffer = device.createBuffer({
                 size: parsedCommand.count * elementSize,
-                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | (resourceMetadata[resourceName]?.indirect ? GPUBufferUsage.INDIRECT : 0),
             });
 
             const floatArray = new Float32Array(parsedCommand.count);
@@ -858,6 +888,31 @@ async function processResourceCommands(resourceBindings: Bindings, resourceComma
     return allocatedResources;
 }
 
+type ResourceMetadata = {
+    indirect?: boolean,
+    excludeBinding: string[],
+}
+
+function getResourceMetadata(compiledCode: CompiledPlayground): { [k: string]: ResourceMetadata } {
+    const metadata = {};
+
+    for (const resourceName of Object.keys(compiledCode.shader.layout)) {
+        metadata[resourceName] = {
+            indirect: false,
+            excludeBinding: [],
+        };
+    }
+
+    for (const callCommand of compiledCode.callCommands) {
+        if (callCommand.type === 'INDIRECT') {
+            metadata[callCommand.bufferName].indirect = true;
+            metadata[callCommand.bufferName].excludeBinding.push(callCommand.fnName);
+        }
+    }
+
+    return metadata;
+}
+
 function onRun(runCompiledCode: CompiledPlayground) {
     if (!device) return;
 
@@ -886,17 +941,41 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
             const module = device.createShaderModule({ code: compiledCode.shader.code });
 
+            const resourceMetadata = getResourceMetadata(compiledCode);
+
             for (const callCommand of compiledCode.callCommands) {
                 const entryPoint = callCommand.fnName;
                 const pipeline = new ComputePipeline(device);
+
+                const entryPointReflection = compiledCode.shader.reflection.entryPoints.find(e => e.name === entryPoint);
+                if (!entryPointReflection) {
+                    throw new Error(`Entry point ${entryPoint} not found in reflection data`);
+                }
+
+                const pipelineBindings: Bindings = {};
+                for (const param in compiledCode.shader.layout) {
+                    if (resourceMetadata[param]?.excludeBinding.includes(entryPoint)) {
+                        continue;
+                    }
+                    pipelineBindings[param] = compiledCode.shader.layout[param];
+                }
+
                 // create a pipeline resource 'signature' based on the bindings found in the program.
-                pipeline.createPipelineLayout(compiledCode.shader.layout);
-                pipeline.createPipeline(module, entryPoint);
+                pipeline.createPipelineLayout(pipelineBindings);
+                let pipelineCreationResult = await pipeline.createPipeline(module, entryPoint);
+                if (pipelineCreationResult.succ == false) {
+                    throw new Error(`Failed to create pipeline for entry point "${entryPoint}":\n${pipelineCreationResult.message}`);
+                }
                 pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSizes[entryPoint]);
                 computePipelines.push(pipeline);
             }
 
-            allocatedResources = await processResourceCommands(compiledCode.shader.layout, compiledCode.resourceCommands, compiledCode.uniformSize);
+            allocatedResources = await processResourceCommands(
+                compiledCode.shader.layout,
+                compiledCode.resourceCommands,
+                resourceMetadata,
+                compiledCode.uniformSize
+            );
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);
