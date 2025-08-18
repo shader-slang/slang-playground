@@ -906,7 +906,7 @@ function getResourceMetadata(compiledCode: CompiledPlayground): { [k: string]: R
     for (const callCommand of compiledCode.callCommands) {
         if (callCommand.type === 'INDIRECT') {
             metadata[callCommand.bufferName].indirect = true;
-            metadata[callCommand.bufferName].excludeBinding.push("buffer");
+            metadata[callCommand.bufferName].excludeBinding.push(callCommand.fnName);
         }
     }
 
@@ -941,7 +941,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
             const module = device.createShaderModule({ code: compiledCode.shader.code });
 
-            const resource_metadata = getResourceMetadata(compiledCode);
+            const resourceMetadata = getResourceMetadata(compiledCode);
 
             for (const callCommand of compiledCode.callCommands) {
                 const entryPoint = callCommand.fnName;
@@ -954,7 +954,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
                 const pipelineBindings: Bindings = {};
                 for (const param in compiledCode.shader.layout) {
-                    if (resource_metadata[param]?.excludeBinding.includes(entryPoint)) {
+                    if (resourceMetadata[param]?.excludeBinding.includes(entryPoint)) {
                         continue;
                     }
                     pipelineBindings[param] = compiledCode.shader.layout[param];
@@ -970,7 +970,7 @@ function onRun(runCompiledCode: CompiledPlayground) {
             allocatedResources = await processResourceCommands(
                 compiledCode.shader.layout,
                 compiledCode.resourceCommands,
-                resource_metadata,
+                resourceMetadata,
                 compiledCode.uniformSize
             );
 
