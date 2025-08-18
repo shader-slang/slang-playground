@@ -1,10 +1,10 @@
-import type { Bindings } from "slang-playground-shared";
+import type { Bindings, Result } from "slang-playground-shared";
 
 export class ComputePipeline {
     pipeline: GPUComputePipeline | undefined;
     pipelineLayout: GPUPipelineLayout | "auto" | undefined;
 
-    device;
+    device: GPUDevice;
     bindGroup: GPUBindGroup | undefined;
 
     // thread group size (array of 3 integers)
@@ -39,16 +39,31 @@ export class ComputePipeline {
         this.pipelineLayout = layout;
     }
 
-    createPipeline(shaderModule: GPUShaderModule, entryPoint: string) {
+    async createPipeline(shaderModule: GPUShaderModule, entryPoint: string): Promise<Result<undefined>> {
         if (this.pipelineLayout == undefined)
             throw new Error("Cannot create pipeline without layout");
+
+        this.device.pushErrorScope("validation");
         const pipeline = this.device.createComputePipeline({
             label: 'compute pipeline',
             layout: this.pipelineLayout,
             compute: { module: shaderModule, entryPoint },
         });
 
+        const error = await this.device.popErrorScope();
+        if (error) {
+            return {
+                succ: false,
+                message: error.message,
+            }
+        }
+
         this.pipeline = pipeline;
+
+        return {
+            succ: true,
+            result: undefined,
+        }
     }
 
     createBindGroup(allocatedResources: Map<string, GPUObjectBase>) {

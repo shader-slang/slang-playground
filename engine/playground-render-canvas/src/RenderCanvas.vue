@@ -962,7 +962,10 @@ function onRun(runCompiledCode: CompiledPlayground) {
 
                 // create a pipeline resource 'signature' based on the bindings found in the program.
                 pipeline.createPipelineLayout(pipelineBindings);
-                pipeline.createPipeline(module, entryPoint);
+                let pipelineCreationResult = await pipeline.createPipeline(module, entryPoint);
+                if (pipelineCreationResult.succ == false) {
+                    throw new Error(`Failed to create pipeline for entry point "${entryPoint}":\n${pipelineCreationResult.message}`);
+                }
                 pipeline.setThreadGroupSize(compiledCode.shader.threadGroupSizes[entryPoint]);
                 computePipelines.push(pipeline);
             }
