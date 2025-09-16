@@ -83,8 +83,4 @@ runs:
         mkdir -p ${{ inputs.build-artifacts-dir }}
         mv ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ${{ inputs.build-artifacts-dir }}/
         mv ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ${{ inputs.build-artifacts-dir }}/
-        
-        # Also copy type definitions to engine media directory for compilation
-        mkdir -p ./engine/slang-compilation-engine/media
-        cp ${{ inputs.build-artifacts-dir }}/slang-wasm.d.ts ./engine/slang-compilation-engine/media/
-        cp ${{ inputs.build-artifacts-dir }}/spirv-tools.d.ts ./engine/slang-compilation-engine/media/
+        ls -la ${{ inputs.build-artifacts-dir }}/

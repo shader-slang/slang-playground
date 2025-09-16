@@ -22,6 +22,7 @@ jobs:
         run: |
           cp ./src/slang-wasm.d.ts ./engine/slang-compilation-engine/media/slang-wasm.d.ts
           cp ./src/spirv-tools.d.ts ./engine/slang-compilation-engine/media/spirv-tools.d.ts
+          ls -la ./src
 
       - name: Build
         run: |
