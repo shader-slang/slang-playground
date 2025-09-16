@@ -1,6 +1,6 @@
-# Composite action to download and cache WASM dependencies (slang, spirv-tools)
+# Composite action to download WASM dependencies (slang release, spirv-tools build)
 name: 'Download WASM Deps'
-description: 'Download and cache WASM dependencies (slang release, spirv-tools build) for the project.'
+description: 'Download Slang release and build SPIRV-tools WASM dependencies for the project.'
 inputs:
   build-artifacts-dir:
     description: 'Directory to move built artifacts into.'
@@ -20,14 +20,13 @@ runs:
           sed -i 's/\r$//' emsdk/emsdk emsdk/emsdk_env.sh
         fi
 
-    - name: get latest slang release
-      shell: bash
-      run: |
-        # Use a known stable release until we can reliably fetch latest
-        # In the future, this could be enhanced to fetch the latest release
-        RELEASE_TAG="v2025.16.1"
-        echo "Using Slang release: $RELEASE_TAG"
-        echo "$RELEASE_TAG" > key.txt
+    - name: download slang-wasm release
+      uses: robinraju/release-downloader@v1.11
+      with:
+        repository: "shader-slang/slang"
+        tag: "v2025.16.1"
+        fileName: "slang-2025.16.1-wasm.zip"
+        extract: true
 
     - name: get spirv-tool head commit
       shell: bash
@@ -40,16 +39,6 @@ runs:
         fi
         git -C spirv-tools rev-parse HEAD > key-spirv-tool.txt
 
-    - name: restore slang-wasm
-      id: cache_slang
-      uses: actions/cache/restore@v4
-      with:
-        path: |
-          ./slang-wasm.wasm.gz
-          ./slang-wasm.js
-          ./slang-wasm.d.ts
-        key: ${{ hashFiles('key.txt') }}
-
     - name: restore spirv-tools
       id: cache_spirv_tools
       uses: actions/cache/restore@v4
@@ -60,38 +49,17 @@ runs:
           ./spirv-tools.d.ts
         key: ${{ hashFiles('key-spirv-tool.txt') }}
 
-    - name: download slang-wasm release
-      if: steps.cache_slang.outputs.cache-hit != 'true'
+    - name: process slang-wasm files
       shell: bash
       run: |
-        # Use a known stable release
-        RELEASE_TAG="v2025.16.1"
-        WASM_URL="https://github.com/shader-slang/slang/releases/download/$RELEASE_TAG/slang-${RELEASE_TAG:1}-wasm.zip"
-        
-        echo "Downloading Slang WASM release from: $WASM_URL"
-        curl -L -o slang-wasm.zip "$WASM_URL"
-        
-        # Extract the files
-        unzip slang-wasm.zip
-        
         # Rename interface.d.ts to slang-wasm.d.ts to match expected naming
         mv interface.d.ts slang-wasm.d.ts
         
         # Compress the WASM file as expected by the playground
         gzip -c slang-wasm.wasm > slang-wasm.wasm.gz
         
-        # Clean up
-        rm slang-wasm.zip slang-wasm.wasm
-
-    - name: save slang-wasm
-      if: steps.cache_slang.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: |
-          ./slang-wasm.wasm.gz
-          ./slang-wasm.js
-          ./slang-wasm.d.ts
-        key: ${{ hashFiles('key.txt') }}
+        # Clean up uncompressed WASM file
+        rm slang-wasm.wasm
 
     - name: spirv-tools-wasm build
       if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
