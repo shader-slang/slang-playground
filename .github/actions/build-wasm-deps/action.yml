@@ -24,8 +24,8 @@ runs:
       uses: robinraju/release-downloader@v1.11
       with:
         repository: "shader-slang/slang"
-        tag: "v2025.16.1"
-        fileName: "slang-2025.16.1-wasm.zip"
+        tag: "latest"
+        fileName: "*wasm.zip"
         extract: true
 
     - name: get spirv-tool head commit
