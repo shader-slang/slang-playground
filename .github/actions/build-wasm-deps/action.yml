@@ -24,9 +24,21 @@ runs:
       uses: robinraju/release-downloader@v1.11
       with:
         repository: "shader-slang/slang"
-        tag: "latest"
+        latest: true
         fileName: "*wasm.zip"
         extract: true
+
+    - name: process slang-wasm files
+      shell: bash
+      run: |
+        # Rename interface.d.ts to slang-wasm.d.ts to match expected naming
+        mv interface.d.ts slang-wasm.d.ts
+        
+        # Compress the WASM file as expected by the playground
+        gzip -c slang-wasm.wasm > slang-wasm.wasm.gz
+        
+        # Clean up uncompressed WASM file
+        rm slang-wasm.wasm
 
     - name: get spirv-tool head commit
       shell: bash
@@ -48,18 +60,6 @@ runs:
           ./spirv-tools.js
           ./spirv-tools.d.ts
         key: ${{ hashFiles('key-spirv-tool.txt') }}
-
-    - name: process slang-wasm files
-      shell: bash
-      run: |
-        # Rename interface.d.ts to slang-wasm.d.ts to match expected naming
-        mv interface.d.ts slang-wasm.d.ts
-        
-        # Compress the WASM file as expected by the playground
-        gzip -c slang-wasm.wasm > slang-wasm.wasm.gz
-        
-        # Clean up uncompressed WASM file
-        rm slang-wasm.wasm
 
     - name: spirv-tools-wasm build
       if: steps.cache_spirv_tools.outputs.cache-hit != 'true'
