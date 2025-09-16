@@ -1,4 +1,4 @@
-# Provides builds of slang and spirv-tools for the website
+# Provides downloads of slang and builds of spirv-tools for the website
 name: Build Dependencies
 
 on:
@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build and cache WASM dependencies
+      - name: Download and cache WASM dependencies
         uses: ./.github/actions/build-wasm-deps
         with:
           build-artifacts-dir: ./dependencies
