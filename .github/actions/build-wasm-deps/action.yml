@@ -83,4 +83,3 @@ runs:
         mkdir -p ${{ inputs.build-artifacts-dir }}
         mv ./slang-wasm.wasm.gz ./slang-wasm.js ./slang-wasm.d.ts ${{ inputs.build-artifacts-dir }}/
         mv ./spirv-tools.wasm ./spirv-tools.js ./spirv-tools.d.ts ${{ inputs.build-artifacts-dir }}/
-        ls -la ${{ inputs.build-artifacts-dir }}/

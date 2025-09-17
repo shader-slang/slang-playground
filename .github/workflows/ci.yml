@@ -22,7 +22,6 @@ jobs:
         run: |
           cp ./src/slang-wasm.d.ts ./engine/slang-compilation-engine/media/slang-wasm.d.ts
           cp ./src/spirv-tools.d.ts ./engine/slang-compilation-engine/media/spirv-tools.d.ts
-          ls -la ./src
 
       - name: Build
         run: |
@@ -39,6 +38,7 @@ jobs:
       - name: Smoke test
         run: |
           cp ./src/slang-wasm.wasm.gz ./src/slang-wasm.js ./src/slang-wasm.d.ts ./
+          ls -ls ./
           pushd emsdk
           /bin/sh ./emsdk install latest
           /bin/sh ./emsdk activate latest
@@ -46,5 +46,6 @@ jobs:
           popd
           gzip -d src/slang-wasm.wasm.gz
           cp src/slang-wasm.wasm ./
-          cp slang-repo/tests/wasm/smoke/smoke-test.js slang-repo/
-          node slang-repo/smoke-test.js engine/slang-compilation-engine/src/slang/rand_float.slang computeMain
+          mkdir -p slang-test
+          curl -o ./slang-test/smoke-test.js https://raw.githubusercontent.com/shader-slang/slang/master/tests/wasm/smoke/smoke-test.js
+          node slang-test/smoke-test.js engine/slang-compilation-engine/src/slang/rand_float.slang computeMain
