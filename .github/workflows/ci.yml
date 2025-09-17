@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build and cache WASM dependencies
+      - name: Download, build and cache WASM dependencies
         uses: ./.github/actions/build-wasm-deps
         with:
           build-artifacts-dir: ./src

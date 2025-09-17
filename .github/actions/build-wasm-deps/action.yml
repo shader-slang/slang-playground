@@ -1,5 +1,5 @@
-# Composite action to download WASM dependencies (slang release, spirv-tools build)
-name: 'Download WASM Deps'
+# Composite action to download and build WASM dependencies (slang release, spirv-tools build)
+name: 'Download and build WASM Deps'
 description: 'Download Slang release and build SPIRV-tools WASM dependencies for the project.'
 inputs:
   build-artifacts-dir:
