@@ -75,15 +75,15 @@ Initialize a `float` buffer with uniform random floats between 0 and 1.
 
 ### `[playground::TIME]`
 
-Gives a `float` uniform the current time in milliseconds.
+Gives a scalar uniform the current time in milliseconds.
 
 ### `[playground::FRAME_ID]`
 
-Gives a `float` uniform the current frame index (starting from 0).
+Gives a scalar uniform the current frame index (starting from 0).
 
 ### `[playground::MOUSE_POSITION]`
 
-Gives a `float4` uniform mouse data.
+Gives a 4 component vector uniform mouse data.
 
 * `xy`: mouse position (in pixels) during last button down
 * `abs(zw)`: mouse position during last button click

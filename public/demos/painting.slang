@@ -16,7 +16,7 @@ uniform float brush_size;
 uniform float3 color;
 
 [playground::MOUSE_POSITION]
-uniform float4 mousePosition;
+uniform int4 mousePosition;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -31,19 +31,19 @@ void update(uint2 dispatchThreadId: SV_DispatchThreadID)
 [shader("compute")]
 [numthreads(THREAD_COUNT, THREAD_COUNT, 1)]
 [playground::CALL_INDIRECT("indirectBuffer", 0)]
-void draw(uint2 dispatchThreadId: SV_DispatchThreadID)
+void draw(int2 dispatchThreadId: SV_DispatchThreadID)
 {
     if (mousePosition.z >= 0)
         return;
 
-    let offset = float2(dispatchThreadId.xy) - brush_size;
+    let offset = dispatchThreadId.xy - int2(brush_size);
     if (length(offset) > brush_size / 2)
         return;
 
     uint2 screenSize;
     tex.GetDimensions(screenSize.x, screenSize.y);
 
-    var mouse_pos = int2(0, screenSize.y) + int2(1, -1) * int2(mousePosition.xy + offset);
+    var mouse_pos = int2(0, screenSize.y) + int2(1, -1) * mousePosition.xy + offset;
     drawPixel(mouse_pos, (int2 screenSize) => {
         return float4(color, 1.0);
     });

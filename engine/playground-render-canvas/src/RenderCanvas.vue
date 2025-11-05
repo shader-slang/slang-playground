@@ -2,7 +2,7 @@
 import { ComputePipeline } from './compute';
 import { GraphicsPipeline, passThroughshaderCode } from './pass_through';
 import { NotReadyError, parsePrintfBuffer, sizeFromFormat } from './canvasUtils';
-import type { Bindings, CallCommand, CompiledPlayground, ResourceCommand } from 'slang-playground-shared';
+import { type ResourceCommand, type Bindings, type CallCommand, type CompiledPlayground, type UniformController, type ScalarType, getScalarSize } from 'slang-playground-shared';
 import { onMounted, ref, useTemplateRef } from 'vue';
 
 let fileUri: string;
@@ -347,55 +347,7 @@ async function execFrame(timeMS: number, playgroundData: CompiledPlayground, fir
         throw new Error("uniformInput doesn't exist or is of incorrect type");
     }
 
-    let uniformBufferData = new ArrayBuffer(playgroundData.uniformSize);
-    let uniformBufferView = new DataView(uniformBufferData);
-
-    for (let uniformComponent of playgroundData.uniformComponents) {
-        let offset = uniformComponent.buffer_offset;
-        if (uniformComponent.type == "SLIDER") {
-            uniformBufferView.setFloat32(offset, uniformComponent.value, true);
-        } else if (uniformComponent.type == "COLOR_PICK") {
-            uniformComponent.value.forEach((v, i) => {
-                uniformBufferView.setFloat32(offset + i * 4, v, true);
-            });
-        } else if (uniformComponent.type == "TIME") {
-            uniformBufferView.setFloat32(offset, timeMS * 0.001, true);
-        } else if (uniformComponent.type == "FRAME_ID") {
-            uniformBufferView.setFloat32(offset, frameID.value, true);
-        } else if (uniformComponent.type == "MOUSE_POSITION") {
-            uniformBufferView.setFloat32(offset, canvasCurrentMousePos.x, true);
-            uniformBufferView.setFloat32(offset + 4, canvasCurrentMousePos.y, true);
-            uniformBufferView.setFloat32(offset + 8, canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1), true);
-            uniformBufferView.setFloat32(offset + 12, canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1), true);
-        } else if (uniformComponent.type == "KEY") {
-            // Set 1 or 0 depending on key state, using correct type
-            const isPressed = pressedKeys.has(uniformComponent.key);
-            if (uniformComponent.scalarType == "float32") {
-                uniformBufferView.setFloat32(offset, isPressed ? 1.0 : 0.0, true);
-            } else if (uniformComponent.scalarType == "float64") {
-                uniformBufferView.setFloat64(offset, isPressed ? 1.0 : 0.0, true);
-            } else if (uniformComponent.scalarType == "int8") {
-                uniformBufferView.setInt8(offset, isPressed ? 1 : 0);
-            } else if (uniformComponent.scalarType == "int16") {
-                uniformBufferView.setInt16(offset, isPressed ? 1 : 0, true);
-            } else if (uniformComponent.scalarType == "int32") {
-                uniformBufferView.setInt32(offset, isPressed ? 1 : 0, true);
-            } else if (uniformComponent.scalarType == "uint8") {
-                uniformBufferView.setUint8(offset, isPressed ? 1 : 0);
-            } else if (uniformComponent.scalarType == "uint16") {
-                uniformBufferView.setUint16(offset, isPressed ? 1 : 0, true);
-            } else if (uniformComponent.scalarType == "uint32") {
-                uniformBufferView.setUint32(offset, isPressed ? 1 : 0, true);
-            } else {
-                throw new Error("KEY_INPUT only scalar type not supported");
-            }
-        } else {
-            let _: never = uniformComponent;
-            throw new Error("Invalid state");
-        }
-    }
-
-    device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
+    writeUniformData(uniformInput, playgroundData.uniformComponents, playgroundData.uniformSize, timeMS);
 
     // Encode commands to do the computation
     const encoder = device.createCommandEncoder({ label: 'compute builtin encoder' });
@@ -574,6 +526,76 @@ async function execFrame(timeMS: number, playgroundData: CompiledPlayground, fir
     return true;
 }
 
+function writeScalar(uniformBufferView: DataView<ArrayBuffer>, scalarType: ScalarType, offset: number, value: number): boolean {
+    if (scalarType == "float32") {
+        uniformBufferView.setFloat32(offset, value, true);
+    } else if (scalarType == "float64") {
+        uniformBufferView.setFloat64(offset, value, true);
+    } else if (scalarType == "int8") {
+        uniformBufferView.setInt8(offset, value);
+    } else if (scalarType == "int16") {
+        uniformBufferView.setInt16(offset, value, true);
+    } else if (scalarType == "int32") {
+        uniformBufferView.setInt32(offset, value, true);
+    } else if (scalarType == "uint8") {
+        uniformBufferView.setUint8(offset, value);
+    } else if (scalarType == "uint16") {
+        uniformBufferView.setUint16(offset, value, true);
+    } else if (scalarType == "uint32") {
+        uniformBufferView.setUint32(offset, value, true);
+    } else {
+        return false;
+    }
+    return true;
+}
+
+function writeUniformData(uniformInput: GPUBuffer, uniformComponents: UniformController[], uniformSize: number, timeMS: number) {
+    let uniformBufferData = new ArrayBuffer(uniformSize);
+    let uniformBufferView = new DataView(uniformBufferData);
+
+    for (let uniformComponent of uniformComponents) {
+        let offset = uniformComponent.buffer_offset;
+        if (uniformComponent.type == "SLIDER") {
+            uniformBufferView.setFloat32(offset, uniformComponent.value, true);
+        } else if (uniformComponent.type == "COLOR_PICK") {
+            uniformComponent.value.forEach((v, i) => {
+                uniformBufferView.setFloat32(offset + i * 4, v, true);
+            });
+        } else if (uniformComponent.type == "TIME") {
+            if(!writeScalar(uniformBufferView, uniformComponent.scalarType, offset, timeMS * 0.001)) {
+                throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
+            }
+        } else if (uniformComponent.type == "FRAME_ID") {
+            if(!writeScalar(uniformBufferView, uniformComponent.scalarType, offset, frameID.value)) {
+                throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
+            }
+        } else if (uniformComponent.type == "MOUSE_POSITION") {
+            let data = [
+                canvasCurrentMousePos.x,
+                canvasCurrentMousePos.y,
+                canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1),
+                canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1),
+            ];
+            for (let i = 0; i < data.length; i++) {
+                if(!writeScalar(uniformBufferView, uniformComponent.scalarType, offset + i * getScalarSize(uniformComponent.scalarType) / 8, data[i])) {
+                    throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
+                }
+            }
+        } else if (uniformComponent.type == "KEY") {
+            // Set 1 or 0 depending on key state, using correct type
+            const isPressed = pressedKeys.has(uniformComponent.key);
+            if(!writeScalar(uniformBufferView, uniformComponent.scalarType, offset, isPressed ? 1 : 0)) {
+                throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
+            }
+        } else {
+            let _: never = uniformComponent;
+            throw new Error("Invalid state");
+        }
+    }
+
+    device.queue.writeBuffer(uniformInput, 0, new Uint8Array(uniformBufferData));
+}
+
 function safeSet<T extends GPUObjectBase>(map: Map<string, T>, key: string, value: T) {
     if (map.has(key)) {
         let currentEntry = map.get(key);
@@ -587,7 +609,7 @@ function safeSet<T extends GPUObjectBase>(map: Map<string, T>, key: string, valu
 
 async function processResourceCommands(
     resourceBindings: Bindings,
-    resourceCommands: ResourceCommand[],
+    bindingResourceCommands: ResourceCommand[],
     resourceMetadata: { [k: string]: ResourceMetadata },
     uniformSize: number
 ) {
@@ -595,13 +617,14 @@ async function processResourceCommands(
 
     safeSet(allocatedResources, "uniformInput", device.createBuffer({ size: uniformSize, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST }));
 
-    for (const { resourceName, parsedCommand } of resourceCommands) {
+    for (const { resourceName, parsedCommand } of bindingResourceCommands) {
+        const bindingInfo = resourceBindings[resourceName];
+        if (!bindingInfo) {
+            throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
+        }
+
         if (parsedCommand.type === "ZEROS") {
             const elementSize = parsedCommand.elementSize;
-            const bindingInfo = resourceBindings[resourceName];
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
 
             if (!bindingInfo.buffer) {
                 throw new Error(`Resource ${resourceName} is an invalid type for ZEROS`);
@@ -638,11 +661,6 @@ async function processResourceCommands(
             safeSet(allocatedResources, resourceName, sampler);
         } else if (parsedCommand.type === "BLACK") {
             const size = parsedCommand.width * parsedCommand.height;
-            const bindingInfo = resourceBindings[resourceName];
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
-
             const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
                 throw new Error(`Could not find format of ${resourceName}`);
@@ -677,12 +695,6 @@ async function processResourceCommands(
             const height = parsedCommand.height_scale * currentWindowSize[1];
             const size = width * height;
 
-            const bindingInfo = resourceBindings[resourceName];
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
-
-
             const format = bindingInfo.storageTexture?.format;
             if (format == undefined) {
                 throw new Error(`Could not find format of ${resourceName}`)
@@ -715,16 +727,9 @@ async function processResourceCommands(
             }
         } else if (parsedCommand.type === "URL") {
             // Load image from URL and wait for it to be ready.
-            const bindingInfo = resourceBindings[resourceName];
-
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
-
             if (!bindingInfo.texture) {
                 throw new Error(`Resource ${resourceName} is not a texture.`);
             }
-
 
             const format = parsedCommand.format;
 
@@ -759,11 +764,6 @@ async function processResourceCommands(
                 throw new Error(`Failed to create texture from image: ${error}`);
             }
         } else if (parsedCommand.type === "DATA") {
-            const bindingInfo = resourceBindings[resourceName];
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
-
             if (!bindingInfo.buffer) {
                 throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
             }
@@ -805,10 +805,6 @@ async function processResourceCommands(
             }
         } else if (parsedCommand.type === "RAND") {
             const elementSize = 4; // RAND is only valid for floats
-            const bindingInfo = resourceBindings[resourceName];
-            if (!bindingInfo) {
-                throw new Error(`Resource ${resourceName} is not defined in the bindings.`);
-            }
 
             if (!bindingInfo.buffer) {
                 throw new Error(`Resource ${resourceName} is not defined as a buffer.`);
@@ -830,58 +826,10 @@ async function processResourceCommands(
             device.queue.writeBuffer(buffer, 0, data);
 
             safeSet(allocatedResources, resourceName, buffer);
-        } else if (parsedCommand.type == "SLIDER") {
-            const elementSize = parsedCommand.elementSize;
-
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with the default.
-            let bufferDefault: BufferSource
-            if (elementSize == 4) {
-                bufferDefault = new Float32Array([parsedCommand.default]);
-            } else
-                throw new Error("Unsupported float size for slider")
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
-        } else if (parsedCommand.type == "COLOR_PICK") {
-            const elementSize = parsedCommand.elementSize;
-
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with the default.
-            let bufferDefault: BufferSource
-            if (elementSize == 4) {
-                bufferDefault = new Float32Array(parsedCommand.default);
-            } else
-                throw new Error("Unsupported float size for color pick")
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
-        } else if (parsedCommand.type == "TIME") {
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with zeros.
-            let bufferDefault: BufferSource = new Float32Array([0.0]);
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
-        } else if (parsedCommand.type == "FRAME_ID") {
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with zeros.
-            let bufferDefault: BufferSource = new Float32Array([0.0]);
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
-        } else if (parsedCommand.type == "MOUSE_POSITION") {
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with zeros.
-            let bufferDefault: BufferSource = new Float32Array([0, 0, 0, 0]);
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
-        } else if (parsedCommand.type == "KEY") {
-            const buffer = allocatedResources.get("uniformInput") as GPUBuffer
-
-            // Initialize the buffer with zeros.
-            let bufferDefault: BufferSource = new Float32Array([0]);
-            device.queue.writeBuffer(buffer, parsedCommand.offset, bufferDefault);
         } else {
             // exhaustiveness check
             let x: never = parsedCommand;
-            throw new Error("Invalid resource command type");
+            throw new Error("Invalid binding command type");
         }
     }
 
@@ -986,6 +934,13 @@ function onRun(runCompiledCode: CompiledPlayground) {
                 resourceMetadata,
                 compiledCode.uniformSize
             );
+
+            writeUniformData(
+                allocatedResources.get("uniformInput") as GPUBuffer,
+                compiledCode.uniformComponents,
+                compiledCode.uniformSize,
+                0.0,
+            )
 
             if (!passThroughPipeline) {
                 passThroughPipeline = new GraphicsPipeline(device);

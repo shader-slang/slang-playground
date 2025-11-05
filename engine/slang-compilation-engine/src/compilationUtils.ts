@@ -1,4 +1,4 @@
-import { ScalarType, SlangFormat } from "slang-playground-shared";
+import { getScalarSize, ScalarType, SlangFormat } from "slang-playground-shared";
 
 export const ACCESS_MAP = {
     "readWrite": "read-write",
@@ -82,9 +82,4 @@ function getWebGPURepresentation(scalarType: ScalarType): ScalarRepresentation {
         type = "sint";
 
     return `${size}${type}` as any
-}
-
-function getScalarSize(scalarType: ScalarType): 8 | 16 | 32 | 64 {
-    let size = parseInt(scalarType.replace(/^[a-z]*/, ""));
-    return size as any;
 }

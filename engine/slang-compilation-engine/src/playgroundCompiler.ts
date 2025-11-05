@@ -1,4 +1,4 @@
-import { Bindings, CallCommand, CompiledPlayground, OutputType, ParsedCommand, ReflectionJSON, ReflectionParameter, ReflectionType, ResourceCommand, Result, ScalarType, Shader, UniformController } from "slang-playground-shared";
+import { ParsedCommand, ResourceCommand, Bindings, CallCommand, CompiledPlayground, OutputType, ReflectionJSON, ReflectionParameter, ReflectionType, ReflectionUserAttribute, Result, ScalarType, Shader, UniformController } from "slang-playground-shared";
 import { ACCESS_MAP, webgpuFormatfromSlangFormat, getTextureFormat } from "./compilationUtils";
 
 export function compilePlayground(compilation: Shader, uri: string): Result<CompiledPlayground> {
@@ -21,12 +21,16 @@ export function compilePlayground(compilation: Shader, uri: string): Result<Comp
         };
     }
 
-    let resourceCommandsResult = getResourceCommandsFromAttributes(compilation.reflection);
+    let resourceCommandsResult = getParsedCommandsFromAttributes(compilation.reflection);
     if (resourceCommandsResult.succ == false) {
         return resourceCommandsResult;
     }
+
+    let uniformComponentsResult = getUniformControllersFromAttributes(compilation.reflection);
+    if (uniformComponentsResult.succ == false) {
+        return uniformComponentsResult;
+    }
     let uniformSize = getUniformSize(compilation.reflection)
-    let uniformComponents = getUniformControllers(resourceCommandsResult.result)
 
     let callCommandResult = parseCallCommands(compilation.reflection);
     if (callCommandResult.succ == false) {
@@ -34,7 +38,7 @@ export function compilePlayground(compilation: Shader, uri: string): Result<Comp
     }
 
     let outputTypes: OutputType[] = [];
-    for(let resourceCommand of resourceCommandsResult.result) {
+    for (let resourceCommand of resourceCommandsResult.result) {
         if (resourceCommand.resourceName == "outputTexture") {
             outputTypes.push("image")
         } else if (resourceCommand.resourceName == "g_printedBuffer") {
@@ -50,7 +54,7 @@ export function compilePlayground(compilation: Shader, uri: string): Result<Comp
             resourceCommands: resourceCommandsResult.result,
             callCommands: callCommandResult.result,
             uniformSize,
-            uniformComponents,
+            uniformComponents: uniformComponentsResult.result,
             layout,
             outputTypes,
         }
@@ -146,7 +150,7 @@ function getResourceBindings(reflectionJson: ReflectionJSON): Bindings {
 /**
  * See help panel for details on commands
  */
-function getResourceCommandsFromAttributes(reflection: ReflectionJSON): Result<ResourceCommand[]> {
+function getParsedCommandsFromAttributes(reflection: ReflectionJSON): Result<ResourceCommand[]> {
     let commands: { resourceName: string, parsedCommand: ParsedCommand }[] = [];
 
     for (let parameter of reflection.parameters) {
@@ -258,14 +262,14 @@ function getResourceCommandsFromAttributes(reflection: ReflectionJSON): Result<R
                     } catch (e) {
                         if (e instanceof Error)
                             return {
-                        succ: false,
-                        message: `Could not get texture format for ${name}: ${e.message}`,
-                    };
+                                succ: false,
+                                message: `Could not get texture format for ${name}: ${e.message}`,
+                            };
                         else
                             return {
-                        succ: false,
-                        message: `Could not get texture format for ${name}`,
-                    };
+                                succ: false,
+                                message: `Could not get texture format for ${name}`,
+                            };
                     }
                 }
 
@@ -273,87 +277,6 @@ function getResourceCommandsFromAttributes(reflection: ReflectionJSON): Result<R
                     type: playground_attribute_name,
                     url: attribute.arguments[0] as string,
                     format,
-                };
-            } else if (playground_attribute_name == "TIME") {
-                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    offset: parameter.binding.offset,
-                };
-            } else if (playground_attribute_name == "FRAME_ID") {
-                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    offset: parameter.binding.offset,
-                };
-            } else if (playground_attribute_name == "MOUSE_POSITION") {
-                if (parameter.type.kind != "vector" || parameter.type.elementCount <= 3 || parameter.type.elementType.kind != "scalar" || !parameter.type.elementType.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports float vectors`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    offset: parameter.binding.offset,
-                };
-            } else if (playground_attribute_name == "SLIDER") {
-                if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports floats`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    default: attribute.arguments[0] as number,
-                    min: attribute.arguments[1] as number,
-                    max: attribute.arguments[2] as number,
-                    elementSize: parameter.binding.size,
-                    offset: parameter.binding.offset,
-                };
-            } else if (playground_attribute_name == "COLOR_PICK") {
-                if (parameter.type.kind != "vector" || parameter.type.elementCount <= 2 || parameter.type.elementType.kind != "scalar" || !parameter.type.elementType.scalarType.startsWith("float") || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute cannot be applied to ${parameter.name}, it only supports float vectors`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    default: attribute.arguments as [number, number, number],
-                    elementSize: parseInt(parameter.type.elementType.scalarType.slice(5)) / 8,
-                    offset: parameter.binding.offset,
-                };
-            } else if (playground_attribute_name == "KEY") {
-                // Only allow on scalar uniforms (float or int)
-                if (parameter.type.kind != "scalar" || parameter.binding.kind != "uniform") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute can only be applied to scalar uniforms`,
-                    };
-                }
-                if (!attribute.arguments || attribute.arguments.length !== 1 || typeof attribute.arguments[0] !== "string") {
-                    return {
-                        succ: false,
-                        message: `${playground_attribute_name} attribute requires a single string argument (the key name)`,
-                    };
-                }
-                command = {
-                    type: playground_attribute_name,
-                    key: attribute.arguments[0] as string,
-                    offset: parameter.binding.offset,
-                    scalarType: parameter.type.scalarType,
                 };
             } else if (playground_attribute_name == "DATA") {
                 if (parameter.type.kind != "resource" || parameter.type.baseShape != "structuredBuffer") {
@@ -386,6 +309,152 @@ function getResourceCommandsFromAttributes(reflection: ReflectionJSON): Result<R
     };
 }
 
+type WithStringIndex<T extends Record<string, unknown>> =
+    T & { [s: string]: T[keyof T] | undefined };
+const UNIFORM_PARSERS: WithStringIndex<{ [k in UniformController["type"]]: (parameter: ReflectionParameter & { binding: { kind: "uniform" } }, attribute: ReflectionUserAttribute) => Result<Omit<UniformController & { type: k }, "type" | "buffer_offset">> }> = {
+    SLIDER: function (parameter, attribute) {
+        if (parameter.type.kind != "scalar" || !parameter.type.scalarType.startsWith("float") || parameter.binding.size != 4) {
+            return {
+                succ: false,
+                message: `SLIDER attribute cannot be applied to ${parameter.name}, it only supports 32 bit floats`,
+            };
+        }
+
+        return {
+            succ: true,
+            result: {
+                name: parameter.name,
+                value: attribute.arguments[0] as number,
+                min: attribute.arguments[1] as number,
+                max: attribute.arguments[2] as number,
+            }
+        };
+    },
+    COLOR_PICK: function (parameter, attribute) {
+        if (parameter.type.kind != "vector" || parameter.type.elementCount <= 2 || parameter.type.elementType.kind != "scalar" || !parameter.type.elementType.scalarType.startsWith("float") || parseInt(parameter.type.elementType.scalarType.slice(5)) / 8 != 4) {
+            return {
+                succ: false,
+                message: `COLOR_PICK attribute cannot be applied to ${parameter.name}, it only supports 32 bit float vectors`,
+            };
+        }
+
+        return {
+            succ: true,
+            result: {
+                name: parameter.name,
+                value: attribute.arguments as [number, number, number],
+                elementSize: parseInt(parameter.type.elementType.scalarType.slice(5)) / 8,
+            }
+        };
+    },
+    TIME: function (parameter) {
+        if (parameter.type.kind != "scalar") {
+            return {
+                succ: false,
+                message: `TIME attribute cannot be applied to ${parameter.name}, it only supports scalars`,
+            };
+        }
+        return {
+            succ: true,
+            result: {
+                scalarType: parameter.type.scalarType,
+            }
+        };
+    },
+    FRAME_ID: function (parameter) {
+        if (parameter.type.kind != "scalar") {
+            return {
+                succ: false,
+                message: `FRAME_ID attribute cannot be applied to ${parameter.name}, it only supports scalars`,
+            };
+        }
+        return {
+            succ: true,
+            result: {
+                scalarType: parameter.type.scalarType,
+            }
+        };
+    },
+    MOUSE_POSITION: function (parameter) {
+        if (parameter.type.kind != "vector" || parameter.type.elementCount <= 3 || parameter.type.elementType.kind != "scalar") {
+            return {
+                succ: false,
+                message: `MOUSE_POSITION attribute cannot be applied to ${parameter.name}, it only supports vectors`,
+            };
+        }
+        return {
+            succ: true,
+            result: {
+                scalarType: parameter.type.elementType.scalarType,
+            }
+        };
+    },
+    KEY: function (parameter, attribute) {
+        // Only allow on scalar uniforms (float or int)
+        if (parameter.type.kind != "scalar") {
+            return {
+                succ: false,
+                message: `KEY attribute on ${parameter.name} can only be applied to scalar uniforms`,
+            };
+        }
+        if (!attribute.arguments || attribute.arguments.length !== 1 || typeof attribute.arguments[0] !== "string") {
+            return {
+                succ: false,
+                message: `KEY attribute on ${parameter.name} requires a single string argument (the key name)`,
+            };
+        }
+        return {
+            succ: true,
+            result: {
+                key: attribute.arguments[0] as string,
+                scalarType: parameter.type.scalarType,
+            }
+        };
+    }
+}
+
+function getUniformControllersFromAttributes(reflection: ReflectionJSON): Result<UniformController[]> {
+    let commands: UniformController[] = [];
+
+    for (let parameter of reflection.parameters) {
+        if (parameter.userAttribs == undefined) continue;
+        for (let attribute of parameter.userAttribs) {
+            if (!attribute.name.startsWith("playground_")) continue;
+
+            let playground_attribute_name = attribute.name.slice(11);
+            let parser = UNIFORM_PARSERS[playground_attribute_name];
+            if (parser == undefined) {
+                continue;
+            }
+
+            if (parameter.binding.kind != "uniform") {
+                return {
+                    succ: false,
+                    message: `${playground_attribute_name} attribute must be applied to uniform`,
+                };
+            }
+
+            let parsedUniformControllerResult = parser(parameter as ReflectionParameter & { binding: { kind: "uniform" } }, attribute)
+            if (parsedUniformControllerResult.succ == false) {
+                return parsedUniformControllerResult;
+            }
+
+            let parsedController = {
+                type: playground_attribute_name,
+                buffer_offset: parameter.binding.offset,
+                ...parsedUniformControllerResult.result
+            } as UniformController;
+
+            commands.push(parsedController);
+        }
+    }
+
+    return {
+        succ: true,
+        result: commands,
+    };
+}
+
 function getUniformSize(reflection: ReflectionJSON): number {
     let size = 0;
 
@@ -399,52 +468,6 @@ function getUniformSize(reflection: ReflectionJSON): number {
 
 function roundUpToNearest(x: number, nearest: number) {
     return Math.ceil(x / nearest) * nearest;
-}
-
-function getUniformControllers(resourceCommands: ResourceCommand[]): UniformController[] {
-    let controllers: UniformController[] = [];
-    for (let resourceCommand of resourceCommands) {
-        if (resourceCommand.parsedCommand.type == 'SLIDER') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-                name: resourceCommand.resourceName,
-                value: resourceCommand.parsedCommand.default,
-                min: resourceCommand.parsedCommand.min,
-                max: resourceCommand.parsedCommand.max,
-            })
-        } else if (resourceCommand.parsedCommand.type == 'COLOR_PICK') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-                name: resourceCommand.resourceName,
-                value: resourceCommand.parsedCommand.default,
-            })
-        } else if (resourceCommand.parsedCommand.type == 'TIME') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-            })
-        } else if (resourceCommand.parsedCommand.type == 'FRAME_ID') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-            })
-        } else if (resourceCommand.parsedCommand.type == 'MOUSE_POSITION') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-            })
-        } else if (resourceCommand.parsedCommand.type == 'KEY') {
-            controllers.push({
-                type: resourceCommand.parsedCommand.type,
-                buffer_offset: resourceCommand.parsedCommand.offset,
-                key: resourceCommand.parsedCommand.key,
-                scalarType: resourceCommand.parsedCommand.scalarType,
-            })
-        }
-    }
-    return controllers;
 }
 
 function parseCallCommands(reflection: ReflectionJSON): Result<CallCommand[]> {

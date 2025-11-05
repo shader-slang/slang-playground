@@ -113,10 +113,13 @@ export type UniformController = { buffer_offset: number } & ({
 	value: [number, number, number],
 } | {
 	type: "TIME",
+	scalarType: ScalarType,
 } | {
 	type: "FRAME_ID",
+	scalarType: ScalarType,
 } | {
 	type: "MOUSE_POSITION",
+	scalarType: ScalarType,
 } | {
 	type: "KEY",
 	key: string,
@@ -166,32 +169,6 @@ export type ParsedCommand = {
 	"type": "DATA",
 	"url": string,
 	"elementSize": number,
-} | {
-	"type": "SLIDER",
-	"default": number,
-	"min": number,
-	"max": number,
-	"elementSize": number,
-	"offset": number,
-} | {
-	"type": "COLOR_PICK",
-	"default": [number, number, number],
-	"elementSize": number,
-	"offset": number,
-} | {
-	"type": "TIME",
-	"offset": number,
-} | {
-	"type": "FRAME_ID",
-	"offset": number,
-} | {
-	"type": "MOUSE_POSITION",
-	"offset": number,
-} | {
-	"type": "KEY",
-	key: string,
-	offset: number,
-	scalarType: ScalarType,
 } | {
 	"type": "SAMPLER"
 };
