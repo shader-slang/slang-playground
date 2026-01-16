@@ -1,0 +1,27 @@
+version = 1
+SPDX-PackageName = "Slang Playground"
+SPDX-PackageDownloadLocation = "https://github.com/shader-slang/slang-playground"
+
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["2024, NVIDIA Corporation", "2024 The Khronos Group, Inc."]
+SPDX-License-Identifier = "Apache-2.0 WITH LLVM-exception"
+
+[[annotations]]
+path = "public/json-tree/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = ["Bunoon", "2024 William Troup"]
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "public/demos/ocean.slang"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "ShaderToys by afl_ext"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["CODE_OF_CONDUCT.md", "CONTRIBUTING.md", "README.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2024 The Khronos Group, Inc."
+SPDX-License-Identifier = "CC-BY-4.0"
