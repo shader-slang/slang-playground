@@ -13,6 +13,7 @@ export let compiler: SlangCompiler | null = null;
 export let slangd: LanguageServer | null = null;
 
 export let moduleLoadingMessage = "";
+export let slangVersion = "";
 
 // Event when loading the WebAssembly module
 type ReplaceReturnType<T extends (...a: any) => any, TNewReturn> = (...a: Parameters<T>) => TNewReturn;
@@ -61,6 +62,7 @@ createModule(moduleConfig).then((module) => {
         }
         compiler = new SlangCompiler(module);
         let result = compiler.init();
+        slangVersion = compiler.getVersionString();
         slangd = module.createLanguageServer();
         if (result.succ) {
             moduleLoadingMessage = "Slang compiler initialized successfully.\n";

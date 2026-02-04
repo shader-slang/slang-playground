@@ -48,6 +48,11 @@ export class SlangCompiler {
 		}
 	}
 
+	getVersionString(): string {
+		const version = (this.slangWasmModule as { getVersionString?: () => string }).getVersionString?.();
+		return typeof version === "string" ? version : "";
+	}
+
 	findCompileTarget(compileTargetStr: CompileTarget) {
 		if (this.compileTargetMap == null)
 			throw new Error("No compile targets to find");

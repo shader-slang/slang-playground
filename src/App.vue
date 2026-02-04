@@ -8,7 +8,7 @@ import { RenderCanvas } from 'playground-render-canvas';
 import 'playground-render-canvas/dist/playground-render-canvas.css';
 import { UniformPanel } from 'playground-uniform-panel';
 import 'playground-uniform-panel/dist/playground-uniform-panel.css';
-import { compiler, slangd, moduleLoadingMessage } from './try-slang'
+import { compiler, slangd, moduleLoadingMessage, slangVersion } from './try-slang'
 import { computed, defineAsyncComponent, onBeforeMount, onMounted, ref, shallowRef, useTemplateRef, watch, type Ref } from 'vue'
 import { isWholeProgramTarget, compilePlayground } from 'slang-compilation-engine'
 import { demoList } from './demo-list'
@@ -66,6 +66,7 @@ const selectedProfile = ref("");
 const profiles = ref<string[]>([]);
 const showProfiles = ref(false);
 
+const compilerVersion = ref("");
 const selectedEntrypoint = ref("");
 const entrypoints = ref<string[]>([]);
 const showEntrypoints = ref(false);
@@ -393,6 +394,7 @@ function restoreFromURL(): boolean {
 async function runIfFullyInitialized() {
     if (compiler && slangd && pageLoaded && codeEditor.value) {
         initialized.value = true;
+        compilerVersion.value = slangVersion;
 
         let gotCodeFromUrl = restoreFromURL();
 
@@ -569,7 +571,7 @@ function logError(message: string) {
             <MonacoEditor class="codingSpace" ref="codeEditor" @vue:mounted="runIfFullyInitialized()" />
         </Teleport>
     </div>
-    <Help v-show="showHelp" ref="helpModal"></Help>
+    <Help v-show="showHelp" ref="helpModal" :compiler-version="compilerVersion"></Help>
 </template>
 
 <style scoped>

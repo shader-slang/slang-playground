@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { ref, useTemplateRef } from 'vue'
 
+defineProps<{
+  compilerVersion: string
+}>()
+
 const showHelp = ref(false)
 const fullscreenModal = useTemplateRef("fullscreenModal")
 
@@ -29,6 +33,9 @@ defineExpose({
       <p>
         Welcome to Slang Playground. Here you can write, compile and run Slang shaders locally within your browser.
         The Slang compiler runs locally in your browser and no data is sent to any server.
+      </p>
+      <p v-if="compilerVersion">
+        Slang compiler version: {{ compilerVersion }}
       </p>
       <h4>Compiling Shaders (the "Compile" button)</h4>
       <p>
