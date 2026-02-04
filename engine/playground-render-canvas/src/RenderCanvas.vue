@@ -570,11 +570,14 @@ function writeUniformData(uniformInput: GPUBuffer, uniformComponents: UniformCon
                 throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
             }
         } else if (uniformComponent.type == "MOUSE_POSITION") {
+            const sanitizeValue = (value: number) => Number.isFinite(value) ? value : 0;
+            const lastMouseDownX = sanitizeValue(canvasLastMouseDownPos.x);
+            const lastMouseDownY = sanitizeValue(canvasLastMouseDownPos.y);
             let data = [
-                canvasCurrentMousePos.x,
-                canvasCurrentMousePos.y,
-                canvasLastMouseDownPos.x * (canvasIsMouseDown ? -1 : 1),
-                canvasLastMouseDownPos.y * (canvasMouseClicked ? -1 : 1),
+                sanitizeValue(canvasCurrentMousePos.x),
+                sanitizeValue(canvasCurrentMousePos.y),
+                lastMouseDownX * (canvasIsMouseDown ? -1 : 1),
+                lastMouseDownY * (canvasMouseClicked ? -1 : 1),
             ];
             for (let i = 0; i < data.length; i++) {
                 if(!writeScalar(uniformBufferView, uniformComponent.scalarType, offset + i * getScalarSize(uniformComponent.scalarType) / 8, data[i])) {
