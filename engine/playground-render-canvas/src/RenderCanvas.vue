@@ -305,19 +305,25 @@ function configContext(device: GPUDevice) {
     return context;
 }
 
+function sanitizeMouseValue(value: number) {
+    return Number.isFinite(value) ? value : 0;
+}
+
 function mousedown(event: MouseEvent) {
-    canvasLastMouseDownPos.x = event.offsetX;
-    canvasLastMouseDownPos.y = event.offsetY;
-    canvasCurrentMousePos.x = event.offsetX;
-    canvasCurrentMousePos.y = event.offsetY;
+    const safeX = sanitizeMouseValue(event.offsetX);
+    const safeY = sanitizeMouseValue(event.offsetY);
+    canvasLastMouseDownPos.x = safeX;
+    canvasLastMouseDownPos.y = safeY;
+    canvasCurrentMousePos.x = safeX;
+    canvasCurrentMousePos.y = safeY;
     canvasMouseClicked = true;
     canvasIsMouseDown = true;
 }
 
 function mousemove(event: MouseEvent) {
     if (canvasIsMouseDown) {
-        canvasCurrentMousePos.x = event.offsetX;
-        canvasCurrentMousePos.y = event.offsetY;
+        canvasCurrentMousePos.x = sanitizeMouseValue(event.offsetX);
+        canvasCurrentMousePos.y = sanitizeMouseValue(event.offsetY);
     }
 }
 
@@ -570,12 +576,11 @@ function writeUniformData(uniformInput: GPUBuffer, uniformComponents: UniformCon
                 throw new Error(`scalar type not supported for ${uniformComponent.type} uniform`);
             }
         } else if (uniformComponent.type == "MOUSE_POSITION") {
-            const sanitizeValue = (value: number) => Number.isFinite(value) ? value : 0;
-            const lastMouseDownX = sanitizeValue(canvasLastMouseDownPos.x);
-            const lastMouseDownY = sanitizeValue(canvasLastMouseDownPos.y);
+            const lastMouseDownX = sanitizeMouseValue(canvasLastMouseDownPos.x);
+            const lastMouseDownY = sanitizeMouseValue(canvasLastMouseDownPos.y);
             let data = [
-                sanitizeValue(canvasCurrentMousePos.x),
-                sanitizeValue(canvasCurrentMousePos.y),
+                sanitizeMouseValue(canvasCurrentMousePos.x),
+                sanitizeMouseValue(canvasCurrentMousePos.y),
                 lastMouseDownX * (canvasIsMouseDown ? -1 : 1),
                 lastMouseDownY * (canvasMouseClicked ? -1 : 1),
             ];
